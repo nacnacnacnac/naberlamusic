@@ -1,0 +1,456 @@
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { 
+  VimeoVideo, 
+  VimeoApiResponse, 
+  VimeoConfig, 
+  SimplifiedVimeoVideo, 
+  VimeoError 
+} from '../types/vimeo';
+
+class VimeoService {
+  private api: AxiosInstance;
+  private config: VimeoConfig | null = null;
+  private baseURL = 'https://api.vimeo.com';
+
+  constructor() {
+    this.api = axios.create({
+      baseURL: this.baseURL,
+      timeout: 10000,
+      headers: {
+        'Accept': 'application/vnd.vimeo.*+json;version=3.4',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    // Request interceptor to add auth token
+    this.api.interceptors.request.use(
+      (config) => {
+        if (this.config?.accessToken) {
+          config.headers.Authorization = `Bearer ${this.config.accessToken}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // Response interceptor for error handling
+    this.api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        console.error('Vimeo API Error:', error.response?.data || error.message);
+        return Promise.reject(this.handleError(error));
+      }
+    );
+  }
+
+  /**
+   * Initialize Vimeo service with configuration
+   */
+  async initialize(config: VimeoConfig): Promise<void> {
+    this.config = config;
+    await this.saveConfig(config);
+  }
+
+  /**
+   * Load saved configuration from AsyncStorage
+   */
+  async loadSavedConfig(): Promise<VimeoConfig | null> {
+    try {
+      const savedConfig = await AsyncStorage.getItem('vimeo_config');
+      if (savedConfig) {
+        this.config = JSON.parse(savedConfig);
+        return this.config;
+      }
+    } catch (error) {
+      console.error('Error loading Vimeo config:', error);
+    }
+    return null;
+  }
+
+  /**
+   * Save configuration to AsyncStorage
+   */
+  private async saveConfig(config: VimeoConfig): Promise<void> {
+    try {
+      await AsyncStorage.setItem('vimeo_config', JSON.stringify(config));
+    } catch (error) {
+      console.error('Error saving Vimeo config:', error);
+    }
+  }
+
+  /**
+   * Test API connection and token validity
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      console.log('Testing Vimeo API connection...');
+      const response = await this.api.get('/me', {
+        timeout: 10000, // 10 second timeout
+      });
+      
+      console.log('Vimeo API response status:', response.status);
+      console.log('Vimeo user data:', response.data?.name || 'No name');
+      
+      return response.status === 200 && response.data;
+    } catch (error: any) {
+      console.error('Vimeo connection test failed:', error);
+      
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+      } else {
+        console.error('Request setup error:', error.message);
+      }
+      
+      return false;
+    }
+  }
+
+  /**
+   * Get user's videos with pagination
+   */
+  async getUserVideos(page: number = 1, perPage: number = 25): Promise<VimeoApiResponse> {
+    try {
+      const response: AxiosResponse<VimeoApiResponse> = await this.api.get('/me/videos', {
+        params: {
+          page,
+          per_page: perPage,
+          fields: 'uri,name,description,duration,width,height,created_time,modified_time,release_time,link,pictures,stats,privacy,status,resource_key,embed',
+          sort: 'date',
+          direction: 'desc'
+        }
+      });
+
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get all user videos (handles pagination automatically)
+   */
+  async getAllUserVideos(): Promise<SimplifiedVimeoVideo[]> {
+    const allVideos: SimplifiedVimeoVideo[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    try {
+      while (hasMore) {
+        const response = await this.getUserVideos(page, 50);
+        
+        // Analyze video statuses
+        const statusAnalysis = {
+          total: response.data.length,
+          available: 0,
+          unavailable: 0,
+          embeddable: 0,
+          private_embed: 0,
+          whitelist_embed: 0,
+          password_protected: 0,
+          nobody_view: 0
+        };
+
+        response.data.forEach(video => {
+          if (video.status === 'available') statusAnalysis.available++;
+          else statusAnalysis.unavailable++;
+          
+          if (video.privacy?.view === 'password') statusAnalysis.password_protected++;
+          if (video.privacy?.view === 'nobody') statusAnalysis.nobody_view++;
+          if (video.privacy?.embed === 'private') statusAnalysis.private_embed++;
+          if (video.privacy?.embed === 'whitelist') statusAnalysis.whitelist_embed++;
+        });
+
+        // Include embeddable + restricted videos (but mark them)
+        const playableVideos = response.data.filter(video => 
+          video.status === 'available' && 
+          video.privacy?.view !== 'password' && 
+          video.privacy?.view !== 'nobody'
+        );
+        
+        const embeddableVideos = playableVideos.filter(VimeoService.isVideoEmbeddable);
+        const restrictedVideos = playableVideos.filter(VimeoService.hasEmbedRestrictions);
+        
+        statusAnalysis.embeddable = embeddableVideos.length;
+        
+        const simplifiedVideos = playableVideos.map(video => ({
+          ...this.simplifyVideoData(video),
+          hasEmbedRestriction: VimeoService.hasEmbedRestrictions(video)
+        }));
+        
+        allVideos.push(...simplifiedVideos);
+
+        console.log(`📊 Including ${restrictedVideos.length} embed-restricted videos with warnings`);
+
+        console.log(`📊 Page ${page} Analysis:`, statusAnalysis);
+        
+        // Log problematic videos
+        const problematicVideos = response.data.filter(video => !VimeoService.isVideoEmbeddable(video));
+        if (problematicVideos.length > 0) {
+          console.log(`❌ Non-embeddable videos on page ${page}:`);
+          problematicVideos.forEach(video => {
+            const reason = video.status !== 'available' ? `Status: ${video.status}` :
+                         video.privacy?.embed === 'private' ? 'Embed: Private' :
+                         video.privacy?.embed === 'whitelist' ? 'Embed: Whitelist only' :
+                         video.privacy?.view === 'password' ? 'View: Password protected' :
+                         video.privacy?.view === 'nobody' ? 'View: Nobody' : 'Unknown';
+            console.log(`  - ${video.name} (${video.uri.split('/').pop()}) - ${reason}`);
+          });
+        }
+
+        // Check if there are more pages
+        hasMore = response.paging.next !== null;
+        page++;
+
+        // Add delay to respect rate limits
+        if (hasMore) {
+          await this.delay(100);
+        }
+      }
+
+      // Cache the videos
+      await this.cacheVideos(allVideos);
+      
+      console.log(`🎯 FINAL SUMMARY: ${allVideos.length} embeddable videos loaded from your Vimeo account`);
+      console.log(`💡 TIP: Missing videos might be copyright-removed, private, or embed-disabled`);
+      
+      return allVideos;
+    } catch (error) {
+      console.error('Error fetching all videos:', error);
+      
+      // Try to return cached videos if API fails
+      const cachedVideos = await this.getCachedVideos();
+      if (cachedVideos.length > 0) {
+        return cachedVideos;
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific video by ID
+   */
+  async getVideo(videoId: string): Promise<SimplifiedVimeoVideo> {
+    try {
+      const response: AxiosResponse<VimeoVideo> = await this.api.get(`/videos/${videoId}`, {
+        params: {
+          fields: 'uri,name,description,duration,width,height,created_time,modified_time,release_time,link,pictures,stats,privacy,status,resource_key'
+        }
+      });
+
+      return this.simplifyVideoData(response.data);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Search videos by query
+   */
+  async searchVideos(query: string, page: number = 1, perPage: number = 25): Promise<SimplifiedVimeoVideo[]> {
+    try {
+      const response: AxiosResponse<VimeoApiResponse> = await this.api.get('/me/videos', {
+        params: {
+          query,
+          page,
+          per_page: perPage,
+          fields: 'uri,name,description,duration,width,height,created_time,modified_time,release_time,link,pictures,stats,privacy,status,resource_key',
+          sort: 'relevant'
+        }
+      });
+
+      return response.data.data.map(this.simplifyVideoData);
+    } catch (error) {
+      throw this.handleError(error);
+    }
+  }
+
+  /**
+   * Get video embed URL
+   */
+  getEmbedUrl(videoId: string, options: {
+    autoplay?: boolean;
+    loop?: boolean;
+    muted?: boolean;
+    controls?: boolean;
+  } = {}): string {
+    const params = new URLSearchParams();
+    
+    if (options.autoplay) params.append('autoplay', '1');
+    if (options.loop) params.append('loop', '1');
+    if (options.muted) params.append('muted', '1');
+    if (options.controls === false) params.append('controls', '0');
+    
+    const queryString = params.toString();
+    return `https://player.vimeo.com/video/${videoId}${queryString ? `?${queryString}` : ''}`;
+  }
+
+  /**
+   * Get video thumbnail URL
+   */
+  getVideoThumbnail(video: VimeoVideo, size: 'small' | 'medium' | 'large' = 'medium'): string {
+    if (!video.pictures?.sizes || video.pictures.sizes.length === 0) {
+      return 'https://via.placeholder.com/640x360/000000/FFFFFF/?text=No+Thumbnail';
+    }
+
+    const sizes = video.pictures.sizes.sort((a, b) => b.width - a.width);
+    
+    switch (size) {
+      case 'small':
+        return sizes[sizes.length - 1]?.link || sizes[0].link;
+      case 'large':
+        return sizes[0]?.link || sizes[sizes.length - 1].link;
+      case 'medium':
+      default:
+        const midIndex = Math.floor(sizes.length / 2);
+        return sizes[midIndex]?.link || sizes[0].link;
+    }
+  }
+
+  /**
+   * Cache videos to AsyncStorage
+   */
+  private async cacheVideos(videos: SimplifiedVimeoVideo[]): Promise<void> {
+    try {
+      const cacheData = {
+        videos,
+        timestamp: Date.now(),
+        version: '1.0'
+      };
+      await AsyncStorage.setItem('vimeo_videos_cache', JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Error caching videos:', error);
+    }
+  }
+
+  /**
+   * Get cached videos from AsyncStorage
+   */
+  async getCachedVideos(): Promise<SimplifiedVimeoVideo[]> {
+    try {
+      const cachedData = await AsyncStorage.getItem('vimeo_videos_cache');
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData);
+        
+        // Check if cache is not older than 1 hour
+        const oneHour = 60 * 60 * 1000;
+        if (Date.now() - parsed.timestamp < oneHour) {
+          return parsed.videos || [];
+        }
+      }
+    } catch (error) {
+      console.error('Error getting cached videos:', error);
+    }
+    return [];
+  }
+
+  /**
+   * Clear video cache
+   */
+  async clearCache(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem('vimeo_videos_cache');
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
+  }
+
+  /**
+   * Simplify Vimeo video data for app usage
+   */
+  private simplifyVideoData = (video: VimeoVideo): SimplifiedVimeoVideo => {
+    const videoId = video.uri.split('/').pop() || '';
+    
+    return {
+      id: videoId,
+      title: video.name || 'Untitled',
+      description: video.description,
+      duration: video.duration || 0,
+      thumbnail: this.getVideoThumbnail(video, 'medium'),
+      videoUrl: video.link || '',
+      embedUrl: this.getEmbedUrl(videoId),
+      createdAt: video.created_time || '',
+      plays: video.stats?.plays || 0,
+      likes: video.stats?.likes || 0,
+    };
+  };
+
+  /**
+   * Handle API errors
+   */
+  private handleError(error: any): VimeoError {
+    if (error.response?.data) {
+      return {
+        error: error.response.data.error || 'Unknown error',
+        error_code: error.response.data.error_code || 0,
+        developer_message: error.response.data.developer_message || error.message,
+        link: error.response.data.link || null,
+      };
+    }
+
+    return {
+      error: 'Network Error',
+      error_code: 0,
+      developer_message: error.message || 'Unknown network error',
+      link: null,
+    };
+  }
+
+  /**
+   * Utility function to add delay
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Format duration from seconds to readable format
+   */
+  static formatDuration(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Check if video is playable (not private, password protected, etc.)
+   */
+  static isVideoPlayable(video: VimeoVideo): boolean {
+    return video.status === 'available' && 
+           video.privacy?.view !== 'password' && 
+           video.privacy?.view !== 'nobody' &&
+           video.privacy?.embed !== 'private';
+  }
+
+  /**
+   * Check if video can be embedded
+   */
+  static isVideoEmbeddable(video: VimeoVideo): boolean {
+    return video.status === 'available' && 
+           video.privacy?.embed !== 'private' &&
+           video.privacy?.embed !== 'whitelist';
+  }
+
+  /**
+   * Check if video is available but has embed restrictions
+   */
+  static hasEmbedRestrictions(video: VimeoVideo): boolean {
+    return video.status === 'available' && 
+           (video.privacy?.embed === 'private' || video.privacy?.embed === 'whitelist');
+  }
+}
+
+// Export singleton instance
+export const vimeoService = new VimeoService();
+export default VimeoService;
