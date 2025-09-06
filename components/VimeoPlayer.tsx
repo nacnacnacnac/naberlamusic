@@ -11,17 +11,34 @@ interface VimeoPlayerProps {
   isFullscreen?: boolean;
   onFullscreenToggle?: () => void;
   onError?: (error: string) => void;
+  onVideoEnd?: () => void;
+  isPaused?: boolean;
+  onPlayStateChange?: (isPlaying: boolean) => void;
 }
 
 export default function VimeoPlayer({ 
   video, 
   isFullscreen = false, 
   onFullscreenToggle,
-  onError 
+  onError,
+  onVideoEnd,
+  isPaused = false,
+  onPlayStateChange
 }: VimeoPlayerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const webViewRef = useRef<WebView>(null);
+  const [internalPaused, setInternalPaused] = useState(isPaused);
+
+  // isPaused prop değişikliklerini takip et
+  React.useEffect(() => {
+    if (isPaused !== internalPaused) {
+      setInternalPaused(isPaused);
+      // WebView'e play/pause komutu gönder
+      const command = isPaused ? 'pause' : 'play';
+      webViewRef.current?.postMessage(JSON.stringify({ action: command }));
+    }
+  }, [isPaused, internalPaused]);
 
   // Vimeo embed URL oluştur
   const getEmbedUrl = () => {
@@ -36,7 +53,7 @@ export default function VimeoPlayer({
     
     const baseUrl = `https://player.vimeo.com/video/${cleanVideoId}`;
     const params = new URLSearchParams({
-      autoplay: '1',
+      autoplay: isPaused ? '0' : '1', // Pause durumunda autoplay kapalı
       loop: '0',
       muted: '0',
       controls: '1',
@@ -50,6 +67,12 @@ export default function VimeoPlayer({
       dnt: '1', // Do not track
       pip: '1', // Picture-in-picture support
       playsinline: '1', // iOS için inline playback
+      keyboard: '0', // Keyboard shortcuts kapalı
+      // Tam ekran için ek parametreler
+      maxwidth: '100%',
+      maxheight: '100%',
+      transparent: '0', // Transparent background kapalı
+      app_id: 'naberla' // Custom app identifier
     });
     
     const finalUrl = `${baseUrl}?${params.toString()}`;
@@ -74,12 +97,17 @@ export default function VimeoPlayer({
           break;
         case 'play':
           console.log('Video started playing');
+          onPlayStateChange?.(true);
           break;
         case 'pause':
           console.log('Video paused');
+          onPlayStateChange?.(false);
           break;
         case 'ended':
           console.log('Video ended');
+          if (onVideoEnd) {
+            onVideoEnd();
+          }
           break;
       }
     } catch (error) {
@@ -211,6 +239,10 @@ export default function VimeoPlayer({
         sharedCookiesEnabled={true}
         // iOS WebView background audio
         allowsAirPlayForMediaPlayback={true}
+        // Background audio için kritik ayarlar
+        setSupportMultipleWindows={false}
+        nestedScrollEnabled={false}
+        overScrollMode="never"
         // Timeout ayarları
         cacheEnabled={true}
         incognito={false}
@@ -218,6 +250,32 @@ export default function VimeoPlayer({
         userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
         // Vimeo player için gerekli injected JavaScript
         injectedJavaScript={`
+          // Telefon ekranına tam oturacak CSS
+          const style = document.createElement('style');
+          style.textContent = \`
+            body {
+              margin: 0;
+              padding: 0;
+              background: #000;
+              overflow: hidden;
+              width: 100vw;
+              height: 100vh;
+            }
+            iframe {
+              width: 100vw !important;
+              height: 100vh !important;
+              border: none;
+              object-fit: cover;
+              transform: scale(1.1);
+              transform-origin: center;
+            }
+            .vp-video-wrapper {
+              width: 100% !important;
+              height: 100% !important;
+            }
+          \`;
+          document.head.appendChild(style);
+          
           console.log('WebView JavaScript loaded for background audio');
           console.log('Current URL:', window.location.href);
           
@@ -237,17 +295,61 @@ export default function VimeoPlayer({
                 }
               }, { once: true });
               
-              // Visibility change'de audio context'i koru
-              document.addEventListener('visibilitychange', function() {
-                if (document.hidden) {
-                  console.log('Page hidden - keeping audio context active');
-                  if (audioContext && audioContext.state === 'suspended') {
-                    audioContext.resume();
+            // Visibility change'de audio context'i koru
+            document.addEventListener('visibilitychange', function() {
+              if (document.hidden) {
+                console.log('Page hidden - keeping audio context active');
+                if (audioContext && audioContext.state === 'suspended') {
+                  audioContext.resume();
+                }
+                // Background'da video'ları pause durumuna göre kontrol et
+                const videos = document.querySelectorAll('video');
+                videos.forEach(function(video) {
+                  // Eğer user pause etmemişse (userPaused !== 'true') background'da çalmaya devam ettir
+                  if (video.dataset.userPaused !== 'true' && !video.paused) {
+                    console.log('Maintaining video playback in background - user did not pause');
+                  } else if (video.dataset.userPaused !== 'true' && video.paused) {
+                    // Sistem pause etmişse ama user pause etmemişse tekrar başlat
+                    console.log('Restarting video in background - was not user paused');
+                    video.play().catch(function(err) {
+                      console.log('Background restart error:', err);
+                    });
                   }
-                } else {
-                  console.log('Page visible');
+                });
+              } else {
+                console.log('Page visible');
+              }
+            });
+            
+            // Page focus/blur events
+            window.addEventListener('blur', function() {
+              console.log('Window blur - maintaining audio');
+              if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+              }
+              // Background'a geçerken video durumunu koru
+              const videos = document.querySelectorAll('video');
+              videos.forEach(function(video) {
+                if (!video.paused && video.dataset.userPaused !== 'true') {
+                  console.log('Window blur - video should continue playing');
+                  video.dataset.shouldPlayInBackground = 'true';
                 }
               });
+            });
+            
+            window.addEventListener('focus', function() {
+              console.log('Window focus');
+              // Focus'a dönerken video durumunu kontrol et
+              const videos = document.querySelectorAll('video');
+              videos.forEach(function(video) {
+                if (video.dataset.shouldPlayInBackground === 'true' && video.paused && video.dataset.userPaused !== 'true') {
+                  console.log('Window focus - resuming video that should be playing');
+                  video.play().catch(function(err) {
+                    console.log('Focus resume error:', err);
+                  });
+                }
+              });
+            });
             }
             
             // Media session API (background controls ve metadata için)
@@ -281,18 +383,39 @@ export default function VimeoPlayer({
             const keepVideoActive = function() {
               const videos = document.querySelectorAll('video');
               videos.forEach(function(video) {
-                // Background'da video'nun pause olmamasını sağla
+                // User pause durumunu track et
                 video.addEventListener('pause', function(e) {
-                  if (document.hidden) {
-                    console.log('Preventing pause in background');
-                    setTimeout(function() {
-                      if (document.hidden && video.paused) {
-                        video.play().catch(function(err) {
-                          console.log('Background play error:', err);
-                        });
-                      }
-                    }, 100);
+                  // Eğer user tarafından pause edildiyse işaretle
+                  if (!document.hidden) {
+                    video.dataset.userPaused = 'true';
+                    console.log('User paused video');
+                    // React Native'e pause durumunu bildir
+                    window.ReactNativeWebView.postMessage(JSON.stringify({event: 'pause'}));
+                  } else {
+                    // Background'da pause oluyorsa kontrol et
+                    // Eğer user pause etmişse (userPaused = true) background'da da pause kalsın
+                    // Eğer user pause etmemişse (userPaused = false/undefined) background'da devam ettir
+                    if (video.dataset.userPaused !== 'true') {
+                      console.log('Preventing automatic pause in background - video was playing');
+                      setTimeout(function() {
+                        if (document.hidden && video.paused && video.dataset.userPaused !== 'true') {
+                          video.play().catch(function(err) {
+                            console.log('Background play error:', err);
+                          });
+                        }
+                      }, 100);
+                    } else {
+                      console.log('Keeping video paused in background - user had paused it');
+                    }
                   }
+                });
+                
+                // User play durumunu track et
+                video.addEventListener('play', function(e) {
+                  video.dataset.userPaused = 'false';
+                  console.log('User played video');
+                  // React Native'e play durumunu bildir
+                  window.ReactNativeWebView.postMessage(JSON.stringify({event: 'play'}));
                 });
                 
                 // Video metadata'sını media session'a aktar
@@ -333,11 +456,54 @@ export default function VimeoPlayer({
             console.log('Background audio setup error:', error);
           }
           
+          // React Native'den gelen mesajları handle et
+          if (window.ReactNativeWebView) {
+            window.addEventListener('message', function(event) {
+              if (event.source === window) {
+                try {
+                  const data = JSON.parse(event.data);
+                  if (data.action) {
+                    const videos = document.querySelectorAll('video');
+                    if (videos.length > 0) {
+                      const video = videos[0];
+                      if (data.action === 'play') {
+                        video.play().catch(function(err) {
+                          console.log('Play error:', err);
+                        });
+                      } else if (data.action === 'pause') {
+                        video.pause();
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.log('Message parse error:', e);
+                }
+              }
+            });
+          }
+          
           // Vimeo Player API mesajlarını yakalamak için
           if (window.addEventListener) {
             window.addEventListener('message', function(event) {
               if (event.origin === 'https://player.vimeo.com') {
                 console.log('Vimeo message:', event.data);
+                
+                // Video ended event'ini özel olarak handle et
+                if (event.data && typeof event.data === 'string') {
+                  try {
+                    const data = JSON.parse(event.data);
+                    if (data.event === 'ended') {
+                      console.log('Video ended - sending to React Native');
+                      window.ReactNativeWebView.postMessage(JSON.stringify({event: 'ended'}));
+                    }
+                  } catch (e) {
+                    // String data ise direkt gönder
+                    if (event.data.includes('ended')) {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({event: 'ended'}));
+                    }
+                  }
+                }
+                
                 window.ReactNativeWebView.postMessage(JSON.stringify(event.data));
               }
             });
@@ -367,7 +533,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000', // Tutarlı siyah
-    position: 'relative',
   },
   fullscreenContainer: {
     position: 'absolute',

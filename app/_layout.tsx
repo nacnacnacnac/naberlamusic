@@ -24,6 +24,8 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="vimeo-setup" options={{ headerShown: false }} />
+          <Stack.Screen name="create-playlist" options={{ headerShown: false }} />
+          <Stack.Screen name="select-playlist" options={{ headerShown: false }} />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style="auto" />
