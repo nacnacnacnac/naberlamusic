@@ -11,7 +11,7 @@ import { useVimeo } from '@/contexts/VimeoContext';
 import { vimeoService } from '@/services/vimeoService';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
 import VimeoPlayer from '@/components/VimeoPlayer';
-import { playlistService } from '@/services/playlistService';
+import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import Toast from '@/components/Toast';
 import MusicPlayerTabBar from '@/components/MusicPlayerTabBar';
 
@@ -106,7 +106,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadPlaylists = async () => {
       try {
-        const playlists = await playlistService.getPlaylists();
+        const playlists = await hybridPlaylistService.getPlaylists();
         setUserPlaylists(playlists);
       } catch (error) {
         console.error('Error loading playlists:', error);
@@ -121,7 +121,7 @@ export default function HomeScreen() {
     React.useCallback(() => {
       const loadPlaylists = async () => {
         try {
-          const playlists = await playlistService.getPlaylists();
+          const playlists = await hybridPlaylistService.getPlaylists();
           setUserPlaylists(playlists);
           console.log('Playlists refreshed:', playlists.length);
           
@@ -565,7 +565,7 @@ export default function HomeScreen() {
                 style={styles.playlistHeaderIcon}
                 contentFit="contain"
               />
-              <ThemedText style={styles.playlistTitle}>Naber LA Playlist</ThemedText>
+              <ThemedText style={styles.playlistTitle}>All Videos ({videos.length})</ThemedText>
             </ThemedView>
             <IconSymbol 
               name={isPlaylistExpanded ? "chevron.down" : "chevron.right"} 
@@ -621,7 +621,7 @@ export default function HomeScreen() {
             </ScrollView>
           )}
 
-          {/* User Created Playlists */}
+          {/* Admin Panel Playlists */}
           {userPlaylists.map((playlist) => {
             console.log('Rendering playlist:', playlist.name, 'Videos:', playlist.videos?.length || 0, 'Video titles:', playlist.videos?.map(v => v.title) || []);
             console.log('Full playlist object:', JSON.stringify(playlist, null, 2));
