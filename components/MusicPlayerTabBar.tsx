@@ -206,26 +206,44 @@ export default function MusicPlayerTabBar({
 
   return (
     <>
-      {/* Gradient + Blur kombinasyonu */}
-      <LinearGradient
-        colors={['transparent', 'transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
-        style={styles.separateGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        pointerEvents="none"
-      >
-        {/* Blur sadece alt yarıda */}
+      {/* Blur'lu Gradient kombinasyonu */}
+      <View style={styles.separateGradient}>
+        {/* Ana blur - yukarı transparan */}
+        <BlurView intensity={40} style={styles.mainBlurView}>
+          <LinearGradient
+            colors={['transparent', 'transparent', 'transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,1)']}
+            style={styles.blurMask}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
+        </BlurView>
+        
+        {/* Ana gradient */}
+        <LinearGradient
+          colors={['transparent', 'transparent', 'transparent', 'transparent', 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
+          style={styles.gradientInBlur}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+        />
+        
+        {/* Ekstra blur sadece alt yarıda - yukarı transparan */}
         <View style={styles.blurContainer}>
-          <BlurView intensity={60} style={styles.blurOverlay}>
+          <BlurView intensity={30} style={styles.blurOverlay}>
             <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
-              style={styles.blurGradientOverlay}
+              colors={['transparent', 'transparent', 'transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
+              style={styles.extraBlurMask}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
             />
           </BlurView>
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
+            style={styles.blurGradientOverlay}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
         </View>
-      </LinearGradient>
+      </View>
 
       {/* Main footer container - only icons */}
       <View style={styles.container}>
@@ -285,6 +303,34 @@ const styles = StyleSheet.create({
     height: 120, // Daha kısa - playlist'e değmesin
     zIndex: 1,
     overflow: 'hidden', // Keskin kenarları gizle
+  },
+  mainBlurView: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  blurMask: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  extraBlurMask: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  gradientInBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   blurContainer: {
     position: 'absolute',

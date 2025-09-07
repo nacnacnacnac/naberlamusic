@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -68,6 +68,9 @@ export default function HomeScreen() {
   const [currentPlaylist, setCurrentPlaylist] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [videoDuration, setVideoDuration] = useState<number>(0);
+  const [isPlaylistExpanded, setIsPlaylistExpanded] = useState(true);
+  const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
+  const [expandedPlaylists, setExpandedPlaylists] = useState<Set<string>>(new Set());
   const playlistScrollRef = useRef<ScrollView>(null);
 
   // Integration Testing State
@@ -92,9 +95,70 @@ export default function HomeScreen() {
       setCurrentVideo(videos[0]);
       setCurrentVideoIndex(0);
       setIsPaused(false); // Start playing automatically
-      debugLog.main('Auto-selected first video and started playback:', videos[0].title);
+      debugLog.main('Auto-selected first video and started playbook:', videos[0].title);
     }
   }, [videos]);
+
+  // Load user playlists
+  useEffect(() => {
+    const loadPlaylists = async () => {
+      try {
+        const playlists = await playlistService.getPlaylists();
+        setUserPlaylists(playlists);
+      } catch (error) {
+        console.error('Error loading playlists:', error);
+      }
+    };
+    
+    loadPlaylists();
+  }, []);
+
+  // Refresh playlists when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadPlaylists = async () => {
+        try {
+          const playlists = await playlistService.getPlaylists();
+          setUserPlaylists(playlists);
+          console.log('Playlists refreshed:', playlists.length);
+          
+          // Auto-expand playlists that have videos
+          const newExpanded = new Set<string>();
+          playlists.forEach(playlist => {
+            if (playlist.videos && playlist.videos.length > 0) {
+              newExpanded.add(playlist.id);
+            }
+          });
+          setExpandedPlaylists(newExpanded);
+          
+        } catch (error) {
+          console.error('Error refreshing playlists:', error);
+        }
+      };
+      loadPlaylists();
+    }, [])
+  );
+
+  // Toggle user playlist expansion
+  const togglePlaylistExpansion = (playlistId: string) => {
+    const newExpanded = new Set(expandedPlaylists);
+    if (newExpanded.has(playlistId)) {
+      newExpanded.delete(playlistId);
+    } else {
+      newExpanded.add(playlistId);
+    }
+    setExpandedPlaylists(newExpanded);
+  };
+
+  // Refresh playlists when returning from other screens
+  const refreshPlaylists = async () => {
+    try {
+      const playlists = await playlistService.getPlaylists();
+      setUserPlaylists(playlists);
+    } catch (error) {
+      console.error('Error refreshing playlists:', error);
+    }
+  };
 
   const playVideo = (video: SimplifiedVimeoVideo) => {
     const videoIndex = videos.findIndex(v => v.id === video.id);
@@ -470,7 +534,7 @@ export default function HomeScreen() {
         <View style={styles.playlistArea}>
           <TouchableOpacity 
             style={styles.playlistHeader}
-            onPress={scrollToPlaylist}
+            onPress={() => setIsPlaylistExpanded(!isPlaylistExpanded)}
             activeOpacity={0.7}
           >
             <ThemedView style={styles.playlistTitleContainer}>
@@ -481,53 +545,144 @@ export default function HomeScreen() {
               />
               <ThemedText style={styles.playlistTitle}>Naber LA Playlist</ThemedText>
             </ThemedView>
-            <IconSymbol name="chevron.down" size={16} color="#e0af92" />
+            <IconSymbol 
+              name={isPlaylistExpanded ? "chevron.down" : "chevron.right"} 
+              size={16} 
+              color="#e0af92" 
+            />
           </TouchableOpacity>
           
-          <ScrollView 
-            ref={playlistScrollRef}
-            style={styles.playlistScroll}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={true}
-            nestedScrollEnabled={true}
-          >
-            {videos.map((video, index) => (
-              <TouchableOpacity
-                key={video.id}
-                style={[
-                  styles.playlistItem,
-                  currentVideo?.id === video.id && styles.currentPlaylistItem
-                ]}
-                onPress={() => playVideo(video)}
+          {isPlaylistExpanded && (
+            <ScrollView 
+              ref={playlistScrollRef}
+              style={styles.playlistScroll}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={true}
+              nestedScrollEnabled={true}
+            >
+              {videos.map((video, index) => (
+                <TouchableOpacity
+                  key={video.id}
+                  style={[
+                    styles.playlistItem,
+                    currentVideo?.id === video.id && styles.currentPlaylistItem
+                  ]}
+                  onPress={() => playVideo(video)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.playlistItemInfo}>
+                    <Text 
+                      style={[
+                        styles.playlistItemTitle,
+                        currentVideo?.id === video.id && styles.currentPlaylistItemTitle
+                      ]} 
+                      numberOfLines={1}
+                    >
+                      {video.title}
+                    </Text>
+                    <Text 
+                      style={[
+                        styles.playlistItemDuration,
+                        currentVideo?.id === video.id && styles.currentPlaylistItemDuration
+                      ]}
+                    >
+                      {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
+                    </Text>
+                  </View>
+                  <View style={styles.playlistItemActions}>
+                    {currentVideo?.id === video.id && (
+                      <IconSymbol name="speaker.wave.2.fill" size={16} color="#e0af92" />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* User Created Playlists */}
+          {userPlaylists.map((playlist) => {
+            console.log('Rendering playlist:', playlist.name, 'Videos:', playlist.videos?.length || 0, 'Video titles:', playlist.videos?.map(v => v.title) || []);
+            console.log('Full playlist object:', JSON.stringify(playlist, null, 2));
+            return (
+            <View key={playlist.id} style={styles.userPlaylistContainer}>
+              <TouchableOpacity 
+                style={styles.playlistHeader}
+                onPress={() => togglePlaylistExpansion(playlist.id)}
                 activeOpacity={0.7}
               >
-                <View style={styles.playlistItemInfo}>
-                  <Text 
-                    style={[
-                      styles.playlistItemTitle,
-                      currentVideo?.id === video.id && styles.currentPlaylistItemTitle
-                    ]} 
-                    numberOfLines={1}
-                  >
-                    {video.title}
-                  </Text>
-                  <Text 
-                    style={[
-                      styles.playlistItemDuration,
-                      currentVideo?.id === video.id && styles.currentPlaylistItemDuration
-                    ]}
-                  >
-                    {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
-                  </Text>
-                </View>
-                <View style={styles.playlistItemActions}>
-                  {currentVideo?.id === video.id && (
-                    <IconSymbol name="speaker.wave.2.fill" size={16} color="#e0af92" />
-                  )}
-                </View>
+                <ThemedView style={styles.playlistTitleContainer}>
+                  <ExpoImage 
+                    source={require('@/assets/images/playlist.svg')}
+                    style={styles.playlistHeaderIcon}
+                    contentFit="contain"
+                  />
+                  <ThemedText style={styles.playlistTitle}>{playlist.name}</ThemedText>
+                </ThemedView>
+                <IconSymbol 
+                  name={expandedPlaylists.has(playlist.id) ? "chevron.down" : "chevron.right"} 
+                  size={16} 
+                  color="#e0af92" 
+                />
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+              
+              {expandedPlaylists.has(playlist.id) && (
+                <ScrollView 
+                  style={styles.userPlaylistScroll}
+                  showsVerticalScrollIndicator={false}
+                  scrollEnabled={true}
+                  nestedScrollEnabled={true}
+                >
+                  {playlist.videos && playlist.videos.length > 0 ? (
+                    playlist.videos.map((playlistVideo: any, index: number) => (
+                      <TouchableOpacity
+                        key={`${playlist.id}-${playlistVideo.id}`}
+                        style={[
+                          styles.playlistItem,
+                          currentVideo?.id === playlistVideo.id && styles.currentPlaylistItem
+                        ]}
+                        onPress={() => {
+                          // Find the video in the main videos array and play it
+                          const video = videos.find(v => v.id === playlistVideo.id);
+                          if (video) playVideo(video);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.playlistItemInfo}>
+                          <Text 
+                            style={[
+                              styles.playlistItemTitle,
+                              currentVideo?.id === playlistVideo.id && styles.currentPlaylistItemTitle
+                            ]} 
+                            numberOfLines={1}
+                          >
+                            {playlistVideo.title}
+                          </Text>
+                          <Text 
+                            style={[
+                              styles.playlistItemDuration,
+                              currentVideo?.id === playlistVideo.id && styles.currentPlaylistItemDuration
+                            ]}
+                          >
+                            {Math.floor(playlistVideo.duration / 60)}:{(playlistVideo.duration % 60).toString().padStart(2, '0')}
+                          </Text>
+                        </View>
+                        <View style={styles.playlistItemActions}>
+                          {currentVideo?.id === playlistVideo.id && (
+                            <IconSymbol name="speaker.wave.2.fill" size={16} color="#e0af92" />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <View style={styles.emptyPlaylistContainer}>
+                      <ThemedText style={styles.emptyPlaylistText}>No videos in this playlist</ThemedText>
+                    </View>
+                  )}
+                </ScrollView>
+              )}
+            </View>
+            );
+          })}
         </View>
       )}
 
@@ -708,6 +863,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     position: 'relative',
   },
+  userPlaylistContainer: {
+    marginTop: 0,
+  },
+  emptyPlaylistContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyPlaylistText: {
+    color: '#666666',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
   gradientOverlay: {
     position: 'absolute',
     bottom: 0, // Playlist area'nın altından başla
@@ -743,6 +910,10 @@ const styles = StyleSheet.create({
   playlistScroll: {
     flex: 1,
     backgroundColor: '#000000', // Tam siyah background
+  },
+  userPlaylistScroll: {
+    maxHeight: 200, // Fixed height instead of flex
+    backgroundColor: '#000000',
   },
   playlistItem: {
     flexDirection: 'row',
