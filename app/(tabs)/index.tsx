@@ -663,9 +663,34 @@ export default function HomeScreen() {
                           currentVideo?.id === playlistVideo.id && styles.currentPlaylistItem
                         ]}
                         onPress={() => {
+                          console.log('🎵 Playlist video tapped:', playlistVideo.title, 'ID:', playlistVideo.id);
+                          console.log('🎵 Available main videos:', videos.map(v => ({ id: v.id, title: v.name })));
+                          
                           // Find the video in the main videos array and play it
                           const video = videos.find(v => v.id === playlistVideo.id);
-                          if (video) playVideo(video);
+                          console.log('🎵 Found matching video:', video ? video.name : 'NOT FOUND');
+                          
+                          if (video) {
+                            console.log('🎵 Playing video:', video.name);
+                            playVideo(video);
+                          } else {
+                            console.log('❌ Video not found in main list, trying to create from playlist data');
+                            // Create a video object from playlist data
+                            const syntheticVideo = {
+                              id: playlistVideo.id,
+                              name: playlistVideo.title,
+                              description: '',
+                              duration: playlistVideo.duration,
+                              embed: {
+                                html: `<iframe src="https://player.vimeo.com/video/${playlistVideo.id}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+                              },
+                              pictures: {
+                                sizes: [{ link: playlistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+                              }
+                            };
+                            console.log('🎵 Playing synthetic video:', syntheticVideo.name);
+                            playVideo(syntheticVideo);
+                          }
                         }}
                         activeOpacity={0.7}
                       >
