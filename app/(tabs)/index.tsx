@@ -3,10 +3,12 @@ import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, 
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useVimeo } from '@/contexts/VimeoContext';
+import { vimeoService } from '@/services/vimeoService';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
 import VimeoPlayer from '@/components/VimeoPlayer';
 import { playlistService } from '@/services/playlistService';
@@ -57,7 +59,8 @@ const debugLog = {
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
-  const { videos, isConfigured, isLoading } = useVimeo();
+  const { videos, isConfigured, isLoading, refreshVideos } = useVimeo();
+  const { user, signOut } = useAuth();
   const [currentVideo, setCurrentVideo] = useState<SimplifiedVimeoVideo | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = useState<number>(-1);
@@ -160,6 +163,15 @@ export default function HomeScreen() {
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      router.replace('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   const playVideo = (video: SimplifiedVimeoVideo) => {
     const videoIndex = videos.findIndex(v => v.id === video.id);
     
@@ -170,9 +182,6 @@ export default function HomeScreen() {
     setCurrentVideo(video);
     setCurrentVideoIndex(videoIndex);
     setIsPaused(false); // Set to play immediately
-    
-    // Toast göster
-    showToast(`Now Playing: ${video.title}`, 'info');
   };
 
   const handlePlayStateChange = (isPlaying: boolean) => {
@@ -290,18 +299,17 @@ export default function HomeScreen() {
   };
 
   const playNextVideo = () => {
+    console.log('🎵 PLAY NEXT VIDEO CALLED - videos.length:', videos.length);
     if (videos.length === 0) return;
     
     const nextIndex = (currentVideoIndex + 1) % videos.length; // Loop back to first video
     const nextVideo = videos[nextIndex];
     
+    console.log('🎵 Playing next video:', nextVideo.title, 'at index:', nextIndex);
     setCurrentVideo(nextVideo);
     setCurrentVideoIndex(nextIndex);
     setIsPaused(false); // Yeni şarkı başladığında pause durumunu sıfırla
     debugLog.main('Playing next video:', `${nextVideo.title} at index: ${nextIndex}`);
-    
-    // Toast göster
-    showToast(`Next: ${nextVideo.title}`, 'info');
   };
 
   const playPreviousVideo = () => {
@@ -314,9 +322,6 @@ export default function HomeScreen() {
     setCurrentVideoIndex(prevIndex);
     setIsPaused(false); // Yeni şarkı başladığında pause durumunu sıfırla
     debugLog.main('Playing previous video:', `${prevVideo.title} at index: ${prevIndex}`);
-    
-    // Toast göster
-    showToast(`Previous: ${prevVideo.title}`, 'info');
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -436,8 +441,8 @@ export default function HomeScreen() {
     );
   }
 
-  // Vimeo setup gerekiyorsa
-  if (!isConfigured) {
+  // Loading state while Vimeo initializes
+  if (!isConfigured && isLoading) {
     return (
       <ThemedView style={[styles.container, styles.darkContainer]}>
         <StatusBar barStyle="light-content" backgroundColor="#000000" />
@@ -445,15 +450,8 @@ export default function HomeScreen() {
           <IconSymbol name="video.fill" size={64} color="#e0af92" />
           <ThemedText style={styles.setupTitle}>Naber LA</ThemedText>
           <ThemedText style={styles.setupDescription}>
-            Connect to your Vimeo music collection
+            Initializing music collection...
           </ThemedText>
-          <TouchableOpacity 
-            style={styles.setupButton}
-            onPress={() => router.push('/vimeo-setup')}
-          >
-            <IconSymbol name="link" size={20} color="white" />
-            <ThemedText style={styles.setupButtonText}>Connect</ThemedText>
-          </TouchableOpacity>
         </ThemedView>
       </ThemedView>
     );
@@ -482,7 +480,17 @@ export default function HomeScreen() {
                   ...prev,
                   failedCommands: prev.failedCommands + 1
                 }));
-                showToast(error, 'error');
+                
+                // If video has 401 error, skip to next video automatically
+                if (error.includes('401') && videos.length > 1) {
+                  console.log('🔄 Auto-skipping private video, playing next...');
+                  showToast('Private video skipped', 'info');
+                  setTimeout(() => {
+                    playNextVideo();
+                  }, 1000);
+                } else {
+                  showToast(error, 'error');
+                }
               }}
               onVideoEnd={playNextVideo}
               isPaused={isPaused}
@@ -493,7 +501,7 @@ export default function HomeScreen() {
             {/* Top Gradient Overlay */}
             {!isFullscreen && (
               <LinearGradient
-                colors={['#000000', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0)']}
+                colors={['rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.5)', 'transparent']}
                 style={styles.topGradientOverlay}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
@@ -517,12 +525,20 @@ export default function HomeScreen() {
                 {currentVideo.title}
               </ThemedText>
             </ThemedView>
-            <TouchableOpacity 
-              style={styles.addToPlaylistButton}
-              onPress={() => handleAddToPlaylist(currentVideo)}
-            >
-              <IconSymbol name="plus" size={16} color="#e0af92" />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity 
+                style={styles.adminSettingsButton}
+                onPress={() => router.push('/admin-settings')}
+              >
+                <IconSymbol name="gearshape" size={16} color="#e0af92" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.addToPlaylistButton}
+                onPress={() => handleAddToPlaylist(currentVideo)}
+              >
+                <IconSymbol name="plus" size={16} color="#e0af92" />
+              </TouchableOpacity>
+            </View>
           </ThemedView>
           {/* Separator Line */}
           <ThemedView style={styles.separatorLine} />
@@ -703,7 +719,7 @@ export default function HomeScreen() {
           onPrevious={playPreviousVideo}
           onNext={playNextVideo}
           onPlaylistPress={() => {
-            router.push('/(tabs)/videos');
+            router.push('/videos');
           }}
           onAddToPlaylist={() => {
             router.push({
@@ -780,7 +796,7 @@ const styles = StyleSheet.create({
     maxHeight: 300, // Hard constraint to prevent expansion
     width: '100%', // Prevent horizontal expansion
     backgroundColor: '#000000', // Consistent black background
-    marginTop: 5, // Reduced space from camera notch
+    marginTop: 5, // Eski haline döndür
     position: 'relative', // For overlay positioning
     overflow: 'hidden', // Prevent content from expanding beyond bounds
     // Debug styling (commented out)
@@ -789,11 +805,11 @@ const styles = StyleSheet.create({
   },
   topGradientOverlay: {
     position: 'absolute',
-    top: 0,
+    top: 0, // playerArea'nın en üstünden başla
     left: 0,
     right: 0,
-    height: 250, // Daha uzun gradient
-    zIndex: 10,
+    height: 150, // playerArea'nın yarısı kadar
+    zIndex: 20, // Daha yüksek z-index
     pointerEvents: 'none', // Touch event'leri geçsin
   },
   fullscreenPlayer: {
@@ -846,6 +862,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  adminSettingsButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+    marginRight: 8,
+  },
   addToPlaylistButton: {
     width: 36,
     height: 36,
@@ -877,10 +909,10 @@ const styles = StyleSheet.create({
   },
   gradientOverlay: {
     position: 'absolute',
-    bottom: 0, // Playlist area'nın altından başla
+    bottom: -80, // Gradient'i daha da aşağı indir - kamera altına doğru
     left: 0,
     right: 0,
-    height: 60, // Daha küçük gradient
+    height: 180, // Aynı boyut
     zIndex: 1,
     pointerEvents: 'none', // Touch event'leri geçsin
   },
@@ -932,7 +964,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   playlistItemTitle: {
-    color: 'white',
+    color: '#666666', // Çok koyu gri
     fontSize: 16,
     fontWeight: '500',
     marginBottom: 4,
@@ -941,7 +973,7 @@ const styles = StyleSheet.create({
     color: '#e0af92', // Seçili item title vurgu rengi
   },
   playlistItemDuration: {
-    color: 'white', // Siyah yerine beyaz
+    color: '#333333', // Maksimum koyu gri
     fontSize: 12,
   },
   currentPlaylistItemDuration: {

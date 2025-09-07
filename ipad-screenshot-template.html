@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naber LA - iPad Screenshot Template</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000000;
+            color: white;
+            width: 2048px;
+            height: 2732px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .ipad-frame {
+            width: 2048px;
+            height: 2732px;
+            background: #000000;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .status-bar {
+            height: 60px;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 40px;
+            font-size: 32px;
+            font-weight: 600;
+        }
+        
+        .time {
+            color: white;
+        }
+        
+        .battery {
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .app-content {
+            flex: 1;
+            background: #000000;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 60px;
+            padding: 40px 0;
+        }
+        
+        .logo {
+            font-size: 48px;
+            font-weight: bold;
+            color: #e0af92;
+            letter-spacing: 2px;
+        }
+        
+        .nav-buttons {
+            display: flex;
+            gap: 30px;
+        }
+        
+        .nav-btn {
+            padding: 20px 40px;
+            background: rgba(224, 175, 146, 0.1);
+            border: 2px solid #e0af92;
+            border-radius: 12px;
+            color: #e0af92;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: start;
+        }
+        
+        .left-section {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+        
+        .hero-text {
+            font-size: 72px;
+            font-weight: bold;
+            line-height: 1.2;
+            margin-bottom: 40px;
+        }
+        
+        .subtitle {
+            font-size: 36px;
+            color: #999;
+            line-height: 1.4;
+            margin-bottom: 60px;
+        }
+        
+        .cta-button {
+            background: #e0af92;
+            color: #000;
+            padding: 30px 60px;
+            border-radius: 16px;
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            width: fit-content;
+            letter-spacing: 2px;
+        }
+        
+        .right-section {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        
+        .playlist-item {
+            background: #1a1a1a;
+            border-radius: 20px;
+            padding: 40px;
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+        
+        .playlist-icon {
+            width: 120px;
+            height: 120px;
+            background: #e0af92;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+        }
+        
+        .playlist-info {
+            flex: 1;
+        }
+        
+        .playlist-name {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .playlist-count {
+            font-size: 24px;
+            color: #999;
+        }
+        
+        .play-icon {
+            width: 60px;
+            height: 60px;
+            background: #e0af92;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-size: 24px;
+        }
+        
+        .features {
+            position: absolute;
+            bottom: 80px;
+            left: 40px;
+            right: 40px;
+            display: flex;
+            justify-content: space-around;
+            background: rgba(26, 26, 26, 0.8);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .feature {
+            text-align: center;
+            color: #e0af92;
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .feature-text {
+            font-size: 24px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="ipad-frame">
+        <div class="status-bar">
+            <div class="time">9:41</div>
+            <div class="battery">
+                <span>📶</span>
+                <span>🔋 100%</span>
+            </div>
+        </div>
+        
+        <div class="app-content">
+            <div class="header">
+                <div class="logo">NABER LA</div>
+                <div class="nav-buttons">
+                    <div class="nav-btn">Videos</div>
+                    <div class="nav-btn">Playlists</div>
+                </div>
+            </div>
+            
+            <div class="main-content">
+                <div class="left-section">
+                    <div class="hero-text">
+                        Create Amazing<br>
+                        Video Playlists
+                    </div>
+                    <div class="subtitle">
+                        Organize your favorite videos,<br>
+                        create custom playlists, and<br>
+                        enjoy seamless playback
+                    </div>
+                    <div class="cta-button">ENJOY</div>
+                </div>
+                
+                <div class="right-section">
+                    <div class="playlist-item">
+                        <div class="playlist-icon">🎵</div>
+                        <div class="playlist-info">
+                            <div class="playlist-name">My Favorites</div>
+                            <div class="playlist-count">12 videos • 45 min</div>
+                        </div>
+                        <div class="play-icon">▶</div>
+                    </div>
+                    
+                    <div class="playlist-item">
+                        <div class="playlist-icon">🎬</div>
+                        <div class="playlist-info">
+                            <div class="playlist-name">Workout Mix</div>
+                            <div class="playlist-count">8 videos • 32 min</div>
+                        </div>
+                        <div class="play-icon">▶</div>
+                    </div>
+                    
+                    <div class="playlist-item">
+                        <div class="playlist-icon">🌟</div>
+                        <div class="playlist-info">
+                            <div class="playlist-name">Chill Vibes</div>
+                            <div class="playlist-count">15 videos • 1h 12min</div>
+                        </div>
+                        <div class="play-icon">▶</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">📱</div>
+                    <div class="feature-text">Easy to Use</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎯</div>
+                    <div class="feature-text">Smart Playlists</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-text">Fast & Smooth</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔄</div>
+                    <div class="feature-text">Sync Anywhere</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

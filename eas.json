@@ -6,16 +6,23 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_USE_FAST_RESOLVER": "1"
+      }
     },
     "preview": {
       "distribution": "internal"
     },
     "production": {
       "autoIncrement": true
+    },
+    "production-old": {
+      "autoIncrement": true
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "production-old": {}
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
 // Safely import expo-av with error handling
+// Note: expo-av is deprecated in SDK 54, will migrate to expo-audio/expo-video
 let Audio: any = null;
 try {
   Audio = require('expo-av').Audio;
@@ -33,14 +34,23 @@ export const useBackgroundAudio = (): BackgroundAudioState => {
           return;
         }
 
+        // Check if Audio constants are available
+        if (!Audio.InterruptionModeIOS && !Audio.INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS) {
+          console.warn('[BackgroundAudio] Audio constants not available, skipping configuration');
+          if (isMounted) {
+            setState({ isConfigured: true, error: null });
+          }
+          return;
+        }
+
         // Configure audio session for background playback
         await Audio.setAudioModeAsync({
           playsInSilentModeIOS: true,
           staysActiveInBackground: true,
-          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
+          interruptionModeIOS: Audio.InterruptionModeIOS?.MixWithOthers || 1,
           shouldDuckAndroid: false,
           allowsRecordingIOS: false,
-          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+          interruptionModeAndroid: Audio.InterruptionModeAndroid?.DoNotMix || 1,
         });
 
         if (__DEV__) {

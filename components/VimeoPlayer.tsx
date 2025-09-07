@@ -132,6 +132,8 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   const lastSavedRef = useRef(0);
   const lastKnownTimeRef = useRef(0); // Cache last known time from timeupdate for fallback
   const retryCountRef = useRef(0);
+  const hasTriggeredEndRef = useRef(false); // Prevent multiple end triggers
+  const autoNextTimerRef = useRef<NodeJS.Timeout | null>(null); // Auto-next timer
   const maxRetries = 3;
   const pendingDesiredPauseRef = useRef<boolean | null>(null);
   const [isAppInBackground, setIsAppInBackground] = useState(false);
@@ -590,6 +592,35 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     // Reset position loading gate before loading saved position
     setPositionLoaded(false);
     
+    // Reset end trigger flag for new video
+    hasTriggeredEndRef.current = false;
+    
+    // Clear any existing auto-next timer
+    if (autoNextTimerRef.current) {
+      clearTimeout(autoNextTimerRef.current);
+      autoNextTimerRef.current = null;
+    }
+    
+    // Start auto-next timer for new video
+    console.log('🎬 TIMER SETUP: Video duration:', video.duration, 'Title:', video.title);
+    
+    const estimatedDuration = video.duration || 180; // Default 3 minutes
+    const autoNextDelay = estimatedDuration * 0.95 * 1000; // 95% in milliseconds
+    
+    console.log(`🎬 AUTO-NEXT TIMER: Set for ${Math.round(autoNextDelay/1000)}s (95% of ${estimatedDuration}s)`);
+    console.log(`🎬 TIMER WILL TRIGGER AT: ${new Date(Date.now() + autoNextDelay).toLocaleTimeString()}`);
+    
+    autoNextTimerRef.current = setTimeout(() => {
+      console.log('🎬 ⏰ AUTO-NEXT TIMER TRIGGERED - Playing next video');
+      if (!hasTriggeredEndRef.current) {
+        hasTriggeredEndRef.current = true;
+        console.log('🎬 ✅ Calling onVideoEnd callback');
+        onVideoEnd?.();
+      } else {
+        console.log('🎬 ❌ Already triggered, skipping');
+      }
+    }, autoNextDelay);
+    
     // Load saved position for new video
     loadSavedPosition();
     
@@ -930,6 +961,26 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
           // Cache the last known time for fallback in flushPosition
           lastKnownTimeRef.current = currentTime;
           
+          // Check if video is near end (95% complete) and trigger next video
+          const progress = currentTime / duration;
+          
+          // Debug: Log only at critical progress points
+          const progressPercent = Math.round(progress * 100);
+          if ((progressPercent === 90 || progressPercent === 95 || progressPercent === 98) && 
+              sec !== lastSavedRef.current) { // Prevent duplicate logs
+            console.log(`🎬 VIDEO PROGRESS: ${progressPercent}% (${Math.round(currentTime)}s / ${Math.round(duration)}s)`);
+          }
+          
+          if (progress >= 0.95 && duration > 10 && !hasTriggeredEndRef.current) { // Only for videos longer than 10 seconds
+            console.log('🎬 VIDEO NEAR END (95%) - Auto-playing next video');
+            console.log(`🎬 Progress: ${Math.round(progress * 100)}%, Duration: ${duration}s, Current: ${currentTime}s`);
+            playerDebugLog.state('Video near end, triggering onVideoEnd');
+            hasTriggeredEndRef.current = true; // Prevent multiple triggers
+            savePosition(0); // Reset position
+            onVideoEnd?.();
+            return; // Don't process further timeupdate events
+          }
+          
           // Throttle saving: only save every 5 seconds
           if (sec - lastSavedRef.current >= 5) {
             savePosition(currentTime);
@@ -958,7 +1009,8 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
           onPlayStateChange?.(false);
         }
       } else if (data.name === 'ended') {
-        playerDebugLog.state('Video ended');
+        playerDebugLog.state('🎬 VIDEO ENDED - Auto-playing next video');
+        console.log('🎬 VIDEO ENDED - Calling onVideoEnd callback');
         // Reset position when video ends
         savePosition(0);
         onVideoEnd?.();

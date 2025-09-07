@@ -14,7 +14,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { playlistService } from '@/services/playlistService';
+import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { useVimeo } from '@/contexts/VimeoContext';
 
 export default function CreatePlaylistScreen() {
@@ -38,7 +38,7 @@ export default function CreatePlaylistScreen() {
       setIsCreating(true);
 
       // Playlist oluştur
-      const newPlaylist = await playlistService.createPlaylist(
+      const newPlaylist = await hybridPlaylistService.createPlaylist(
         playlistName.trim(),
         playlistDescription.trim() || undefined
       );
@@ -48,7 +48,7 @@ export default function CreatePlaylistScreen() {
         try {
           const video = getVideo(videoId);
           if (video) {
-            await playlistService.addVideoToPlaylist(newPlaylist.id, video);
+            await hybridPlaylistService.addVideoToPlaylist(newPlaylist.id, video);
           }
         } catch (error) {
           console.log('Video not found, creating playlist without video');

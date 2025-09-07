@@ -449,6 +449,116 @@ class VimeoService {
     return video.status === 'available' && 
            (video.privacy?.embed === 'private' || video.privacy?.embed === 'whitelist');
   }
+
+  /**
+   * Get private videos from current video list (using cached metadata)
+   */
+  async getPrivateVideos(): Promise<SimplifiedVimeoVideo[]> {
+    try {
+      const cachedVideos = await this.getCachedVideos();
+      
+      // Use a simple heuristic: videos that commonly cause 401 errors
+      const knownPrivateIds = ['140178314']; // Add known private video IDs here
+      
+      return cachedVideos.filter(video => 
+        knownPrivateIds.includes(video.id)
+      );
+    } catch (error) {
+      console.error('Error getting private videos:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get public videos only (filter out known private ones)
+   */
+  async getPublicVideos(): Promise<SimplifiedVimeoVideo[]> {
+    try {
+      const cachedVideos = await this.getCachedVideos();
+      
+      // Get dynamic private video list from storage
+      const privateIds = await this.getPrivateVideoIds();
+      
+      const publicVideos = cachedVideos.filter(video => 
+        !privateIds.includes(video.id)
+      );
+      
+      console.log(`🔍 Filtered out ${cachedVideos.length - publicVideos.length} known private videos`);
+      return publicVideos;
+    } catch (error) {
+      console.error('Error filtering public videos:', error);
+      return await this.getCachedVideos(); // Return all if filtering fails
+    }
+  }
+
+  /**
+   * Add a video ID to the private video blacklist
+   */
+  async addToPrivateList(videoId: string): Promise<void> {
+    try {
+      const privateList = await AsyncStorage.getItem('private_video_ids');
+      const privateIds = privateList ? JSON.parse(privateList) : [];
+      
+      if (!privateIds.includes(videoId)) {
+        privateIds.push(videoId);
+        await AsyncStorage.setItem('private_video_ids', JSON.stringify(privateIds));
+        console.log(`📝 Added video ${videoId} to private list`);
+      }
+    } catch (error) {
+      console.error('Error adding to private list:', error);
+    }
+  }
+
+  /**
+   * Get private video IDs from storage
+   */
+  async getPrivateVideoIds(): Promise<string[]> {
+    try {
+      const privateList = await AsyncStorage.getItem('private_video_ids');
+      return privateList ? JSON.parse(privateList) : ['140178314']; // Default known private video
+    } catch (error) {
+      console.error('Error getting private video IDs:', error);
+      return ['140178314']; // Default fallback
+    }
+  }
+
+  /**
+   * Debug function: Clear all caches and reload fresh data
+   */
+  async debugRefreshAll(): Promise<void> {
+    try {
+      console.log('🧹 DEBUG: Clearing all caches...');
+      await this.clearCache();
+      await AsyncStorage.removeItem('private_video_ids');
+      console.log('✅ DEBUG: All caches cleared, will reload fresh data');
+    } catch (error) {
+      console.error('Error in debug refresh:', error);
+    }
+  }
+
+  /**
+   * Debug function: Show filtering statistics
+   */
+  async debugShowFilteringStats(): Promise<void> {
+    try {
+      const allVideos = await this.getCachedVideos();
+      const privateIds = await this.getPrivateVideoIds();
+      const publicVideos = allVideos.filter(video => !privateIds.includes(video.id));
+      
+      console.log('📊 DEBUG FILTERING STATS:');
+      console.log(`   Total videos in cache: ${allVideos.length}`);
+      console.log(`   Private video IDs: [${privateIds.join(', ')}]`);
+      console.log(`   Public videos after filtering: ${publicVideos.length}`);
+      console.log(`   Filtered out: ${allVideos.length - publicVideos.length} videos`);
+      
+      if (allVideos.length - publicVideos.length > 0) {
+        const filteredVideos = allVideos.filter(video => privateIds.includes(video.id));
+        console.log(`   Filtered video titles: ${filteredVideos.map(v => v.title).join(', ')}`);
+      }
+    } catch (error) {
+      console.error('Error showing filtering stats:', error);
+    }
+  }
 }
 
 // Export singleton instance

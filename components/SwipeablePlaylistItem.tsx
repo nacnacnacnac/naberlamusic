@@ -1,13 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import {
   StyleSheet,
   TouchableOpacity,
-  Animated,
-  PanResponder,
-  Dimensions,
   Alert,
   View,
+  Animated,
+  Text,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -21,142 +21,15 @@ interface SwipeablePlaylistItemProps {
   onDelete: () => void;
 }
 
-const { width } = Dimensions.get('window');
-const SWIPE_THRESHOLD = width * 0.25; // 25% of screen width
-const DELETE_AREA_WIDTH = 120;
-const COLOR_CHANGE_THRESHOLD = 60;
-const OPACITY_THRESHOLD = 80;
-
 export default function SwipeablePlaylistItem({ 
   playlist, 
   onPress, 
   onDelete 
 }: SwipeablePlaylistItemProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
-  const translateX = useRef(new Animated.Value(0)).current;
-  const deleteBackgroundColor = useRef(new Animated.Value(0)).current;
-  const deleteOpacity = useRef(new Animated.Value(0)).current;
-  const deleteWidth = useRef(new Animated.Value(0)).current;
+  const swipeableRef = useRef<Swipeable>(null);
+  const [isSwiping, setIsSwiping] = React.useState(false);
 
-  const panResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: (evt, gestureState) => {
-      // More sensitive horizontal detection
-      return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) && Math.abs(gestureState.dx) > 5;
-    },
-    onPanResponderGrant: () => {
-      // Set initial values for smooth start
-      translateX.setOffset(translateX._value);
-      translateX.setValue(0);
-    },
-    onPanResponderMove: (evt, gestureState) => {
-      // Only allow left swipe (negative dx)
-      if (gestureState.dx < 0) {
-        const swipeDistance = Math.abs(gestureState.dx);
-        const clampedDistance = Math.min(swipeDistance, DELETE_AREA_WIDTH);
-        
-        // Use direct setValue for smooth real-time updates
-        translateX.setValue(gestureState.dx);
-        deleteWidth.setValue(clampedDistance);
-        
-        // Optimized color transition calculation
-        const colorProgress = Math.min(1, Math.max(0, (swipeDistance - COLOR_CHANGE_THRESHOLD) / COLOR_CHANGE_THRESHOLD));
-        deleteBackgroundColor.setValue(colorProgress);
-        
-        // Optimized opacity transition calculation  
-        const opacityProgress = Math.min(1, Math.max(0, (swipeDistance - OPACITY_THRESHOLD) / (DELETE_AREA_WIDTH - OPACITY_THRESHOLD)));
-        deleteOpacity.setValue(opacityProgress);
-      } else {
-        // Prevent right swipe
-        translateX.setValue(0);
-      }
-    },
-    onPanResponderRelease: (evt, gestureState) => {
-      translateX.flattenOffset();
-      
-      if (gestureState.dx < -SWIPE_THRESHOLD) {
-        // Swipe threshold reached, show delete confirmation
-        showDeleteConfirmation();
-      } else {
-        // Smooth snap back animation
-        Animated.parallel([
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 100,
-            friction: 8,
-          }),
-          Animated.timing(deleteWidth, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: false,
-          }),
-          Animated.timing(deleteBackgroundColor, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: false,
-          }),
-          Animated.timing(deleteOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: false,
-          }),
-        ]).start();
-      }
-    },
-    onPanResponderTerminate: () => {
-      // Handle interruption gracefully
-      translateX.flattenOffset();
-      Animated.parallel([
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-        }),
-        Animated.timing(deleteWidth, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(deleteBackgroundColor, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-        Animated.timing(deleteOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: false,
-        }),
-      ]).start();
-    },
-  });
-
-  const resetAnimations = () => {
-    Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 100,
-        friction: 8,
-      }),
-      Animated.timing(deleteWidth, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: false,
-      }),
-      Animated.timing(deleteBackgroundColor, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: false,
-      }),
-      Animated.timing(deleteOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  };
-
-  const showDeleteConfirmation = () => {
+  const handleDelete = async () => {
     Alert.alert(
       'Delete Playlist',
       `Are you sure you want to delete "${playlist.name}"?`,
@@ -164,41 +37,40 @@ export default function SwipeablePlaylistItem({
         {
           text: 'Cancel',
           style: 'cancel',
-          onPress: resetAnimations,
+          onPress: () => {
+            swipeableRef.current?.close();
+          },
         },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: handleDelete,
+          onPress: async () => {
+            try {
+              await playlistService.deletePlaylist(playlist.id);
+              onDelete(); // Refresh the list
+            } catch (error) {
+              console.error('Error deleting playlist:', error);
+              Alert.alert('Error', 'Failed to delete playlist');
+            }
+          },
         },
       ]
     );
   };
 
-  const handleDelete = async () => {
-    try {
-      setIsDeleting(true);
-      
-      // Smooth delete animation
-      Animated.timing(translateX, {
-        toValue: -width,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(async () => {
-        try {
-          await playlistService.deletePlaylist(playlist.id);
-          onDelete();
-        } catch (error) {
-          console.error('Error deleting playlist:', error);
-          setIsDeleting(false);
-          resetAnimations();
-        }
-      });
-    } catch (error) {
-      console.error('Error deleting playlist:', error);
-      setIsDeleting(false);
-      resetAnimations();
-    }
+  const renderRightActions = (progress: Animated.AnimatedAddition, dragX: Animated.AnimatedAddition) => {
+    return (
+      <View style={styles.rightActionsContainer}>
+        <TouchableOpacity
+          style={styles.deleteAction}
+          onPress={handleDelete}
+          activeOpacity={0.8}
+        >
+          <IconSymbol name="trash" size={22} color="white" />
+          <Text style={styles.deleteText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   const formatDuration = (duration: number) => {
@@ -207,216 +79,148 @@ export default function SwipeablePlaylistItem({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Interpolate background color from gray to red
-  const backgroundColor = deleteBackgroundColor.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['#666666', '#FF6B6B'],
-  });
+  const getTotalDuration = () => {
+    if (!playlist.videos || playlist.videos.length === 0) return 0;
+    return playlist.videos.reduce((total, video) => total + (video.duration || 0), 0);
+  };
 
   return (
-    <View style={styles.container}>
-      {/* Animated Delete Background */}
-      <Animated.View 
-        style={[
-          styles.deleteBackground,
-          {
-            width: deleteWidth,
-            backgroundColor,
-          }
-        ]}
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={renderRightActions}
+      rightThreshold={40}
+      friction={2}
+      overshootRight={false}
+      shouldCancelWhenOutside={true}
+      enableTrackpadTwoFingerGesture={false}
+      onSwipeableWillOpen={() => {
+        setIsSwiping(true);
+      }}
+      onSwipeableClose={() => {
+        setIsSwiping(false);
+      }}
+      onBegan={() => {
+        setIsSwiping(true);
+      }}
+      onEnded={() => {
+        setTimeout(() => setIsSwiping(false), 100);
+      }}
+    >
+      <TouchableOpacity
+        style={styles.container}
+        onPress={isSwiping ? () => {} : onPress}
+        activeOpacity={isSwiping ? 1 : 0.7}
       >
-        <Animated.View 
-          style={[
-            styles.deleteContent,
-            {
-              opacity: deleteOpacity,
-            }
-          ]}
-        >
-          <View style={styles.deleteIcon}>
-            <View style={styles.minusLine} />
+        <ThemedView style={styles.content}>
+          <View style={styles.iconContainer}>
+            <IconSymbol name="heart.fill" size={24} color="#e0af92" />
           </View>
-          <Animated.Text style={[styles.deleteText, { opacity: deleteOpacity }]}>
-            Delete
-          </Animated.Text>
-        </Animated.View>
-      </Animated.View>
-
-      {/* Main Item */}
-      <Animated.View
-        style={[
-          styles.itemContainer,
-          {
-            transform: [{ translateX }],
-          },
-        ]}
-        {...panResponder.panHandlers}
-      >
-        <TouchableOpacity
-          style={styles.playlistItem}
-          onPress={onPress}
-          activeOpacity={0.7}
-          disabled={isDeleting}
-        >
-          <ThemedView style={styles.playlistThumbnail}>
-            <ThemedView style={styles.thumbnailPlaceholder}>
-              <Image 
-                source={require('@/assets/images/playlist.svg')}
-                style={styles.playlistThumbnailIcon}
-                contentFit="contain"
-              />
-            </ThemedView>
-            <ThemedView style={styles.videoCountBadge}>
-              <ThemedText style={styles.videoCountText}>
-                {playlist.videos.length}
-              </ThemedText>
-            </ThemedView>
-          </ThemedView>
           
-          <ThemedView style={styles.playlistInfo}>
-            <ThemedText style={styles.playlistName} numberOfLines={2}>
+          <View style={styles.textContainer}>
+            <ThemedText style={styles.playlistName} numberOfLines={1}>
               {playlist.name}
             </ThemedText>
-            {playlist.description && (
-              <ThemedText style={styles.playlistDescription} numberOfLines={1}>
-                {playlist.description}
+            <View style={styles.statsContainer}>
+              <ThemedText style={styles.videoCount}>
+                {playlist.videos?.length || 0} video{(playlist.videos?.length || 0) !== 1 ? 's' : ''}
               </ThemedText>
-            )}
-            <ThemedView style={styles.playlistStats}>
-              <ThemedText style={styles.playlistStatsText}>
-                {playlist.videos.length} video
-              </ThemedText>
-              <ThemedText style={styles.playlistStatsText}>
-                {formatDuration(playlistService.getPlaylistDuration(playlist))}
-              </ThemedText>
-            </ThemedView>
-          </ThemedView>
-
-          <IconSymbol name="chevron.right" size={16} color="#e0af92" />
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
+              {getTotalDuration() > 0 && (
+                <>
+                  <ThemedText style={styles.separator}>•</ThemedText>
+                  <ThemedText style={styles.duration}>
+                    {formatDuration(getTotalDuration())}
+                  </ThemedText>
+                </>
+              )}
+            </View>
+          </View>
+          
+          <View style={styles.chevronContainer}>
+            <IconSymbol name="chevron.right" size={16} color="#666666" />
+          </View>
+        </ThemedView>
+      </TouchableOpacity>
+    </Swipeable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
-    marginBottom: 12,
-    overflow: 'hidden',
-    borderRadius: 12,
+    backgroundColor: '#000000',
   },
-  deleteBackground: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#1a1a1a',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
+    marginRight: 16,
   },
-  deleteContent: {
+  textContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  playlistName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginBottom: 4,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  videoCount: {
+    fontSize: 14,
+    color: '#888888',
+  },
+  separator: {
+    fontSize: 14,
+    color: '#666666',
+    marginHorizontal: 8,
+  },
+  duration: {
+    fontSize: 14,
+    color: '#888888',
+  },
+  chevronContainer: {
+    padding: 4,
+  },
+  rightActionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'flex-end',
+    backgroundColor: '#ff3b30',
+    width: 120,
+  },
+  deleteAction: {
+    flex: 1,
+    backgroundColor: '#ff3b30',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
+  },
+  deleteButton: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   deleteText: {
     color: 'white',
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  deleteIcon: {
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  minusLine: {
-    width: 12,
-    height: 2,
-    backgroundColor: 'white',
-    borderRadius: 1,
-  },
-  itemContainer: {
-    backgroundColor: '#000000',
-    borderRadius: 12,
-  },
-  playlistItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#000000',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#333333', // Koyu gri border
-  },
-  playlistThumbnail: {
-    position: 'relative',
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 15,
-  },
-  thumbnailPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333333', // Koyu gri border
-  },
-  playlistThumbnailIcon: {
-    width: 32,
-    height: 32,
-  },
-  videoCountBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    backgroundColor: '#e0af92',
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  videoCountText: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    lineHeight: 12,
-  },
-  playlistInfo: {
-    flex: 1,
-  },
-  playlistName: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  playlistDescription: {
-    color: 'white',
-    fontSize: 13,
-    marginBottom: 6,
-  },
-  playlistStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  playlistStatsText: {
-    color: '#e0af92',
-    fontSize: 12,
-    marginRight: 15,
   },
 });

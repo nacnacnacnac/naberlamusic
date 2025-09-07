@@ -29,13 +29,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="play.fill" color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="videos"
-        options={{
-          title: 'Playlist',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="list.bullet" color={color} />,
-        }}
-      />
     </Tabs>
   );
 }

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Alert } from 'react-native';
 import { vimeoService } from '@/services/vimeoService';
 import { VimeoConfig, SimplifiedVimeoVideo, VimeoError } from '@/types/vimeo';
+import { remoteConfigService, RemoteConfig } from '@/services/remoteConfigService';
 
 interface VimeoContextType {
   // Configuration
@@ -22,6 +23,14 @@ interface VimeoContextType {
   // Video operations
   getVideo: (videoId: string) => SimplifiedVimeoVideo | undefined;
   searchVideos: (query: string) => SimplifiedVimeoVideo[];
+  
+  // Privacy operations
+  getPrivateVideos: () => Promise<SimplifiedVimeoVideo[]>;
+  getPublicVideos: () => Promise<SimplifiedVimeoVideo[]>;
+  
+  // Remote config
+  remoteConfig: RemoteConfig | null;
+  refreshRemoteConfig: () => Promise<void>;
 }
 
 const VimeoContext = createContext<VimeoContextType | undefined>(undefined);
@@ -36,42 +45,81 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
   const [videos, setVideos] = useState<SimplifiedVimeoVideo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<VimeoError | null>(null);
+  const [remoteConfig, setRemoteConfig] = useState<RemoteConfig | null>(null);
 
   // Initialize on app start
   useEffect(() => {
     initializeFromStorage();
+    initializeRemoteConfig();
   }, []);
+
+  const initializeRemoteConfig = async () => {
+    try {
+      const config = await remoteConfigService.initialize();
+      setRemoteConfig(config);
+      
+      // Listen for config updates
+      remoteConfigService.addListener((newConfig) => {
+        setRemoteConfig(newConfig);
+        // Refilter videos when config changes
+        if (videos.length > 0) {
+          const filteredVideos = remoteConfigService.filterVideos(videos);
+          setVideos(filteredVideos);
+        }
+      });
+    } catch (error) {
+      console.error('Error initializing remote config:', error);
+    }
+  };
 
   const initializeFromStorage = async () => {
     try {
-      const savedConfig = await vimeoService.loadSavedConfig();
-      if (savedConfig) {
-        setConfig(savedConfig);
-        setIsConfigured(true);
-        
-        // Test connection
-        const isConnected = await vimeoService.testConnection();
-        if (isConnected) {
-          // Load cached videos first
-          const cachedVideos = await vimeoService.getCachedVideos();
-          if (cachedVideos.length > 0) {
-            setVideos(cachedVideos);
-          }
-          
-          // Then refresh from API in background
-          loadVideosFromAPI();
-        } else {
-          setIsConfigured(false);
-          setError({
-            error: 'Connection Failed',
-            error_code: 401,
-            developer_message: 'Saved token is no longer valid',
-            link: null,
-          });
+      // Try to load saved configuration first
+      let config = await vimeoService.loadSavedConfig();
+      
+      // If no saved config, use environment token
+      if (!config) {
+        console.log('📝 No saved config found, using environment token');
+        const envToken = process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN;
+        if (!envToken) {
+          throw new Error('Vimeo access token not found in environment variables');
         }
+        
+        config = {
+          accessToken: envToken,
+          userId: 'naberla-user',
+          userName: 'Naber LA User'
+        };
+        
+        // Save the default config for future use
+        await vimeoService.initialize(config);
+      }
+      
+      console.log('🔧 Using Vimeo configuration');
+      await vimeoService.initialize(config);
+      setConfig(config);
+      setIsConfigured(true);
+      
+      // Test connection
+      const isConnected = await vimeoService.testConnection();
+      if (isConnected) {
+        // Load cached videos first, but filter private ones
+        const cachedVideos = await vimeoService.getCachedVideos();
+        if (cachedVideos.length > 0) {
+          console.log('🔍 Filtering cached videos...');
+          const publicCachedVideos = await vimeoService.getPublicVideos();
+          setVideos(publicCachedVideos);
+        }
+        
+        // Then refresh from API in background
+        loadVideosFromAPI();
+      } else {
+        console.log('⚠️ Vimeo connection failed');
+        setIsConfigured(true); // Still mark as configured to avoid setup loop
       }
     } catch (err) {
-      console.error('Error initializing from storage:', err);
+      console.error('Error initializing Vimeo:', err);
+      setIsConfigured(true); // Mark as configured to avoid setup loop
     }
   };
 
@@ -114,10 +162,12 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       return;
     }
 
-    // First try to load from cache
+    // First try to load from cache, but filter private videos
     const cachedVideos = await vimeoService.getCachedVideos();
     if (cachedVideos.length > 0) {
-      setVideos(cachedVideos);
+      console.log('🔍 Filtering cached videos...');
+      const publicCachedVideos = await vimeoService.getPublicVideos();
+      setVideos(publicCachedVideos);
     }
 
     // Then load from API
@@ -129,10 +179,20 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       setIsLoading(true);
       setError(null);
       
+      // First get all videos
       const allVideos = await vimeoService.getAllUserVideos();
-      setVideos(allVideos);
+      console.log(`📥 Loaded ${allVideos.length} total videos from Vimeo`);
       
-      console.log(`Loaded ${allVideos.length} videos from Vimeo`);
+      // Then filter to only public videos
+      console.log('🔍 Filtering out private videos...');
+      const publicVideos = await vimeoService.getPublicVideos();
+      console.log(`✅ Found ${publicVideos.length} public videos (filtered out ${allVideos.length - publicVideos.length} private)`);
+      
+      // Apply remote config filtering
+      const filteredVideos = remoteConfigService.filterVideos(publicVideos);
+      console.log(`🎛️ Remote config filtered to ${filteredVideos.length} videos`);
+      
+      setVideos(filteredVideos);
       
     } catch (err: any) {
       console.error('Error loading videos:', err);
@@ -209,6 +269,33 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
     );
   };
 
+  const getPrivateVideos = async (): Promise<SimplifiedVimeoVideo[]> => {
+    try {
+      return await vimeoService.getPrivateVideos();
+    } catch (error) {
+      console.error('Error getting private videos:', error);
+      return [];
+    }
+  };
+
+  const getPublicVideos = async (): Promise<SimplifiedVimeoVideo[]> => {
+    try {
+      return await vimeoService.getPublicVideos();
+    } catch (error) {
+      console.error('Error getting public videos:', error);
+      return videos; // Return all videos if filtering fails
+    }
+  };
+
+  const refreshRemoteConfig = async (): Promise<void> => {
+    try {
+      await remoteConfigService.refresh();
+      console.log('🔄 Remote config refreshed');
+    } catch (error) {
+      console.error('Error refreshing remote config:', error);
+    }
+  };
+
   const contextValue: VimeoContextType = {
     // Configuration
     isConfigured,
@@ -228,6 +315,12 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
     // Video operations
     getVideo,
     searchVideos,
+    getPrivateVideos,
+    getPublicVideos,
+    
+    // Remote config
+    remoteConfig,
+    refreshRemoteConfig,
   };
 
   return (

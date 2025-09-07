@@ -3,10 +3,12 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { VimeoProvider } from '@/contexts/VimeoContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
 
 export default function RootLayout() {
@@ -32,17 +34,29 @@ export default function RootLayout() {
   }
 
   return (
-    <VimeoProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="vimeo-setup" options={{ headerShown: false }} />
-          <Stack.Screen name="create-playlist" options={{ headerShown: false }} />
-          <Stack.Screen name="select-playlist" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </VimeoProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <VimeoProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack>
+              <Stack.Screen name="login" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="create-playlist" options={{ headerShown: false }} />
+              <Stack.Screen name="select-playlist" options={{ headerShown: false }} />
+              <Stack.Screen 
+                name="videos" 
+                options={{ 
+                  headerShown: false,
+                  presentation: 'modal',
+                  animation: 'slide_from_right'
+                }} 
+              />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="light" hideTransitionAnimation="fade" />
+          </ThemeProvider>
+        </VimeoProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -12,7 +12,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { playlistService } from '@/services/playlistService';
+import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { useVimeo } from '@/contexts/VimeoContext';
 import { Playlist } from '@/types/playlist';
 import Toast from '@/components/Toast';
@@ -37,7 +37,7 @@ export default function SelectPlaylistScreen() {
 
   const loadPlaylists = async () => {
     try {
-      const allPlaylists = await playlistService.getPlaylists();
+      const allPlaylists = await hybridPlaylistService.getPlaylists();
       setPlaylists(allPlaylists);
     } catch (error) {
       console.error('Error loading playlists:', error);
@@ -59,7 +59,7 @@ export default function SelectPlaylistScreen() {
         return;
       }
 
-      await playlistService.addVideoToPlaylist(playlistId, video);
+      await hybridPlaylistService.addVideoToPlaylist(playlistId, video);
       
       const playlist = playlists.find(p => p.id === playlistId);
       
