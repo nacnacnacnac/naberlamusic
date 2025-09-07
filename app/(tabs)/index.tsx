@@ -527,6 +527,12 @@ export default function HomeScreen() {
             </ThemedView>
             <View style={styles.headerActions}>
               <TouchableOpacity 
+                style={styles.debugButton}
+                onPress={() => router.push('/debug-api')}
+              >
+                <IconSymbol name="ladybug" size={16} color="#e0af92" />
+              </TouchableOpacity>
+              <TouchableOpacity 
                 style={styles.adminSettingsButton}
                 onPress={() => router.push('/admin-settings')}
               >
@@ -866,6 +872,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  debugButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+    marginRight: 8,
   },
   adminSettingsButton: {
     width: 36,
