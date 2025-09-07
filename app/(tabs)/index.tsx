@@ -429,7 +429,7 @@ export default function HomeScreen() {
             {/* Top Gradient Overlay */}
             {!isFullscreen && (
               <LinearGradient
-                colors={['#000000', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0)']}
+                colors={['#000000', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0)']}
                 style={styles.topGradientOverlay}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
@@ -468,12 +468,6 @@ export default function HomeScreen() {
       {/* Playlist Area */}
       {!isFullscreen && (
         <View style={styles.playlistArea}>
-          <LinearGradient
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)', '#000000']}
-            style={styles.gradientOverlay}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-          />
           <TouchableOpacity 
             style={styles.playlistHeader}
             onPress={scrollToPlaylist}
@@ -494,6 +488,8 @@ export default function HomeScreen() {
             ref={playlistScrollRef}
             style={styles.playlistScroll}
             showsVerticalScrollIndicator={false}
+            scrollEnabled={true}
+            nestedScrollEnabled={true}
           >
             {videos.map((video, index) => (
               <TouchableOpacity
@@ -575,7 +571,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   darkContainer: {
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
   },
   safeAreaTop: {
     height: 0, // Video'yu en yukarı taşı
@@ -629,7 +625,7 @@ const styles = StyleSheet.create({
     maxHeight: 300, // Hard constraint to prevent expansion
     width: '100%', // Prevent horizontal expansion
     backgroundColor: '#000000', // Consistent black background
-    marginTop: 30, // Space from camera notch
+    marginTop: 5, // Reduced space from camera notch
     position: 'relative', // For overlay positioning
     overflow: 'hidden', // Prevent content from expanding beyond bounds
     // Debug styling (commented out)
@@ -641,7 +637,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 80, // Yukarıdan az bir gradient
+    height: 250, // Daha uzun gradient
     zIndex: 10,
     pointerEvents: 'none', // Touch event'leri geçsin
   },
@@ -664,8 +660,8 @@ const styles = StyleSheet.create({
   videoInfoArea: {
     backgroundColor: '#000000',
     paddingHorizontal: 20,
-    paddingVertical: 12, // Equal top and bottom spacing
-    marginTop: 0, // No additional margin to maintain player constraints
+    paddingVertical: 4, // Even more reduced spacing
+    marginTop: -25, // Pull up even more to reduce gap
     position: 'relative', // Ensure proper positioning without affecting player
   },
   titleContainer: {
@@ -709,9 +705,8 @@ const styles = StyleSheet.create({
   // Playlist Area
   playlistArea: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: 'transparent',
     position: 'relative',
-    paddingBottom: 150, // Daha büyük footer için alan bırak
   },
   gradientOverlay: {
     position: 'absolute',

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Image } from 'expo-image';
 
@@ -204,12 +205,47 @@ export default function MusicPlayerTabBar({
   }
 
   return (
-    <LinearGradient
-      colors={['#000000', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0)']}
-      style={styles.container}
-      start={{ x: 0, y: 1 }}
-      end={{ x: 0, y: 0 }}
-    >
+    <>
+      {/* Gradient + Blur kombinasyonu */}
+      <LinearGradient
+        colors={['transparent', 'transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
+        style={styles.separateGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        pointerEvents="none"
+      >
+        {/* Blur sadece alt yarıda */}
+        <View style={styles.blurContainer}>
+          <BlurView intensity={60} style={styles.blurOverlay}>
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
+              style={styles.blurGradientOverlay}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+            />
+          </BlurView>
+        </View>
+      </LinearGradient>
+
+      {/* Main footer container - only icons */}
+      <View style={styles.container}>
+        {/* Container gradient overlay */}
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.4)']}
+          style={styles.containerGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          pointerEvents="none"
+        />
+      {/* Left Logo */}
+      <View style={styles.leftLogo}>
+        <Image
+          source={require('@/assets/images/naberla.svg')}
+          style={styles.logoImage}
+          contentFit="contain"
+        />
+      </View>
+
       {/* Music Controls - Centered */}
       <View style={styles.controls}>
         <TouchableOpacity style={styles.controlButton} onPress={onPrevious}>
@@ -235,11 +271,43 @@ export default function MusicPlayerTabBar({
           <IconSymbol name="list.bullet" size={22} color="#e0af92" />
         </TouchableOpacity>
       </View>
-    </LinearGradient>
+      </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  separateGradient: {
+    position: 'absolute',
+    bottom: 0, // En alttan başla
+    left: 0,
+    right: 0,
+    height: 120, // Daha kısa - playlist'e değmesin
+    zIndex: 1,
+    overflow: 'hidden', // Keskin kenarları gizle
+  },
+  blurContainer: {
+    position: 'absolute',
+    top: '15%', // Daha da yukarıdan başla
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  blurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  blurGradientOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+  },
   container: {
     position: 'absolute',
     bottom: 0,
@@ -250,15 +318,34 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 20,
-    paddingBottom: 40, // Safe area için daha fazla
-    height: 150, // Daha büyük footer - gradient için
-    zIndex: 1000,
+    paddingBottom: 30, // İconları çok az daha yukarı
+    height: 100, // Daha küçük container
+    zIndex: 100,
+  },
+  containerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1, // Container'ın arkasında
+  },
+  leftLogo: {
+    width: 100, // Sabit genişlik
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  logoImage: {
+    width: 80,
+    height: 32,
+    marginLeft: -10, // Logo'yu daha sola taşı
   },
   controls: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    gap: 15,
   },
   controlButton: {
     width: 40,
@@ -278,11 +365,13 @@ const styles = StyleSheet.create({
     borderColor: '#333333', // Gri border
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 20,
+    marginHorizontal: 8,
   },
   rightActions: {
+    width: 100, // Logo ile eşit genişlik
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   actionButton: {
     width: 36,
