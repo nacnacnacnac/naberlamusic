@@ -1,0 +1,1175 @@
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { StyleSheet, View, ActivityIndicator, TouchableOpacity, Alert, Image } from 'react-native';
+import { WebView } from 'react-native-webview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { SimplifiedVimeoVideo } from '@/types/vimeo';
+
+interface VimeoPlayerProps {
+  video: SimplifiedVimeoVideo;
+  isFullscreen?: boolean;
+  onFullscreenToggle?: () => void;
+  onError?: (error: string) => void;
+  onVideoEnd?: () => void;
+  isPaused?: boolean;
+  onPlayStateChange?: (isPlaying: boolean) => void;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
+}
+
+export default function VimeoPlayer({ 
+  video, 
+  isFullscreen = false, 
+  onFullscreenToggle,
+  onError,
+  onVideoEnd,
+  isPaused = false,
+  onPlayStateChange,
+  onTimeUpdate
+}: VimeoPlayerProps) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const webViewRef = useRef<WebView>(null);
+  const [internalPaused, setInternalPaused] = useState(isPaused);
+  const [savedPosition, setSavedPosition] = useState<number>(0);
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
+
+  // Video değiştiğinde kaydedilmiş pozisyonu yükle
+  useEffect(() => {
+    loadSavedPosition();
+    setIsPlayerReady(false);
+  }, [video.id]);
+
+  // isPaused prop değişikliklerini takip et - GÜÇLÜ AUTOPLAY
+  useEffect(() => {
+    console.log('🔄 VimeoPlayer useEffect - isPaused:', isPaused, 'internal:', internalPaused, 'playerReady:', isPlayerReady);
+    
+    if (isPaused !== internalPaused) {
+      setInternalPaused(isPaused);
+      
+      const command = isPaused ? 'pause' : 'play';
+      console.log('📡 SENDING COMMAND TO WEBVIEW:', command);
+      
+      // Her durumda komut gönder (player ready olsun olmasın)
+      webViewRef.current?.postMessage(JSON.stringify({ action: command }));
+      
+      if (!isPlayerReady) {
+        console.log('⏳ Player not ready, but sending command anyway');
+        // Player hazır değilse birkaç kez daha dene
+        setTimeout(() => {
+          console.log('🔄 Retry command (1s delay):', command);
+          webViewRef.current?.postMessage(JSON.stringify({ action: command }));
+        }, 1000);
+        
+        setTimeout(() => {
+          console.log('🔄 Retry command (2s delay):', command);
+          webViewRef.current?.postMessage(JSON.stringify({ action: command }));
+        }, 2000);
+      }
+    } else {
+      console.log('🔄 No change in pause state, skipping command');
+    }
+  }, [isPaused, internalPaused, isPlayerReady]);
+
+  // Kaydedilmiş pozisyonu yükle
+  const loadSavedPosition = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(`video_position_${video.id}`);
+      if (saved) {
+        const position = parseFloat(saved);
+        setSavedPosition(position);
+        console.log('Loaded saved position for video', video.id, ':', position);
+      } else {
+        setSavedPosition(0);
+      }
+    } catch (error) {
+      console.error('Error loading saved position:', error);
+      setSavedPosition(0);
+    }
+  };
+
+  // Video pozisyonunu kaydet
+  const savePosition = async (position: number) => {
+    try {
+      await AsyncStorage.setItem(`video_position_${video.id}`, position.toString());
+      console.log('Saved position for video', video.id, ':', position);
+    } catch (error) {
+      console.error('Error saving position:', error);
+    }
+  };
+
+  // Vimeo embed URL oluştur - MEMOIZED (sadece video.id değişince yeniden oluştur)
+  const embedUrl = useMemo(() => {
+    // Video ID'yi temizle (sadece sayısal kısım)
+    let cleanVideoId = video.id.replace(/\D/g, '');
+    
+    // Eğer video ID boşsa veya çok kısaysa, test video kullan
+    if (!cleanVideoId || cleanVideoId.length < 6) {
+      console.warn('Invalid video ID, using test video');
+      cleanVideoId = '76979871'; // Vimeo test video
+    }
+    
+    const baseUrl = `https://player.vimeo.com/video/${cleanVideoId}`;
+    const params = new URLSearchParams({
+      autoplay: '1', // Her zaman autoplay=1 - JavaScript ile kontrol edeceğiz
+      loop: '0',
+      muted: '0',
+      controls: '0', // Native controls'ü kapat - sadece Media Session kullan
+      title: '0',
+      byline: '0',
+      portrait: '0',
+      badge: '0',
+      autopause: '0', // Autopause'u da kapat
+      background: '0',
+      responsive: '1',
+      dnt: '1',
+      pip: '0', // Picture-in-picture'ı kapat
+      playsinline: '1',
+      keyboard: '0',
+      maxwidth: '100%',
+      maxheight: '100%',
+      transparent: '0',
+      app_id: 'naberla'
+    });
+    
+    // Kaydedilmiş pozisyon varsa URL'e ekle
+    if (savedPosition > 0) {
+      params.append('t', `${Math.floor(savedPosition)}s`);
+      console.log('Adding saved position to URL:', savedPosition);
+    }
+    
+    const finalUrl = `${baseUrl}?${params.toString()}`;
+    console.log('Vimeo Embed URL:', finalUrl);
+    console.log('Original Video ID:', video.id);
+    console.log('Clean Video ID:', cleanVideoId);
+    console.log('Video Title:', video.title);
+    
+    return finalUrl;
+  }, [video.id, savedPosition]); // Sadece video.id veya savedPosition değişince yeniden oluştur
+
+  // WebView mesajlarını handle et
+  const handleMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('Vimeo Player Message:', data);
+      
+      // Player events'leri handle edebiliriz
+      switch (data.event) {
+        case 'ready':
+          console.log('🎯 VIMEO PLAYER READY!');
+          setIsPlayerReady(true);
+          
+          // Player hazır olduğunda kaydedilmiş pozisyona git
+          if (savedPosition > 0) {
+            setTimeout(() => {
+              webViewRef.current?.postMessage(JSON.stringify({ 
+                action: 'seekTo', 
+                time: savedPosition 
+              }));
+              console.log('📍 Seeking to saved position:', savedPosition);
+            }, 500);
+          }
+          
+          // AUTOPLAY LOGIC - Player hazır olduğunda isPaused durumuna bak
+          setTimeout(() => {
+            if (!isPaused) {
+              console.log('🚀 AUTOPLAY: Video should be playing (autoplay=1)');
+              // autoplay=1 olduğu için zaten çalıyor olmalı, ama emin olmak için
+              webViewRef.current?.postMessage(JSON.stringify({ action: 'play' }));
+            } else {
+              console.log('⏸️ Video should be paused, sending pause command');
+              webViewRef.current?.postMessage(JSON.stringify({ action: 'pause' }));
+            }
+          }, savedPosition > 0 ? 1500 : 800); // Pozisyon varsa biraz daha bekle
+          break;
+        case 'play':
+          console.log('Video started playing');
+          setInternalPaused(false);
+          onPlayStateChange?.(true);
+          // Media Session state'i güncelle
+          webViewRef.current?.postMessage(JSON.stringify({ 
+            action: 'updateMediaSession', 
+            state: 'playing' 
+          }));
+          break;
+        case 'pause':
+          console.log('Video paused');
+          setInternalPaused(true);
+          onPlayStateChange?.(false);
+          // Media Session state'i güncelle
+          webViewRef.current?.postMessage(JSON.stringify({ 
+            action: 'updateMediaSession', 
+            state: 'paused' 
+          }));
+          break;
+        case 'ended':
+          console.log('Video ended');
+          // Video bittiğinde pozisyonu sıfırla
+          savePosition(0);
+          if (onVideoEnd) {
+            onVideoEnd();
+          }
+          break;
+        case 'timeupdate':
+          if (data.seconds && data.duration) {
+            const currentTime = parseFloat(data.seconds);
+            const duration = parseFloat(data.duration);
+            // Her 5 saniyede bir pozisyonu kaydet
+            if (Math.floor(currentTime) % 5 === 0) {
+              savePosition(currentTime);
+            }
+            onTimeUpdate?.(currentTime, duration);
+          }
+          break;
+        case 'background_mode':
+          console.log('🌙 Background mode detected from WebView');
+          // Background mode'da ekstra bir şey yapmaya gerek yok, WebView halledecek
+          break;
+        case 'media_session_play':
+          console.log('🎵 Media session play from lock screen');
+          setInternalPaused(false);
+          onPlayStateChange?.(true);
+          break;
+        case 'media_session_pause':
+          console.log('⏸️ Media session pause from lock screen');
+          setInternalPaused(true);
+          onPlayStateChange?.(false);
+          break;
+        case 'media_session_next':
+          console.log('⏭️ Media session next track');
+          onVideoEnd?.(); // Next track trigger
+          break;
+        case 'media_session_previous':
+          console.log('⏮️ Media session previous track');
+          // Previous track logic burada implement edilebilir
+          break;
+        case 'webview_test_response':
+          console.log('🧪 WebView test response:', data.message);
+          console.log('🔍 WebView has', data.iframes, 'iframes and', data.videos, 'videos');
+          break;
+      }
+    } catch (error) {
+      console.log('Message parsing error:', error);
+    }
+  };
+
+  // Loading başladı
+  const handleLoadStart = () => {
+    console.log('WebView loading started');
+    setIsLoading(true);
+    setHasError(false);
+  };
+
+  // Loading tamamlandı
+  const handleLoadEnd = () => {
+    console.log('🌐 WebView loading ended - injecting test message');
+    setIsLoading(false);
+    setHasError(false);
+    
+    // WebView yüklendiğinde test mesajı gönder
+    setTimeout(() => {
+      console.log('🧪 Sending test message to WebView');
+      webViewRef.current?.postMessage(JSON.stringify({ action: 'test', message: 'WebView connection test' }));
+    }, 1000);
+  };
+
+  // Hata durumu
+  const handleError = (syntheticEvent: any) => {
+    const { nativeEvent } = syntheticEvent;
+    console.error('WebView Error:', nativeEvent);
+    console.error('Error description:', nativeEvent.description);
+    console.error('Error code:', nativeEvent.code);
+    setIsLoading(false);
+    setHasError(true);
+    onError?.(`Video yüklenemedi: ${nativeEvent.description || 'Bilinmeyen hata'}`);
+  };
+
+  // HTTP error handling
+  const handleHttpError = (syntheticEvent: any) => {
+    const { nativeEvent } = syntheticEvent;
+    console.error('WebView HTTP Error:', nativeEvent);
+    console.error('Status code:', nativeEvent.statusCode);
+    console.error('URL:', nativeEvent.url);
+    
+    if (nativeEvent.statusCode >= 400) {
+      setIsLoading(false);
+      setHasError(true);
+      const errorMsg = nativeEvent.statusCode === 404 
+        ? `Video bulunamadı veya embed edilmeye kapalı (ID: ${video.id})`
+        : `HTTP Error ${nativeEvent.statusCode}: Video yüklenemedi`;
+      onError?.(errorMsg);
+    }
+  };
+
+  // Retry fonksiyonu
+  const retry = () => {
+    setHasError(false);
+    setIsLoading(true);
+    webViewRef.current?.reload();
+  };
+
+  // Hata durumu UI
+  if (hasError) {
+    return (
+      <ThemedView style={[styles.container, isFullscreen && styles.fullscreenContainer]}>
+        <ThemedView style={styles.errorContainer}>
+          <IconSymbol name="exclamationmark.triangle" size={48} color="#FF6B6B" />
+          <ThemedText style={styles.errorTitle}>Video Yüklenemedi</ThemedText>
+          <ThemedText style={styles.errorText}>
+            {video.title}
+          </ThemedText>
+          <TouchableOpacity style={styles.retryButton} onPress={retry}>
+            <IconSymbol name="arrow.clockwise" size={20} color="white" />
+            <ThemedText style={styles.retryText}>Tekrar Dene</ThemedText>
+          </TouchableOpacity>
+        </ThemedView>
+        
+        {/* Fullscreen Toggle */}
+        {onFullscreenToggle && (
+          <TouchableOpacity 
+            style={styles.fullscreenButton}
+            onPress={onFullscreenToggle}
+          >
+            <IconSymbol 
+              name={isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right"} 
+              size={24} 
+              color="white" 
+            />
+          </TouchableOpacity>
+        )}
+      </ThemedView>
+    );
+  }
+
+  return (
+    <ThemedView style={[styles.container, isFullscreen && styles.fullscreenContainer]}>
+      {/* Loading Indicator */}
+      {isLoading && (
+        <ThemedView style={styles.loadingContainer}>
+          <Image 
+            source={require('@/assets/images/loading.gif')} 
+            style={styles.loadingGif}
+            resizeMode="contain"
+          />
+        </ThemedView>
+      )}
+
+      {/* Vimeo WebView */}
+      <WebView
+        ref={webViewRef}
+        source={{ uri: embedUrl }}
+        style={styles.webview}
+        onLoadStart={handleLoadStart}
+        onLoadEnd={handleLoadEnd}
+        onError={handleError}
+        onHttpError={handleHttpError}
+        onMessage={handleMessage}
+        allowsInlineMediaPlayback={true}
+        mediaPlaybackRequiresUserAction={false}
+        allowsFullscreenVideo={false}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        startInLoadingState={false}
+        scalesPageToFit={true}
+        bounces={false}
+        scrollEnabled={false}
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        // GÜÇLÜ BACKGROUND AUDIO AYARLARI
+        allowsBackForwardNavigationGestures={false}
+        allowsLinkPreview={false}
+        mixedContentMode="compatibility"
+        thirdPartyCookiesEnabled={true}
+        sharedCookiesEnabled={true}
+        allowsAirPlayForMediaPlayback={true}
+        allowsProtectedMedia={true}
+        setSupportMultipleWindows={false}
+        nestedScrollEnabled={false}
+        overScrollMode="never"
+        cacheEnabled={true}
+        incognito={false}
+        applicationNameForUserAgent="NaberLA-Music-Player"
+        // Background audio için kritik iOS ayarları
+        allowsBackgroundLocationUpdates={false}
+        automaticallyAdjustContentInsets={false}
+        // Background playback için ek ayarlar
+        pullToRefreshEnabled={false}
+        hideKeyboardAccessoryView={true}
+        // User agent (bazı durumlarda gerekli olabilir)
+        userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
+        // BASIT VE KISA INJECTED JAVASCRIPT
+        injectedJavaScript={`
+          console.log('🚀 WEBVIEW JAVASCRIPT STARTED');
+          
+          // React Native'den gelen mesajları handle et
+          window.addEventListener('message', function(event) {
+            if (event.source === window) {
+              try {
+                const data = JSON.parse(event.data);
+                console.log('📨 Message received:', data.action);
+                
+                if (data.action === 'test') {
+                  console.log('🧪 TEST MESSAGE RECEIVED');
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    event: 'webview_test_response',
+                    message: 'JavaScript is working!'
+                  }));
+                  return;
+                }
+                
+                const iframe = document.querySelector('iframe');
+                
+                if (data.action === 'play') {
+                  console.log('🎬 PLAY COMMAND RECEIVED');
+                  if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                    console.log('📡 Play sent to iframe');
+                  } else {
+                    console.log('❌ No iframe found');
+                  }
+                } else if (data.action === 'pause') {
+                  console.log('⏸️ PAUSE COMMAND RECEIVED');
+                  if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage('{"method":"pause"}', '*');
+                    console.log('📡 Pause sent to iframe');
+                  } else {
+                    console.log('❌ No iframe found');
+                  }
+                }
+              } catch (e) {
+                console.log('❌ Message parse error:', e);
+              }
+            }
+          });
+          
+          // Vimeo mesajlarını dinle
+          window.addEventListener('message', function(event) {
+            if (event.origin === 'https://player.vimeo.com') {
+              console.log('📺 Vimeo message:', event.data);
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify(event.data));
+              }
+            }
+          });
+          
+          console.log('✅ WEBVIEW JAVASCRIPT SETUP COMPLETE');
+          true;
+        `}
+      />
+
+      {/* Fullscreen toggle kaldırıldı - pil kısmıyla çakışıyor */}
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000', // Tutarlı siyah
+  },
+  fullscreenContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#000000', // Tutarlı siyah
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000', // Tutarlı siyah
+    zIndex: 10,
+  },
+  loadingGif: {
+    width: 60,
+    height: 60,
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+    marginTop: 15,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  errorTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 20,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1AB7EA',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+});
+              overflow: hidden;
+              width: 100vw;
+              height: 100vh;
+            }
+            iframe {
+              width: 100vw !important;
+              height: 100vh !important;
+              border: none;
+              object-fit: cover;
+              transform: scale(1.1);
+              transform-origin: center;
+            }
+            .vp-video-wrapper {
+              width: 100% !important;
+              height: 100% !important;
+            }
+            /* Native video controls'ü gizle */
+            video::-webkit-media-controls {
+              display: none !important;
+            }
+            video::-webkit-media-controls-enclosure {
+              display: none !important;
+            }
+            video::-webkit-media-controls-panel {
+              display: none !important;
+            }
+            /* Vimeo player controls'ü de gizle */
+            .vp-controls {
+              display: none !important;
+            }
+            .vp-overlay {
+              display: none !important;
+            }
+          \`;
+          document.head.appendChild(style);
+          
+          console.log('WebView JavaScript loaded with enhanced controls');
+          console.log('Current URL:', window.location.href);
+          
+          // Vimeo Player API için global değişkenler
+          let vimeoPlayer = null;
+          let isPlayerReady = false;
+          
+          // Background audio için kritik ayarlar
+          try {
+            // Audio context'i unlock et ve background'da aktif tut
+            let audioContext;
+            if (typeof AudioContext !== 'undefined' || typeof webkitAudioContext !== 'undefined') {
+              const AudioContextClass = AudioContext || webkitAudioContext;
+              audioContext = new AudioContextClass();
+              
+              // Touch event ile audio context'i başlat
+              document.addEventListener('touchstart', function() {
+                if (audioContext.state === 'suspended') {
+                  audioContext.resume();
+                  console.log('AudioContext resumed');
+                }
+              }, { once: true });
+              
+            // AGRESIF BACKGROUND AUDIO ÇÖZÜMÜ
+            document.addEventListener('visibilitychange', function() {
+              const videos = document.querySelectorAll('video');
+              const iframe = document.querySelector('iframe');
+              
+              if (document.hidden) {
+                console.log('🌙 APP WENT TO BACKGROUND - FORCING AUDIO TO CONTINUE');
+                
+                // Audio context'i zorla aktif tut
+                if (audioContext && audioContext.state === 'suspended') {
+                  audioContext.resume();
+                  console.log('🔊 AudioContext resumed for background');
+                }
+                
+                // Video'ları agresif şekilde çalmaya devam ettir
+                videos.forEach(function(video) {
+                  if (video.dataset.userPaused !== 'true') {
+                    console.log('🎵 Forcing video to play in background');
+                    video.play().catch(function(err) {
+                      console.log('Background play error:', err);
+                    });
+                    
+                    // Video'nun background'da çalması için özel ayarlar
+                    video.setAttribute('playsinline', 'true');
+                    video.setAttribute('webkit-playsinline', 'true');
+                    video.muted = false; // Ses açık olsun
+                  }
+                });
+                
+                // Vimeo iframe'e agresif play komutları
+                if (iframe && iframe.contentWindow) {
+                  console.log('📡 Sending aggressive play commands to Vimeo iframe');
+                  iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                  
+                  // Birkaç kez daha gönder
+                  setTimeout(function() {
+                    iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                  }, 100);
+                  setTimeout(function() {
+                    iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                  }, 500);
+                  setTimeout(function() {
+                    iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                  }, 1000);
+                }
+                
+                // React Native'e background durumunu bildir
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    event: 'background_mode',
+                    playing: true
+                  }));
+                }
+                
+              } else {
+                console.log('☀️ APP RETURNED TO FOREGROUND');
+                
+                // Foreground'a dönerken durumu kontrol et ve devam ettir
+                videos.forEach(function(video) {
+                  if (video.dataset.userPaused !== 'true' && video.paused) {
+                    console.log('🔄 Resuming video in foreground');
+                    video.play().catch(function(err) {
+                      console.log('Foreground resume error:', err);
+                    });
+                  }
+                });
+                
+                // Vimeo iframe'e de resume komutu
+                if (iframe && iframe.contentWindow) {
+                  iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                }
+              }
+            });
+            
+            // Page focus/blur events
+            window.addEventListener('blur', function() {
+              console.log('Window blur - maintaining audio');
+              if (audioContext && audioContext.state === 'suspended') {
+                audioContext.resume();
+              }
+              // Background'a geçerken video durumunu koru
+              const videos = document.querySelectorAll('video');
+              videos.forEach(function(video) {
+                if (!video.paused && video.dataset.userPaused !== 'true') {
+                  console.log('Window blur - video should continue playing');
+                  video.dataset.shouldPlayInBackground = 'true';
+                }
+              });
+            });
+            
+            window.addEventListener('focus', function() {
+              console.log('Window focus');
+              // Focus'a dönerken video durumunu kontrol et
+              const videos = document.querySelectorAll('video');
+              videos.forEach(function(video) {
+                if (video.dataset.shouldPlayInBackground === 'true' && video.paused && video.dataset.userPaused !== 'true') {
+                  console.log('Window focus - resuming video that should be playing');
+                  video.play().catch(function(err) {
+                    console.log('Focus resume error:', err);
+                  });
+                }
+              });
+            });
+            }
+            
+            // GÜÇLÜ MEDIA SESSION API (kilit ekranı kontrolleri için)
+            if ('mediaSession' in navigator) {
+              console.log('🎛️ Setting up Media Session API');
+              
+              // Metadata'yı dinamik olarak güncelle
+              const updateMediaMetadata = function(title) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                  title: title || 'Naber LA Music',
+                  artist: 'Naber LA',
+                  album: 'Music Collection',
+                  artwork: [
+                    { src: 'https://via.placeholder.com/96x96', sizes: '96x96', type: 'image/png' },
+                    { src: 'https://via.placeholder.com/128x128', sizes: '128x128', type: 'image/png' },
+                    { src: 'https://via.placeholder.com/192x192', sizes: '192x192', type: 'image/png' },
+                    { src: 'https://via.placeholder.com/256x256', sizes: '256x256', type: 'image/png' },
+                    { src: 'https://via.placeholder.com/384x384', sizes: '384x384', type: 'image/png' },
+                    { src: 'https://via.placeholder.com/512x512', sizes: '512x512', type: 'image/png' }
+                  ]
+                });
+                console.log('📱 Media metadata updated:', title);
+              };
+              
+              updateMediaMetadata('Naber LA Music');
+              
+              // PLAY ACTION - Kilit ekranından play
+              navigator.mediaSession.setActionHandler('play', function() {
+                console.log('🎵 MEDIA SESSION PLAY - from lock screen');
+                const videos = document.querySelectorAll('video');
+                const iframe = document.querySelector('iframe');
+                
+                // Vimeo iframe'e play komutu
+                if (iframe && iframe.contentWindow) {
+                  iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                  console.log('📡 Sent play to Vimeo iframe from media session');
+                }
+                
+                // Video elementlerine de play
+                if (videos.length > 0) {
+                  videos[0].play().catch(function(err) {
+                    console.log('Media session play error:', err);
+                  });
+                }
+                
+                // React Native'e bildir
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    event: 'media_session_play'
+                  }));
+                }
+              });
+              
+              // PAUSE ACTION - Kilit ekranından pause
+              navigator.mediaSession.setActionHandler('pause', function() {
+                console.log('⏸️ MEDIA SESSION PAUSE - from lock screen');
+                const videos = document.querySelectorAll('video');
+                const iframe = document.querySelector('iframe');
+                
+                // Vimeo iframe'e pause komutu
+                if (iframe && iframe.contentWindow) {
+                  iframe.contentWindow.postMessage('{"method":"pause"}', '*');
+                  console.log('📡 Sent pause to Vimeo iframe from media session');
+                }
+                
+                // Video elementlerine de pause
+                if (videos.length > 0) {
+                  videos[0].pause();
+                }
+                
+                // React Native'e bildir
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    event: 'media_session_pause'
+                  }));
+                }
+              });
+              
+              // NEXT/PREVIOUS TRACK (opsiyonel)
+              navigator.mediaSession.setActionHandler('nexttrack', function() {
+                console.log('⏭️ MEDIA SESSION NEXT TRACK');
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    event: 'media_session_next'
+                  }));
+                }
+              });
+              
+              navigator.mediaSession.setActionHandler('previoustrack', function() {
+                console.log('⏮️ MEDIA SESSION PREVIOUS TRACK');
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    event: 'media_session_previous'
+                  }));
+                }
+              });
+              
+              // Playback state'i güncelle
+              navigator.mediaSession.playbackState = 'playing';
+              console.log('🎛️ Media Session setup complete');
+            }
+            
+            // Video elementlerini background'da aktif tut - BASIT ÇÖZÜM
+            const keepVideoActive = function() {
+              const videos = document.querySelectorAll('video');
+              videos.forEach(function(video) {
+                // Background audio için kritik ayarlar
+                video.setAttribute('playsinline', 'true');
+                video.setAttribute('webkit-playsinline', 'true');
+                video.removeAttribute('controls'); // Native kontrolleri tamamen kaldır
+                video.controls = false; // JavaScript ile de kapat
+                
+                // iOS native player'ını devre dışı bırak
+                video.setAttribute('disablePictureInPicture', 'true');
+                video.setAttribute('controlsList', 'nodownload nofullscreen noremoteplayback');
+                
+                // User pause durumunu track et
+                video.addEventListener('pause', function(e) {
+                  if (!document.hidden) {
+                    video.dataset.userPaused = 'true';
+                    console.log('User paused video');
+                    if (window.ReactNativeWebView) {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({event: 'pause'}));
+                    }
+                  } else {
+                    console.log('System paused video (background)');
+                  }
+                });
+                
+                // User play durumunu track et
+                video.addEventListener('play', function(e) {
+                  video.dataset.userPaused = 'false';
+                  console.log('User played video');
+                  if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({event: 'play'}));
+                  }
+                });
+                
+                // Video metadata'sını media session'a aktar
+                video.addEventListener('loadedmetadata', function() {
+                  if ('mediaSession' in navigator && navigator.mediaSession.metadata) {
+                    navigator.mediaSession.metadata.title = document.title || 'Naber LA Music';
+                  }
+                });
+              });
+            };
+            
+            // DOM ready olduğunda video'ları kontrol et
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', keepVideoActive);
+            } else {
+              keepVideoActive();
+            }
+            
+            // Yeni video elementleri için observer
+            const observer = new MutationObserver(function(mutations) {
+              mutations.forEach(function(mutation) {
+                if (mutation.addedNodes) {
+                  mutation.addedNodes.forEach(function(node) {
+                    if (node.tagName === 'VIDEO') {
+                      keepVideoActive();
+                    }
+                  });
+                }
+              });
+            });
+            
+            observer.observe(document.body, {
+              childList: true,
+              subtree: true
+            });
+            
+          } catch (error) {
+            console.log('Background audio setup error:', error);
+          }
+          
+          // React Native'den gelen mesajları handle et
+          if (window.ReactNativeWebView) {
+            window.addEventListener('message', function(event) {
+              if (event.source === window) {
+                try {
+                  const data = JSON.parse(event.data);
+                  console.log('Received message from React Native:', data);
+                  
+                  if (data.action) {
+                    const videos = document.querySelectorAll('video');
+                    const iframe = document.querySelector('iframe');
+                    
+                    // ÖNCE VIMEO IFRAME'E KOMUT GÖNDER (ANA PLAYER)
+                    if (data.action === 'play') {
+                      console.log('🎬 EXECUTING PLAY COMMAND - SUPER AGGRESSIVE MODE');
+                      
+                      // 1. Vimeo iframe'e play komutu gönder (ana player)
+                      if (iframe && iframe.contentWindow) {
+                        console.log('📡 Sending play to Vimeo iframe');
+                        iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                        
+                        // Çoklu retry
+                        setTimeout(function() {
+                          iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                          console.log('🔄 Retry 1: play command sent');
+                        }, 100);
+                        setTimeout(function() {
+                          iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                          console.log('🔄 Retry 2: play command sent');
+                        }, 300);
+                        setTimeout(function() {
+                          iframe.contentWindow.postMessage('{"method":"play"}', '*');
+                          console.log('🔄 Retry 3: play command sent');
+                        }, 600);
+                      } else {
+                        console.log('❌ Vimeo iframe not found initially');
+                      }
+                      
+                      // 2. iframe bulunamazsa sürekli ara
+                      let retryCount = 0;
+                      const findIframeInterval = setInterval(function() {
+                        const retryIframe = document.querySelector('iframe');
+                        retryCount++;
+                        
+                        if (retryIframe && retryIframe.contentWindow) {
+                          console.log('✅ Found iframe after', retryCount, 'attempts, sending play');
+                          retryIframe.contentWindow.postMessage('{"method":"play"}', '*');
+                          clearInterval(findIframeInterval);
+                        } else if (retryCount > 10) {
+                          console.log('❌ Could not find iframe after 10 attempts');
+                          clearInterval(findIframeInterval);
+                        }
+                      }, 200);
+                      
+                      // Backup olarak video elementlerine de gönder
+                      if (videos.length > 0) {
+                        console.log('📺 Sending play to video elements');
+                        videos[0].play().catch(function(err) {
+                          console.log('Video play error:', err);
+                        });
+                      }
+                    } else if (data.action === 'pause') {
+                      console.log('⏸️ EXECUTING PAUSE COMMAND - SUPER AGGRESSIVE MODE');
+                      
+                      // 1. Vimeo iframe'e pause komutu gönder (ana player)
+                      if (iframe && iframe.contentWindow) {
+                        console.log('📡 Sending pause to Vimeo iframe');
+                        iframe.contentWindow.postMessage('{"method":"pause"}', '*');
+                        
+                        // Çoklu retry
+                        setTimeout(function() {
+                          iframe.contentWindow.postMessage('{"method":"pause"}', '*');
+                          console.log('🔄 Retry 1: pause command sent');
+                        }, 100);
+                        setTimeout(function() {
+                          iframe.contentWindow.postMessage('{"method":"pause"}', '*');
+                          console.log('🔄 Retry 2: pause command sent');
+                        }, 300);
+                      } else {
+                        console.log('❌ Vimeo iframe not found for pause');
+                      }
+                      
+                      // 2. iframe bulunamazsa sürekli ara
+                      let retryCount = 0;
+                      const findIframeInterval = setInterval(function() {
+                        const retryIframe = document.querySelector('iframe');
+                        retryCount++;
+                        
+                        if (retryIframe && retryIframe.contentWindow) {
+                          console.log('✅ Found iframe for pause after', retryCount, 'attempts');
+                          retryIframe.contentWindow.postMessage('{"method":"pause"}', '*');
+                          clearInterval(findIframeInterval);
+                        } else if (retryCount > 5) {
+                          console.log('❌ Could not find iframe for pause after 5 attempts');
+                          clearInterval(findIframeInterval);
+                        }
+                      }, 200);
+                      
+                      // Backup olarak video elementlerine de gönder
+                      if (videos.length > 0) {
+                        console.log('📺 Sending pause to video elements');
+                        videos[0].pause();
+                      }
+                    } else if (data.action === 'seekTo' && data.time) {
+                      console.log('Executing seekTo command:', data.time);
+                      // Vimeo iframe'e seekTo komutu gönder (ana player)
+                      if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.postMessage(JSON.stringify({
+                          method: 'setCurrentTime',
+                          value: data.time
+                        }), '*');
+                      }
+                      // Backup olarak video elementlerine de gönder
+                      if (videos.length > 0) {
+                        videos[0].currentTime = data.time;
+                      }
+                    } else if (data.action === 'updateMediaSession' && data.state) {
+                      console.log('🎛️ Updating media session state:', data.state);
+                      if ('mediaSession' in navigator) {
+                        navigator.mediaSession.playbackState = data.state;
+                        console.log('📱 Media session state updated to:', data.state);
+                      }
+                    } else if (data.action === 'test') {
+                      console.log('🧪 TEST MESSAGE RECEIVED IN WEBVIEW:', data.message);
+                      console.log('🔍 Current iframe count:', document.querySelectorAll('iframe').length);
+                      console.log('🔍 Current video count:', document.querySelectorAll('video').length);
+                      
+                      // React Native'e test cevabı gönder
+                      if (window.ReactNativeWebView) {
+                        window.ReactNativeWebView.postMessage(JSON.stringify({
+                          event: 'webview_test_response',
+                          message: 'WebView JavaScript is working!',
+                          iframes: document.querySelectorAll('iframe').length,
+                          videos: document.querySelectorAll('video').length
+                        }));
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.log('Message parse error:', e);
+                }
+              }
+            });
+          }
+          
+          // Vimeo Player API mesajlarını yakalamak için
+          if (window.addEventListener) {
+            window.addEventListener('message', function(event) {
+              if (event.origin === 'https://player.vimeo.com') {
+                console.log('Vimeo message:', event.data);
+                
+                // Vimeo mesajlarını parse et
+                if (event.data && typeof event.data === 'string') {
+                  try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Önemli event'leri handle et
+                    switch (data.event) {
+                      case 'ready':
+                        console.log('Vimeo player ready');
+                        isPlayerReady = true;
+                        window.ReactNativeWebView.postMessage(JSON.stringify({event: 'ready'}));
+                        break;
+                      case 'play':
+                        console.log('Vimeo play event');
+                        window.ReactNativeWebView.postMessage(JSON.stringify({event: 'play'}));
+                        break;
+                      case 'pause':
+                        console.log('Vimeo pause event');
+                        window.ReactNativeWebView.postMessage(JSON.stringify({event: 'pause'}));
+                        break;
+                      case 'ended':
+                        console.log('Vimeo ended event');
+                        window.ReactNativeWebView.postMessage(JSON.stringify({event: 'ended'}));
+                        break;
+                      case 'timeupdate':
+                        // Zaman güncellemelerini React Native'e gönder
+                        if (data.data && data.data.seconds && data.data.duration) {
+                          window.ReactNativeWebView.postMessage(JSON.stringify({
+                            event: 'timeupdate',
+                            seconds: data.data.seconds,
+                            duration: data.data.duration
+                          }));
+                        }
+                        break;
+                      default:
+                        // Diğer tüm mesajları da gönder
+                        window.ReactNativeWebView.postMessage(JSON.stringify(data));
+                        break;
+                    }
+                  } catch (e) {
+                    // String data ise direkt gönder
+                    console.log('Raw Vimeo message:', event.data);
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      event: 'raw_message',
+                      data: event.data
+                    }));
+                  }
+                } else {
+                  // Object data ise direkt gönder
+                  window.ReactNativeWebView.postMessage(JSON.stringify(event.data));
+                }
+              }
+            });
+          }
+          
+          // Page load durumunu kontrol et
+          if (document.readyState === 'complete') {
+            console.log('Document ready for background audio');
+            window.ReactNativeWebView.postMessage(JSON.stringify({event: 'page_ready'}));
+          } else {
+            window.addEventListener('load', function() {
+              console.log('Window loaded with background audio support');
+              window.ReactNativeWebView.postMessage(JSON.stringify({event: 'page_loaded'}));
+            });
+          }
+          
+          true;
+        `}
+      />
+
+      {/* Fullscreen toggle kaldırıldı - pil kısmıyla çakışıyor */}
+    </ThemedView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000000', // Tutarlı siyah
+  },
+  fullscreenContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#000000', // Tutarlı siyah
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000', // Tutarlı siyah
+    zIndex: 10,
+  },
+  loadingGif: {
+    width: 60,
+    height: 60,
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+    marginTop: 15,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  errorTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    color: '#999',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 20,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1AB7EA',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+});

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, FlatList, TouchableOpacity, StatusBar, Alert } from 'react-native';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -99,18 +99,22 @@ export default function PlaylistDetailScreen() {
   }
 
   return (
-    <ThemedView style={[styles.container, styles.darkContainer]}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <ThemedView style={[styles.container, styles.darkContainer]}>
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       {/* Header */}
       <ThemedView style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <IconSymbol name="chevron.left" size={24} color="#e0af92" />
-        </TouchableOpacity>
-        <ThemedView style={styles.headerInfo}>
+        <ThemedView style={styles.headerLeft}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+            <IconSymbol name="chevron.left" size={24} color="#e0af92" />
+          </TouchableOpacity>
           <ThemedText style={styles.playlistTitle} numberOfLines={1}>
             {playlist.name}
           </ThemedText>
+        </ThemedView>
+        <ThemedView style={styles.headerStats}>
           <ThemedText style={styles.videoCount}>
             {videos.length} videos
           </ThemedText>
@@ -137,7 +141,8 @@ export default function PlaylistDetailScreen() {
           <ThemedText style={styles.emptyText}>No videos in this playlist</ThemedText>
         </ThemedView>
       )}
-    </ThemedView>
+      </ThemedView>
+    </>
   );
 }
 
@@ -150,34 +155,43 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
     paddingTop: 60, // Safe area
+    paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   backButton: {
     padding: 8,
-    marginRight: 15,
+    marginRight: 10,
   },
   backButtonText: {
     color: '#e0af92',
     fontSize: 16,
     fontWeight: '600',
   },
-  headerInfo: {
-    flex: 1,
+  headerStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 20,
   },
   playlistTitle: {
+    color: 'white',
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
+    flex: 1,
   },
   videoCount: {
-    fontSize: 14,
-    color: '#999999',
+    color: '#e0af92',
+    fontSize: 16,
   },
   videosList: {
     flex: 1,

@@ -1,0 +1,1151 @@
+import React, { useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
+import { WebView } from 'react-native-webview';
+
+// Enhanced Vimeo wrapper with ref-driven Player.js API
+export interface VimeoWrapperRef {
+  play(): Promise<void>;
+  pause(): Promise<void>;
+  getCurrentTime(): Promise<number>;
+  getDuration(): Promise<number>;
+  setCurrentTime(seconds: number): Promise<void>;
+  getWebViewRef(): React.RefObject<WebView>;
+  destroy(): Promise<void>;
+}
+
+export interface VimeoWrapperProps {
+  videoId: string;
+  params?: string;
+  reference?: string;
+  isFullscreen?: boolean;
+  playerHeight?: number;
+  onMessage?: (event: any) => void;
+  onReady?: () => void;
+  onError?: (error: string) => void;
+  style?: any;
+  webViewProps?: any;
+}
+
+
+export const VimeoWrapper = forwardRef<VimeoWrapperRef, VimeoWrapperProps>(({
+  videoId,
+  params,
+  reference,
+  isFullscreen = false,
+  playerHeight = 300,
+  onMessage,
+  onReady,
+  onError,
+  style,
+  webViewProps,
+  ...otherProps
+}, ref) => {
+  const webViewRef = useRef<WebView>(null);
+  const pendingCommandsRef = useRef(new Map<string, { resolve: (v: any) => void; reject: (e: any) => void; timeout?: NodeJS.Timeout }>());
+
+  // Guard against invalid videoId
+  if (!videoId || typeof videoId !== 'string' || videoId.trim().length === 0) {
+    console.error('VimeoWrapper: Invalid videoId provided:', videoId);
+    return null;
+  }
+
+  // Validate videoId format (should be numeric or contain numeric part)
+  const cleanVideoId = videoId.replace(/\D/g, '');
+  if (!cleanVideoId || cleanVideoId.length < 6) {
+    console.error('VimeoWrapper: VideoId does not match expected format:', videoId);
+    return null;
+  }
+
+  const url: string = params
+    ? `https://player.vimeo.com/video/${videoId}?${params}`
+    : `https://player.vimeo.com/video/${videoId}`;
+
+  const autoPlay = params?.includes('autoplay=1');
+
+  console.log('🎬 VimeoWrapper rendering with:', { videoId, url, params, isFullscreen, playerHeight });
+  console.log('🔍 DIAGNOSTIC INFO:');
+  console.log('🔍 Video URL:', url);
+  console.log('🔍 Video ID:', videoId);
+  console.log('🔍 Params:', params);
+  console.log('🔍 MediaPlaybackRequiresUserAction:', false);
+
+  // Simple direct command execution - NO FALLBACKS
+  const executeCommand = useCallback((action: string, args: any[] = []): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      if (!webViewRef.current) {
+        reject(new Error('WebView not ready'));
+        return;
+      }
+
+      console.log(`🎬 DIRECT COMMAND: ${action}`);
+      
+      // Direct video control - no timeouts, no fallbacks
+      let script = '';
+      
+      if (action === 'play') {
+        script = `
+          console.log('🎬 Direct play command executing...');
+          const videos = document.querySelectorAll('video');
+          if (videos.length > 0) {
+            const video = videos[0];
+            video.muted = false;
+            video.play().then(() => {
+              console.log('✅ Direct play SUCCESS');
+            }).catch(e => {
+              console.log('❌ Direct play failed:', e.message);
+            });
+          } else {
+            console.log('⚠️ No video elements found for play');
+          }
+          true;
+        `;
+        webViewRef.current.injectJavaScript(script);
+        resolve('play_command_sent');
+        return;
+        
+      } else if (action === 'pause') {
+        script = `
+          console.log('🎬 Direct pause command executing...');
+          const videos = document.querySelectorAll('video');
+          if (videos.length > 0) {
+            const video = videos[0];
+            video.pause();
+            console.log('✅ Direct pause SUCCESS');
+          } else {
+            console.log('⚠️ No video elements found for pause');
+          }
+          true;
+        `;
+        webViewRef.current.injectJavaScript(script);
+        resolve('pause_command_sent');
+        return;
+        
+      } else if (action === 'getCurrentTime') {
+        const id = `time_${Date.now()}`;
+        pendingCommandsRef.current.set(id, { resolve, reject });
+        
+        script = `
+          console.log('🎬 Direct getCurrentTime command executing...');
+          const videos = document.querySelectorAll('video');
+          let currentTime = 0;
+          if (videos.length > 0) {
+            currentTime = videos[0].currentTime;
+            console.log('✅ Current time:', currentTime);
+          } else {
+            console.log('⚠️ No video elements found for getCurrentTime');
+          }
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'vimeo_cmd',
+            id: '${id}',
+            status: 'ok',
+            result: currentTime
+          }));
+          true;
+        `;
+        webViewRef.current.injectJavaScript(script);
+        
+        // Simple timeout for getCurrentTime only
+        setTimeout(() => {
+          const pending = pendingCommandsRef.current.get(id);
+          if (pending) {
+            pendingCommandsRef.current.delete(id);
+            pending.resolve(0); // Default to 0 if no response
+          }
+        }, 1000);
+        return;
+      }
+      
+      // For other commands, just resolve immediately
+      resolve('command_not_supported');
+              
+              // Force immediate execution
+              setTimeout(function() {
+                console.log('🔍 Searching for video elements...');
+                var videos = document.querySelectorAll('video');
+                var iframes = document.querySelectorAll('iframe');
+                
+                console.log('📊 Found ' + videos.length + ' videos, ' + iframes.length + ' iframes');
+                
+                if (videos.length > 0) {
+                  var video = videos[0];
+                  console.log('🎬 Found video element, current state: paused=' + video.paused + ', time=' + video.currentTime);
+                  
+                  if ('${action}' === 'play') {
+                    console.log('▶️ Attempting to play video...');
+                    video.muted = false;
+                    video.style.display = 'block';
+                    video.style.visibility = 'visible';
+                    
+                    video.play().then(function() {
+                      console.log('✅ Video play SUCCESS');
+                      window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'vimeo_cmd',
+                        id: '${id}',
+                        status: 'ok',
+                        result: 'video_playing'
+                      }));
+                    }).catch(function(error) {
+                      console.log('❌ Video play FAILED:', error.message);
+                      window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'vimeo_cmd',
+                        id: '${id}',
+                        status: 'ok',
+                        result: 'play_failed'
+                      }));
+                    });
+                  } else if ('${action}' === 'pause') {
+                    console.log('⏸️ Attempting to pause video...');
+                    video.pause();
+                    console.log('✅ Video paused');
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'vimeo_cmd',
+                      id: '${id}',
+                      status: 'ok',
+                      result: 'video_paused'
+                    }));
+                  }
+                } else {
+                  console.log('❌ No video elements found');
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'vimeo_cmd',
+                    id: '${id}',
+                    status: 'ok',
+                    result: 'no_video_found'
+                  }));
+                }
+              }, 100);
+              
+              true; // Return true to prevent script errors
+            `;
+            
+            // Re-register the pending command for fallback response
+            pendingCommandsRef.current.set(id, { resolve, reject });
+            
+            // Set a shorter timeout for fallback
+            const fallbackTimeout = setTimeout(() => {
+              const fallbackPending = pendingCommandsRef.current.get(id);
+              if (fallbackPending) {
+                pendingCommandsRef.current.delete(id);
+                // Resolve instead of reject for better UX
+                fallbackPending.resolve('fallback_timeout_handled');
+              }
+            }, 1500); // Shorter fallback timeout
+            
+            pendingCommandsRef.current.get(id)!.timeout = fallbackTimeout;
+            
+            try {
+              webViewRef.current?.injectJavaScript(fallbackScript);
+            } catch (fallbackError) {
+              const fallbackPending = pendingCommandsRef.current.get(id);
+              if (fallbackPending) {
+                if (fallbackPending.timeout) clearTimeout(fallbackPending.timeout);
+                pendingCommandsRef.current.delete(id);
+                // Resolve instead of reject for better UX
+                fallbackPending.resolve('fallback_injection_handled');
+              }
+            }
+          } else {
+            // For non-play/pause commands, resolve gracefully
+            pending.resolve('command_timeout_handled');
+          }
+        }
+      }, 3000); // Reduced timeout for faster response
+      
+      pendingCommandsRef.current.get(id)!.timeout = timeout;
+      
+      // Send command to WebView with validation
+      try {
+        const command = JSON.stringify({
+          type: 'vimeo_cmd',
+          id,
+          action,
+          args: args || []
+        });
+        
+        webViewRef.current?.injectJavaScript(`(function(){
+          try { window.vimeoBridge && window.vimeoBridge.executeCommand(${JSON.stringify(id)}, ${JSON.stringify(action)}, ${JSON.stringify(args || [])}); } catch(e) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'vimeo_cmd', id: ${JSON.stringify(id)}, status: 'error', error: 'Injection failed: ' + e.message })); }
+        })(); true;`);
+      } catch (error) {
+        // Cleanup on send failure
+        const pending = pendingCommandsRef.current.get(id);
+        if (pending) {
+          if (pending.timeout) clearTimeout(pending.timeout);
+          pendingCommandsRef.current.delete(id);
+        }
+        reject(new Error(`Failed to send command: ${error}`));
+      }
+    });
+  }, []);
+
+  // Clean up function - remove all old fallback code after this line
+
+  // Handle messages from WebView with enhanced background audio support
+  const handleMessage = useCallback((event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      
+      // Handle background audio events with special processing
+      if (data.name === 'play' || data.name === 'pause' || data.name === 'timeupdate') {
+        // These events should continue during background state for audio continuity
+        // Forward directly to parent without queuing
+        onMessage?.(event);
+        return;
+      }
+      
+      // Handle test messages
+      if (data.type === 'test_message') {
+        console.log('🧪 TEST MESSAGE RECEIVED:', data.message);
+        return;
+      }
+
+      // Handle video test results
+      if (data.type === 'video_test') {
+        console.log('🧪 VIDEO TEST RESULT:', data.result);
+        if (data.error) {
+          console.log('🧪 VIDEO TEST ERROR:', data.error);
+        }
+        return;
+      }
+
+      // Handle command responses
+      if (data.type === 'vimeo_cmd' && data.id) {
+        const pending = pendingCommandsRef.current.get(data.id);
+        if (pending) {
+          if (pending.timeout) {
+            clearTimeout(pending.timeout);
+          }
+          pendingCommandsRef.current.delete(data.id);
+          
+          if (data.status === 'ok') {
+            pending.resolve(data.result);
+          } else {
+            pending.reject(new Error(data.error || 'Command failed'));
+          }
+        }
+        return;
+      }
+      
+      // Handle player ready event
+      if (data.name === 'player_ready') {
+        onReady?.();
+        return;
+      }
+      
+      // Handle player error event
+      if (data.name === 'player_error') {
+        onError?.(data.data?.error || 'Player error');
+        return;
+      }
+      
+      // Forward other events to parent
+      onMessage?.(event);
+      
+    } catch (error) {
+      console.error('Failed to parse WebView message:', error);
+    }
+  }, [onMessage, onReady, onError]);
+
+  // Cleanup on unmount - clear pending commands and timeouts
+  useEffect(() => {
+    return () => {
+      // Clear all pending commands with proper timeout cleanup
+      pendingCommandsRef.current.forEach((pending) => {
+        if (pending.timeout) {
+          clearTimeout(pending.timeout);
+        }
+        // Resolve instead of reject to prevent error logs
+        pending.resolve('component_unmounting');
+      });
+      pendingCommandsRef.current.clear();
+      
+      console.log('🧹 VimeoWrapper cleanup completed');
+    };
+  }, []);
+
+  // Destroy method for safe cleanup
+  const destroyPlayer = useCallback(async (): Promise<void> => {
+    try {
+      // Clear all pending commands
+      pendingCommandsRef.current.forEach((pending) => {
+        if (pending.timeout) {
+          clearTimeout(pending.timeout);
+        }
+        // Resolve instead of reject to prevent error logs
+        pending.resolve('player_destroyed');
+      });
+      pendingCommandsRef.current.clear();
+
+      // Safely unload the player and cleanup event listeners
+      if (webViewRef.current) {
+        const unloadScript = `
+          try {
+            if (window.vimeoBridge && window.vimeoBridge.player) {
+              window.vimeoBridge.player.unload();
+              window.vimeoBridge.player = null;
+            }
+            
+            // Remove event listeners before resetting init flag
+            if (window.vimeoBridge && window.vimeoBridge.messageHandler) {
+              window.removeEventListener('message', window.vimeoBridge.messageHandler);
+              document.removeEventListener('message', window.vimeoBridge.messageHandler);
+              window.vimeoBridge.messageHandler = null;
+            }
+            
+            // Reset initialization flag so re-init can occur cleanly
+            window.__vimeoBridgeInit = false;
+            
+            console.log('✅ Vimeo player unloaded safely and event listeners reset');
+          } catch (error) {
+            console.error('❌ Error during player unload:', error);
+          }
+        `;
+        webViewRef.current.injectJavaScript(unloadScript);
+      }
+      
+      console.log('🧹 VimeoWrapper destroyed successfully');
+    } catch (error) {
+      console.error('❌ Error during VimeoWrapper destroy:', error);
+    }
+  }, []);
+
+  // Expose imperative methods
+  useImperativeHandle(ref, () => ({
+    play: () => executeCommand('play'),
+    pause: () => executeCommand('pause'),
+    getCurrentTime: () => executeCommand('getCurrentTime'),
+    getDuration: () => executeCommand('getDuration'),
+    setCurrentTime: (seconds: number) => executeCommand('setCurrentTime', [seconds]),
+    getWebViewRef: () => webViewRef,
+    destroy: destroyPlayer
+  }), [executeCommand, destroyPlayer]);
+
+  return (
+    <WebView
+      ref={webViewRef}
+      allowsFullscreenVideo={isFullscreen} // Enable fullscreen when needed
+      allowsInlineMediaPlayback={true} // Ensure inline playback
+      mixedContentMode="compatibility" // Better audio streaming compatibility
+      cacheEnabled={true} // Improve performance during background transitions
+      source={{ uri: url, headers: { Referer: reference } }}
+      javaScriptEnabled={true}
+      allowsInlineMediaPlayback={true}
+      mediaPlaybackRequiresUserAction={false}
+      allowsFullscreenVideo={true}
+      injectedJavaScript={`
+        console.log('🚀 INJECTED SCRIPT RUNNING!');
+        
+        // Wait for page to be ready
+        function checkForVideo() {
+          console.log('🔍 Checking for video elements...');
+          const videos = document.querySelectorAll('video');
+          const iframes = document.querySelectorAll('iframe');
+          
+          console.log('📊 Found ' + videos.length + ' videos, ' + iframes.length + ' iframes');
+          
+          if (videos.length > 0) {
+            const video = videos[0];
+            console.log('🎬 DIRECT VIDEO FOUND!');
+            console.log('🎬 Video paused: ' + video.paused);
+            console.log('🎬 Video src: ' + (video.src || video.currentSrc || 'NO SRC'));
+            
+            // Make video controllable
+            video.controls = false;
+            video.muted = false;
+            video.style.display = 'block';
+            video.style.visibility = 'visible';
+            
+            // Test immediate play
+            console.log('🎬 TESTING DIRECT VIDEO PLAY...');
+            video.play().then(() => {
+              console.log('✅ DIRECT VIDEO PLAY SUCCESS!');
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'video_test',
+                result: 'play_success'
+              }));
+            }).catch((error) => {
+              console.log('❌ DIRECT VIDEO PLAY FAILED: ' + error.message);
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'video_test',
+                result: 'play_failed',
+                error: error.message
+              }));
+            });
+            
+            return true;
+          }
+          
+          return false;
+        }
+        
+        // Try immediately
+        if (!checkForVideo()) {
+          // Try after 1 second
+          setTimeout(() => {
+            if (!checkForVideo()) {
+              // Try after 3 seconds
+              setTimeout(() => {
+                if (!checkForVideo()) {
+                  console.log('❌ NO VIDEO FOUND AFTER 3 ATTEMPTS');
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'video_test',
+                    result: 'no_video_found'
+                  }));
+                }
+              }, 3000);
+            }
+          }, 1000);
+        }
+        
+        true;
+      `}
+      onMessage={handleMessage}
+      onLoad={() => console.log('📱 WebView loaded successfully')}
+      onLoadStart={() => console.log('📱 WebView load started')}
+      onError={(syntheticEvent) => {
+        const { nativeEvent } = syntheticEvent;
+        console.error('❌ WebView ERROR:', nativeEvent);
+        console.error('❌ Error description:', nativeEvent.description);
+        console.error('❌ Error code:', nativeEvent.code);
+        console.error('❌ Error URL:', nativeEvent.url);
+      }}
+      onHttpError={(syntheticEvent) => {
+        const { nativeEvent } = syntheticEvent;
+        console.error('❌ WebView HTTP ERROR:', nativeEvent.statusCode);
+        console.error('❌ HTTP Error URL:', nativeEvent.url);
+      }}
+      onLoadEnd={() => {
+        console.log('📱 WebView load ended - applying enhanced initialization');
+        console.log('📱 Final URL loaded:', url);
+        
+        // Simple test first
+        if (webViewRef.current) {
+          const simpleTest = `
+            console.log('🚀 SIMPLE TEST SCRIPT RUNNING!');
+            console.log('🚀 Document ready:', document.readyState);
+            console.log('🚀 Current URL:', window.location.href);
+            
+            // Send message to React Native
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'test_message',
+              message: 'JavaScript injection working!'
+            }));
+            
+            true;
+          `;
+          webViewRef.current.injectJavaScript(simpleTest);
+          
+          // Try multiple delayed attempts with different methods
+          const delayedTest = `
+            console.log('🚀 SETTING UP DELAYED CHECKS...');
+            
+            // Method 1: setTimeout inside WebView
+            setTimeout(function() {
+              console.log('🚀 DELAYED TEST 1 (setTimeout) RUNNING!');
+              const videos = document.querySelectorAll('video');
+              const iframes = document.querySelectorAll('iframe');
+              console.log('🚀 Method 1 - Found', videos.length, 'videos and', iframes.length, 'iframes');
+              
+              if (videos.length > 0) {
+                console.log('🚀 METHOD 1 - FOUND VIDEO! Attempting direct play...');
+                const video = videos[0];
+                video.muted = false;
+                video.play().then(function() {
+                  console.log('🚀 METHOD 1 - DIRECT VIDEO PLAY SUCCESS!');
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'video_test',
+                    result: 'method1_play_success'
+                  }));
+                }).catch(function(e) {
+                  console.log('🚀 METHOD 1 - DIRECT VIDEO PLAY FAILED:', e.message);
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'video_test',
+                    result: 'method1_play_failed',
+                    error: e.message
+                  }));
+                });
+              }
+            }, 1000);
+            
+            // Method 2: requestAnimationFrame
+            requestAnimationFrame(function() {
+              console.log('🚀 DELAYED TEST 2 (requestAnimationFrame) RUNNING!');
+              const videos = document.querySelectorAll('video');
+              const iframes = document.querySelectorAll('iframe');
+              console.log('🚀 Method 2 - Found', videos.length, 'videos and', iframes.length, 'iframes');
+            });
+            
+            true;
+          `;
+          webViewRef.current.injectJavaScript(delayedTest);
+          
+          // Method 3: React Native side setTimeout
+          setTimeout(() => {
+            if (webViewRef.current) {
+              const reactNativeDelayedTest = `
+                console.log('🚀 DELAYED TEST 3 (React Native setTimeout) RUNNING!');
+                const videos = document.querySelectorAll('video');
+                const iframes = document.querySelectorAll('iframe');
+                console.log('🚀 Method 3 - Found', videos.length, 'videos and', iframes.length, 'iframes');
+                
+                if (videos.length > 0) {
+                  console.log('🚀 METHOD 3 - FOUND VIDEO! Attempting direct play...');
+                  const video = videos[0];
+                  video.muted = false;
+                  video.play().then(function() {
+                    console.log('🚀 METHOD 3 - DIRECT VIDEO PLAY SUCCESS!');
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'video_test',
+                      result: 'method3_play_success'
+                    }));
+                  }).catch(function(e) {
+                    console.log('🚀 METHOD 3 - DIRECT VIDEO PLAY FAILED:', e.message);
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'video_test',
+                      result: 'method3_play_failed',
+                      error: e.message
+                    }));
+                  });
+                }
+                
+                true;
+              `;
+              webViewRef.current.injectJavaScript(reactNativeDelayedTest);
+            }
+          }, 3000);
+        }
+        
+        if (webViewRef.current) {
+          // Enhanced initialization with Player.js setup and fallbacks
+          const enhancedInit = `
+            try {
+              console.log('🔍 DETAILED PAGE INSPECTION:');
+              console.log('🔍 Document ready state:', document.readyState);
+              console.log('🔍 Document URL:', document.URL);
+              console.log('🔍 Document title:', document.title);
+              console.log('🔍 Iframe count:', document.querySelectorAll('iframe').length);
+              console.log('🔍 Video count:', document.querySelectorAll('video').length);
+              console.log('🔍 All elements:', document.querySelectorAll('*').length);
+              console.log('🔍 Body innerHTML length:', document.body ? document.body.innerHTML.length : 'NO BODY');
+              console.log('🔍 Body content preview:', document.body ? document.body.innerHTML.substring(0, 200) : 'NO BODY');
+              console.log('🔍 Vimeo available:', typeof Vimeo !== 'undefined');
+              
+              // Check for Vimeo error messages
+              const errorElements = document.querySelectorAll('.error, .message, .alert');
+              if (errorElements.length > 0) {
+                console.log('⚠️ Found error elements:', errorElements.length);
+                for (let i = 0; i < errorElements.length; i++) {
+                  console.log('⚠️ Error', i, ':', errorElements[i].textContent);
+                }
+              }
+              
+              // Check if video is private/restricted
+              const restrictedElements = document.querySelectorAll('[class*="private"], [class*="restricted"], [class*="password"]');
+              if (restrictedElements.length > 0) {
+                console.log('🔒 Found restriction elements:', restrictedElements.length);
+                for (let i = 0; i < restrictedElements.length; i++) {
+                  console.log('🔒 Restriction', i, ':', restrictedElements[i].textContent);
+                }
+              }
+              
+              // Test direct video access
+              const testVideos = document.querySelectorAll('video');
+              if (testVideos.length > 0) {
+                const testVideo = testVideos[0];
+                console.log('🎬 FOUND VIDEO ELEMENT!');
+                console.log('🎬 Video src:', testVideo.src || testVideo.currentSrc || 'NO SRC');
+                console.log('🎬 Video paused:', testVideo.paused);
+                console.log('🎬 Video duration:', testVideo.duration);
+                console.log('🎬 Video readyState:', testVideo.readyState);
+                console.log('🎬 Video networkState:', testVideo.networkState);
+                
+                // Try immediate play test
+                console.log('🎬 TESTING IMMEDIATE PLAY...');
+                testVideo.play().then(() => {
+                  console.log('✅ IMMEDIATE PLAY TEST SUCCESS!');
+                }).catch((e) => {
+                  console.log('❌ IMMEDIATE PLAY TEST FAILED:', e.message);
+                });
+              } else {
+                console.log('❌ NO VIDEO ELEMENTS FOUND IN PAGE');
+              }
+              
+              // Apply CSS fixes
+              const style = document.createElement('style');
+              style.textContent = \`
+                iframe { 
+                  width: 100% !important; 
+                  height: 100% !important; 
+                  display: block !important;
+                  visibility: visible !important;
+                  opacity: 1 !important;
+                }
+                video { 
+                  width: 100% !important; 
+                  height: 100% !important; 
+                  display: block !important;
+                  visibility: visible !important;
+                  opacity: 1 !important;
+                }
+              \`;
+              document.head.appendChild(style);
+              console.log('✅ CSS applied');
+              
+              // Test iframe access before Player.js
+              const tryIframeAccess = () => {
+                console.log('🔍 TRYING IFRAME DIRECT ACCESS...');
+                const iframes = document.querySelectorAll('iframe');
+                console.log('🔍 Found', iframes.length, 'iframes');
+                
+                for (let i = 0; i < iframes.length; i++) {
+                  const iframe = iframes[i];
+                  console.log('🔍 Iframe', i, 'src:', iframe.src);
+                  
+                  try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (iframeDoc) {
+                      const iframeVideos = iframeDoc.querySelectorAll('video');
+                      console.log('🎬 Found', iframeVideos.length, 'videos in iframe', i);
+                      
+                      if (iframeVideos.length > 0) {
+                        const iframeVideo = iframeVideos[0];
+                        console.log('🎬 IFRAME VIDEO FOUND!');
+                        console.log('🎬 Iframe video src:', iframeVideo.src || iframeVideo.currentSrc);
+                        console.log('🎬 Iframe video paused:', iframeVideo.paused);
+                        
+                        // Test iframe video play
+                        console.log('🎬 TESTING IFRAME VIDEO PLAY...');
+                        iframeVideo.play().then(() => {
+                          console.log('✅ IFRAME VIDEO PLAY SUCCESS!');
+                        }).catch((e) => {
+                          console.log('❌ IFRAME VIDEO PLAY FAILED:', e.message);
+                        });
+                      }
+                    }
+                  } catch (e) {
+                    console.log('❌ Iframe access blocked for iframe', i, ':', e.message);
+                  }
+                }
+              };
+              
+              // Run iframe test
+              tryIframeAccess();
+              
+              // Initialize Player.js if available
+              const initPlayer = () => {
+                try {
+                  const iframe = document.querySelector('iframe');
+                  if (iframe && typeof Vimeo !== 'undefined' && Vimeo.Player) {
+                    console.log('🎯 Initializing Vimeo Player.js');
+                    window.vimeoBridge.player = new Vimeo.Player(iframe);
+                    
+                    // Set up basic event listeners
+                    window.vimeoBridge.player.on('play', () => {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({
+                        name: 'play',
+                        data: {}
+                      }));
+                    });
+                    
+                    window.vimeoBridge.player.on('pause', () => {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({
+                        name: 'pause', 
+                        data: {}
+                      }));
+                    });
+                    
+                    window.vimeoBridge.player.on('ended', () => {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({
+                        name: 'ended',
+                        data: {}
+                      }));
+                    });
+                    
+                    window.vimeoBridge.player.on('timeupdate', (data) => {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({
+                        name: 'timeupdate',
+                        data: {
+                          currentTime: data.seconds,
+                          duration: data.duration
+                        }
+                      }));
+                    });
+                    
+                    // Send ready event when player is initialized
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      name: 'player_ready',
+                      data: {}
+                    }));
+                    
+                    console.log('✅ Player.js initialized successfully');
+                  } else {
+                    console.log('⚠️ Player.js not available, using fallback');
+                    // Send ready event even without Player.js for basic functionality
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      name: 'loaded',
+                      data: {}
+                    }));
+                  }
+                } catch (error) {
+                  console.error('❌ Player.js initialization failed:', error);
+                  // Send ready event even on error for fallback functionality
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    name: 'loaded',
+                    data: {}
+                  }));
+                }
+              };
+              
+              // Try immediate initialization, then retry with increasing delays
+              initPlayer();
+              setTimeout(initPlayer, 500);
+              setTimeout(initPlayer, 1000);
+              setTimeout(initPlayer, 2000);
+              setTimeout(initPlayer, 3000);
+              
+              // Also try when iframe loads
+              const iframe = document.querySelector('iframe');
+              if (iframe) {
+                iframe.addEventListener('load', () => {
+                  console.log('🎯 Iframe loaded, attempting player initialization');
+                  setTimeout(initPlayer, 100);
+                  setTimeout(initPlayer, 500);
+                  // Also try bridge initialization
+                  setTimeout(() => {
+                    if (window.vimeoBridge && window.vimeoBridge.tryInitPlayer) {
+                      window.vimeoBridge.tryInitPlayer();
+                    }
+                  }, 200);
+                });
+              }
+              
+              // Try bridge initialization as well
+              setTimeout(() => {
+                if (window.vimeoBridge && window.vimeoBridge.tryInitPlayer) {
+                  window.vimeoBridge.tryInitPlayer();
+                }
+              }, 1500);
+              
+              // Trigger ready state
+              setTimeout(() => {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  name: 'loaded',
+                  data: {}
+                }));
+              }, 500);
+              
+            } catch (error) {
+              console.error('❌ Enhanced initialization failed:', error);
+              // Still trigger loaded event for fallback
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                name: 'loaded',
+                data: {}
+              }));
+            }
+          `;
+          webViewRef.current.injectJavaScript(enhancedInit);
+        }
+      }}
+      onError={(error) => console.error('📱 WebView error:', error.nativeEvent)}
+      scrollEnabled={false}
+      bounces={false} // Prevent unwanted scrolling behavior
+      injectedJavaScript={`
+        console.log('🔧 Enhanced JavaScript executing...');
+        window.isFullscreen = ${isFullscreen};
+        window.playerHeight = ${playerHeight};
+        
+        // Initialize bridge immediately
+        window.vimeoBridge = {
+          pendingCommands: new Map(),
+          player: null,
+          
+          // Helper function to attempt player initialization
+          tryInitPlayer: function() {
+            if (this.player) return true; // Already initialized
+            
+            const iframe = document.querySelector('iframe');
+            if (iframe) {
+              try {
+                // Try with Vimeo Player.js if available
+                if (typeof Vimeo !== 'undefined' && Vimeo.Player) {
+                  this.player = new Vimeo.Player(iframe);
+                  console.log('🎯 Bridge player initialized with Player.js');
+                  
+                  // Set up event listeners
+                  this.player.on('play', () => {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      name: 'play',
+                      data: {}
+                    }));
+                  });
+                  
+                  this.player.on('pause', () => {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      name: 'pause',
+                      data: {}
+                    }));
+                  });
+                  
+                  this.player.on('ended', () => {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      name: 'ended',
+                      data: {}
+                    }));
+                  });
+                  
+                  this.player.on('timeupdate', (data) => {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      name: 'timeupdate',
+                      data: {
+                        currentTime: data.seconds,
+                        duration: data.duration
+                      }
+                    }));
+                  });
+                } else {
+                  // Fallback: create a mock player for direct video control
+                  console.log('🎯 Creating fallback player for direct video control');
+                  this.player = {
+                    play: () => {
+                      const video = document.querySelector('video');
+                      if (video) {
+                        return video.play();
+                      }
+                      return Promise.resolve();
+                    },
+                    pause: () => {
+                      const video = document.querySelector('video');
+                      if (video) {
+                        video.pause();
+                      }
+                      return Promise.resolve();
+                    },
+                    getCurrentTime: () => {
+                      const video = document.querySelector('video');
+                      return Promise.resolve(video ? video.currentTime : 0);
+                    }
+                  };
+                }
+                
+                // Send ready event
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  name: 'player_ready',
+                  data: {}
+                }));
+                
+                return true;
+              } catch (error) {
+                console.error('❌ Bridge player initialization failed:', error);
+              }
+            }
+            return false;
+          },
+          
+          executeCommand: function(id, action, args = []) {
+            try {
+              console.log('🎬 DIRECT VIDEO CONTROL FIRST for:', action);
+              
+              // Skip Player.js completely - use direct video control first
+              const videos = document.querySelectorAll('video');
+              console.log('🔍 Found', videos.length, 'video elements');
+              
+              if (videos.length > 0) {
+                const video = videos[0];
+                console.log('🎬 Using DIRECT video control for', action);
+                console.log('🎬 Video state: paused=' + video.paused + ', time=' + video.currentTime);
+                
+                if (action === 'play') {
+                  // Restore position if available
+                  const savedTime = parseFloat(localStorage.getItem('vimeo_current_time') || '0');
+                  if (savedTime > 0 && Math.abs(video.currentTime - savedTime) > 1) {
+                    video.currentTime = savedTime;
+                    console.log('🎬 Restored position to:', savedTime);
+                  }
+                  
+                  // Force video to be visible and unmuted
+                  video.style.display = 'block';
+                  video.style.visibility = 'visible';
+                  video.muted = false;
+                  
+                  video.play().then(() => {
+                    console.log('✅ DIRECT VIDEO PLAY SUCCESS');
+                    this.sendResponse(id, 'ok', 'direct_video_success');
+                  }).catch((error) => {
+                    console.error('❌ DIRECT VIDEO PLAY FAILED:', error);
+                    this.sendResponse(id, 'error', 'Direct video play failed: ' + error.message);
+                  });
+                  return;
+                  
+                } else if (action === 'pause') {
+                  // Save current position before pausing
+                  if (video.currentTime > 0) {
+                    localStorage.setItem('vimeo_current_time', video.currentTime.toString());
+                    console.log('🎬 Saved position:', video.currentTime);
+                  }
+                  video.pause();
+                  console.log('✅ DIRECT VIDEO PAUSE SUCCESS');
+                  this.sendResponse(id, 'ok', 'direct_video_success');
+                  return;
+                  
+                } else if (action === 'getCurrentTime') {
+                  console.log('🎬 Getting current time:', video.currentTime);
+                  this.sendResponse(id, 'ok', video.currentTime || 0);
+                  return;
+                }
+              }
+              
+              // If no video found, try Player.js as backup
+              console.log('⚠️ No video elements found, trying Player.js as backup...');
+              if (!this.player) {
+                console.log('🔄 Attempting player initialization for command:', action);
+                this.tryInitPlayer();
+              }
+              
+              // If still no player, show error
+              if (!this.player) {
+                console.log('❌ No Player.js available either, final fallback attempt...');
+                
+                // Enhanced fallback to direct video element control
+                console.log('🔍 Looking for video elements...');
+                const videos = document.querySelectorAll('video');
+                const iframe = document.querySelector('iframe');
+                
+                console.log('🔍 Found', videos.length, 'video elements');
+                console.log('🔍 Found iframe:', !!iframe);
+                
+                if (videos.length > 0) {
+                  const video = videos[0]; // Use first video element
+                  console.log('🎬 Using video element for', action);
+                  
+                  if (action === 'play') {
+                    // Ensure video starts from correct position if available
+                    const savedTime = parseFloat(localStorage.getItem('vimeo_current_time') || '0');
+                    if (savedTime > 0 && Math.abs(video.currentTime - savedTime) > 1) {
+                      video.currentTime = savedTime;
+                    }
+                    
+                    // Force video to be visible and unmuted
+                    video.style.display = 'block';
+                    video.style.visibility = 'visible';
+                    video.muted = false;
+                    
+                    video.play().then(() => {
+                      console.log('🎬 Video play successful');
+                      this.sendResponse(id, 'ok', 'fallback_success');
+                    }).catch((error) => {
+                      console.error('🎬 Video play failed:', error);
+                      this.sendResponse(id, 'error', 'Fallback play failed: ' + error.message);
+                    });
+                    return;
+                  } else if (action === 'pause') {
+                    // Save current position before pausing
+                    if (video.currentTime > 0) {
+                      localStorage.setItem('vimeo_current_time', video.currentTime.toString());
+                    }
+                    video.pause();
+                    console.log('🎬 Video paused');
+                    this.sendResponse(id, 'ok', 'fallback_success');
+                    return;
+                  } else if (action === 'getCurrentTime') {
+                    this.sendResponse(id, 'ok', video.currentTime || 0);
+                    return;
+                  }
+                } else if (iframe) {
+                  // Try to interact with iframe
+                  console.log('🎬 Trying iframe interaction for', action);
+                  try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    const iframeVideo = iframeDoc.querySelector('video');
+                    if (iframeVideo) {
+                      if (action === 'play') {
+                        iframeVideo.play();
+                        this.sendResponse(id, 'ok', 'iframe_fallback_success');
+                      } else if (action === 'pause') {
+                        iframeVideo.pause();
+                        this.sendResponse(id, 'ok', 'iframe_fallback_success');
+                      }
+                      return;
+                    }
+                  } catch (e) {
+                    console.log('🎬 Iframe access blocked:', e.message);
+                  }
+                }
+                
+                this.sendResponse(id, 'error', 'Player not initialized');
+                return;
+              }
+              
+              // Execute command with Player.js
+              const result = this.player[action].apply(this.player, args);
+              
+              if (result && typeof result.then === 'function') {
+                result.then((value) => {
+                  this.sendResponse(id, 'ok', value);
+                }).catch((error) => {
+                  this.sendResponse(id, 'error', error.message || 'Command failed');
+                });
+              } else {
+                this.sendResponse(id, 'ok', result);
+              }
+            } catch (error) {
+              this.sendResponse(id, 'error', error.message || 'Command execution failed');
+            }
+          },
+          
+          sendResponse: function(id, status, result) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'vimeo_cmd',
+              id: id,
+              status: status,
+              result: result,
+              error: status === 'error' ? result : undefined
+            }));
+          }
+        };
+        
+        // Listen for commands with proper initialization gating
+        if (!window.__vimeoBridgeInit) {
+          window.__vimeoBridgeInit = true;
+          window.vimeoBridge = window.vimeoBridge || {};
+          
+          window.vimeoBridge.messageHandler = function(event) {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'vimeo_cmd' && data.id && data.action) {
+                window.vimeoBridge.executeCommand(data.id, data.action, data.args || []);
+              }
+            } catch (error) {
+              console.error('Failed to parse bridge message:', error);
+            }
+          };
+          
+          window.addEventListener('message', window.vimeoBridge.messageHandler);
+          document.addEventListener('message', window.vimeoBridge.messageHandler);
+          
+          // Try to initialize player immediately
+          setTimeout(() => {
+            if (window.vimeoBridge && window.vimeoBridge.tryInitPlayer) {
+              window.vimeoBridge.tryInitPlayer();
+            }
+          }, 100);
+        }
+        
+        console.log('✅ Enhanced JavaScript completed');
+        true;
+      `}
+      mediaPlaybackRequiresUserAction={false} // Better autoplay control
+      style={[
+        {
+          flex: 1,
+          backgroundColor: '#000000',
+          ...(isFullscreen ? {} : { maxHeight: playerHeight }), // Use configurable height
+          maxWidth: '100%', // Prevent horizontal expansion
+          overflow: 'hidden', // Prevent content expansion
+        },
+        style
+      ]}
+      {...webViewProps}
+      {...otherProps}
+    />
+  );
+});
+
+VimeoWrapper.displayName = 'VimeoWrapper';

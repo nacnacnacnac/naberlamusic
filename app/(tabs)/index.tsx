@@ -13,6 +13,47 @@ import { playlistService } from '@/services/playlistService';
 import Toast from '@/components/Toast';
 import MusicPlayerTabBar from '@/components/MusicPlayerTabBar';
 
+// Integration Testing Infrastructure
+interface IntegrationTestState {
+  buttonPressCount: number;
+  successfulCommands: number;
+  failedCommands: number;
+  averageResponseTime: number;
+  lastCommandTime: number;
+  stateDesyncCount: number;
+  isTestingActive: boolean;
+}
+
+interface StateSnapshot {
+  timestamp: number;
+  mainPagePaused: boolean;
+  footerPaused: boolean;
+  playerReady: boolean;
+  source: string;
+}
+
+// Logger factory for production performance
+const isDev = __DEV__;
+const log = (prefix: string) => (msg: string, data?: any) => {
+  if (!isDev) return;
+  console.log(prefix + msg, data ?? '');
+};
+const logError = (prefix: string) => (msg: string, data?: any) => {
+  if (!isDev) return;
+  console.error(prefix + msg, data ?? '');
+};
+
+// Debug logging with color coding
+const debugLog = {
+  footer: log('🎵 [FOOTER] '),
+  main: log('🏠 [MAIN] '),
+  player: log('🎬 [PLAYER] '),
+  sync: log('🔄 [SYNC] '),
+  test: log('🧪 [TEST] '),
+  error: logError('❌ [ERROR] '),
+  performance: log('⚡ [PERF] ')
+};
+
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
@@ -25,35 +66,153 @@ export default function HomeScreen() {
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
   const [isPaused, setIsPaused] = useState(false);
   const [currentPlaylist, setCurrentPlaylist] = useState<any>(null);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [videoDuration, setVideoDuration] = useState<number>(0);
   const playlistScrollRef = useRef<ScrollView>(null);
 
+  // Integration Testing State
+  const [testState, setTestState] = useState<IntegrationTestState>({
+    buttonPressCount: 0,
+    successfulCommands: 0,
+    failedCommands: 0,
+    averageResponseTime: 0,
+    lastCommandTime: 0,
+    stateDesyncCount: 0,
+    isTestingActive: false
+  });
+  const [stateHistory, setStateHistory] = useState<StateSnapshot[]>([]);
+  const [showDebugOverlay, setShowDebugOverlay] = useState(__DEV__);
+  const vimeoPlayerRef = useRef<any>(null);
+  const commandStartTimeRef = useRef<number>(0);
+  const responseTimes = useRef<number[]>([]);
+
   useEffect(() => {
-    // Auto-select first video when videos load
+    // Auto-select first video when videos load and start playing
     if (videos.length > 0 && !currentVideo) {
       setCurrentVideo(videos[0]);
       setCurrentVideoIndex(0);
+      setIsPaused(false); // Start playing automatically
+      debugLog.main('Auto-selected first video and started playback:', videos[0].title);
     }
   }, [videos]);
 
   const playVideo = (video: SimplifiedVimeoVideo) => {
     const videoIndex = videos.findIndex(v => v.id === video.id);
+    
+    debugLog.main('PLAYING NEW VIDEO:', `${video.title} at index: ${videoIndex}`);
+    
+    // Direct video switching with proper state management
+    // Remove complex timeout-based approach for immediate responsiveness
     setCurrentVideo(video);
     setCurrentVideoIndex(videoIndex);
-    setIsPaused(false); // Yeni video seçildiğinde pause durumunu sıfırla
-    console.log('Playing video:', video.title, 'at index:', videoIndex);
+    setIsPaused(false); // Set to play immediately
     
     // Toast göster
     showToast(`Now Playing: ${video.title}`, 'info');
   };
 
   const handlePlayStateChange = (isPlaying: boolean) => {
-    setIsPaused(!isPlaying);
-    console.log('Play state changed:', isPlaying ? 'Playing' : 'Paused');
+    const responseTime = Date.now() - commandStartTimeRef.current;
+    const newPausedState = !isPlaying;
+    
+    debugLog.player(`Play state change callback - isPlaying: ${isPlaying}, newPaused: ${newPausedState}`);
+    debugLog.performance(`End-to-end response time: ${responseTime}ms`);
+    
+    // Track response times for performance analysis
+    if (commandStartTimeRef.current > 0 && responseTime < 10000) { // Valid response time
+      responseTimes.current.push(responseTime);
+      if (responseTimes.current.length > 50) {
+        responseTimes.current = responseTimes.current.slice(-50); // Keep last 50
+      }
+      
+      // Update average response time
+      const avgTime = responseTimes.current.reduce((a, b) => a + b, 0) / responseTimes.current.length;
+      setTestState(prev => ({
+        ...prev,
+        averageResponseTime: Math.round(avgTime),
+        successfulCommands: prev.successfulCommands + 1
+      }));
+      
+      debugLog.performance(`Average response time: ${Math.round(avgTime)}ms (${responseTimes.current.length} samples)`);
+    }
+    
+    // Validate state synchronization
+    if (isPaused === newPausedState) {
+      debugLog.sync(`State synchronization successful - Main: ${isPaused}, Player: ${newPausedState}`);
+    } else {
+      debugLog.error(`State desynchronization detected - Main: ${isPaused}, Player callback: ${newPausedState}`);
+      setTestState(prev => ({
+        ...prev,
+        stateDesyncCount: prev.stateDesyncCount + 1
+      }));
+    }
+    
+    setIsPaused(newPausedState);
+    
+    // Create state snapshot for player response
+    const snapshot: StateSnapshot = {
+      timestamp: Date.now(),
+      mainPagePaused: newPausedState,
+      footerPaused: newPausedState,
+      playerReady: vimeoPlayerRef.current?.isReady() || false,
+      source: 'player-callback'
+    };
+    
+    setStateHistory(prev => [...prev.slice(-19), snapshot]);
+    
+    // Reset command timing
+    commandStartTimeRef.current = 0;
+  };
+
+  const handleTimeUpdate = (currentTime: number, duration: number) => {
+    setCurrentTime(currentTime);
+    setVideoDuration(duration);
   };
 
   const handlePlayPause = () => {
-    setIsPaused(!isPaused);
-    console.log('Manual play/pause:', !isPaused ? 'Paused' : 'Playing');
+    const commandStartTime = Date.now();
+    commandStartTimeRef.current = commandStartTime;
+    
+    const oldPausedState = isPaused;
+    const newPausedState = !isPaused;
+    
+    // Enhanced debug logging with state tracking
+    debugLog.main(`handlePlayPause triggered - State change: ${oldPausedState} → ${newPausedState}`);
+    debugLog.main(`Command ID: ${commandStartTime}, Timestamp: ${new Date().toISOString()}`);
+    
+    // Create state snapshot before change
+    const beforeSnapshot: StateSnapshot = {
+      timestamp: commandStartTime,
+      mainPagePaused: oldPausedState,
+      footerPaused: oldPausedState, // Should match main page
+      playerReady: vimeoPlayerRef.current?.isReady() || false,
+      source: 'handlePlayPause-before'
+    };
+    
+    // Update test state
+    setTestState(prev => ({
+      ...prev,
+      buttonPressCount: prev.buttonPressCount + 1,
+      lastCommandTime: commandStartTime
+    }));
+    
+    // Update main state
+    setIsPaused(newPausedState);
+    
+    // Create state snapshot after change
+    const afterSnapshot: StateSnapshot = {
+      timestamp: Date.now(),
+      mainPagePaused: newPausedState,
+      footerPaused: newPausedState, // Should match main page
+      playerReady: vimeoPlayerRef.current?.isReady() || false,
+      source: 'handlePlayPause-after'
+    };
+    
+    // Add snapshots to history
+    setStateHistory(prev => [...prev.slice(-19), beforeSnapshot, afterSnapshot]);
+    
+    debugLog.main(`State updated successfully - New isPaused: ${newPausedState}`);
+    debugLog.performance(`Command processing time: ${Date.now() - commandStartTime}ms`);
   };
 
   const scrollToPlaylist = () => {
@@ -61,6 +220,8 @@ export default function HomeScreen() {
   };
 
   const toggleFullscreen = () => {
+    // This only affects intentional fullscreen mode, not normal playback
+    // Normal playback should always stay within the 300px height constraint
     setIsFullscreen(!isFullscreen);
   };
 
@@ -73,7 +234,7 @@ export default function HomeScreen() {
     setCurrentVideo(nextVideo);
     setCurrentVideoIndex(nextIndex);
     setIsPaused(false); // Yeni şarkı başladığında pause durumunu sıfırla
-    console.log('Playing next video:', nextVideo.title, 'at index:', nextIndex);
+    debugLog.main('Playing next video:', `${nextVideo.title} at index: ${nextIndex}`);
     
     // Toast göster
     showToast(`Next: ${nextVideo.title}`, 'info');
@@ -88,7 +249,7 @@ export default function HomeScreen() {
     setCurrentVideo(prevVideo);
     setCurrentVideoIndex(prevIndex);
     setIsPaused(false); // Yeni şarkı başladığında pause durumunu sıfırla
-    console.log('Playing previous video:', prevVideo.title, 'at index:', prevIndex);
+    debugLog.main('Playing previous video:', `${prevVideo.title} at index: ${prevIndex}`);
     
     // Toast göster
     showToast(`Previous: ${prevVideo.title}`, 'info');
@@ -99,6 +260,75 @@ export default function HomeScreen() {
     setToastType(type);
     setToastVisible(true);
   };
+
+  // Integration Test Helper Functions
+  const simulateFooterButtonPress = () => {
+    debugLog.test('Simulating footer button press');
+    handlePlayPause();
+  };
+  
+  const validateStateSync = () => {
+    const playerReady = vimeoPlayerRef.current?.isReady() || false;
+    const mainState = isPaused;
+    const playerValidation = vimeoPlayerRef.current?.validateStateSync?.();
+    const playerInternalPaused = playerValidation?.internalPaused;
+    
+    // Compare main isPaused with player's internalPaused
+    const isStatesSynced = mainState === playerInternalPaused;
+    const isValid = playerReady && isStatesSynced && playerValidation?.isValid;
+    
+    debugLog.test(`State validation - Main: ${mainState}, Player Internal: ${playerInternalPaused}, Synced: ${isStatesSynced}, Valid: ${isValid}`);
+    
+    return {
+      isValid,
+      mainState,
+      playerInternalPaused,
+      isStatesSynced,
+      playerReady,
+      playerValidation,
+      timestamp: Date.now(),
+      details: {
+        mainIsPaused: mainState,
+        playerInternalPaused: playerInternalPaused,
+        statesMatch: isStatesSynced,
+        playerReady: playerReady,
+        playerValid: playerValidation?.isValid || false
+      }
+    };
+  };
+  
+  const measureResponseTime = () => {
+    const startTime = Date.now();
+    handlePlayPause();
+    
+    // Response time will be measured in handlePlayStateChange
+    return startTime;
+  };
+  
+  const stressTestPlayPause = async (count: number = 10, interval: number = 500) => {
+    debugLog.test(`Starting stress test - ${count} presses, ${interval}ms interval`);
+    
+    setTestState(prev => ({ ...prev, isTestingActive: true }));
+    
+    for (let i = 0; i < count; i++) {
+      debugLog.test(`Stress test press ${i + 1}/${count}`);
+      handlePlayPause();
+      
+      if (i < count - 1) {
+        await new Promise(resolve => setTimeout(resolve, interval));
+      }
+    }
+    
+    setTestState(prev => ({ ...prev, isTestingActive: false }));
+    debugLog.test('Stress test completed');
+  };
+
+  // Expose test helpers in dev builds
+  useEffect(() => {
+    if (__DEV__ && typeof window !== 'undefined') {
+      (window as any).homeTestHelpers = { simulateFooterButtonPress, validateStateSync, measureResponseTime, stressTestPlayPause };
+    }
+  }, []);
 
   const handleAddToPlaylist = async (video: SimplifiedVimeoVideo) => {
     try {
@@ -118,7 +348,7 @@ export default function HomeScreen() {
         });
       }
     } catch (error) {
-      console.error('Error handling add to playlist:', error);
+      debugLog.error('Error handling add to playlist:', error);
     }
   };
 
@@ -177,16 +407,23 @@ export default function HomeScreen() {
         {currentVideo ? (
           <>
             <VimeoPlayer
+              ref={vimeoPlayerRef}
               video={currentVideo}
               isFullscreen={isFullscreen}
+              playerHeight={300}
               onFullscreenToggle={toggleFullscreen}
               onError={(error) => {
-                console.error('Video player error:', error);
+                debugLog.error('Video player error:', error);
+                setTestState(prev => ({
+                  ...prev,
+                  failedCommands: prev.failedCommands + 1
+                }));
                 showToast(error, 'error');
               }}
               onVideoEnd={playNextVideo}
               isPaused={isPaused}
               onPlayStateChange={handlePlayStateChange}
+              onTimeUpdate={handleTimeUpdate}
             />
             
             {/* Top Gradient Overlay */}
@@ -198,26 +435,6 @@ export default function HomeScreen() {
                 end={{ x: 0, y: 1 }}
               />
             )}
-            {/* Video Title Below Player */}
-            {!isFullscreen && (
-              <ThemedView style={styles.videoInfoArea}>
-                <ThemedView style={styles.titleContainer}>
-                  <ThemedView style={styles.titleTextContainer}>
-                    <ThemedText style={styles.currentVideoTitle} numberOfLines={2}>
-                      {currentVideo.title}
-                    </ThemedText>
-                  </ThemedView>
-                  <TouchableOpacity 
-                    style={styles.addToPlaylistButton}
-                    onPress={() => handleAddToPlaylist(currentVideo)}
-                  >
-                    <IconSymbol name="plus" size={16} color="#e0af92" />
-                  </TouchableOpacity>
-                </ThemedView>
-                {/* Separator Line */}
-                <ThemedView style={styles.separatorLine} />
-              </ThemedView>
-            )}
           </>
         ) : (
           <ThemedView style={styles.noVideoContainer}>
@@ -226,6 +443,27 @@ export default function HomeScreen() {
           </ThemedView>
         )}
       </ThemedView>
+
+      {/* Video Info Area - Now outside playerArea */}
+      {currentVideo && !isFullscreen && (
+        <ThemedView style={styles.videoInfoArea}>
+          <ThemedView style={styles.titleContainer}>
+            <ThemedView style={styles.titleTextContainer}>
+              <ThemedText style={styles.currentVideoTitle} numberOfLines={2}>
+                {currentVideo.title}
+              </ThemedText>
+            </ThemedView>
+            <TouchableOpacity 
+              style={styles.addToPlaylistButton}
+              onPress={() => handleAddToPlaylist(currentVideo)}
+            >
+              <IconSymbol name="plus" size={16} color="#e0af92" />
+            </TouchableOpacity>
+          </ThemedView>
+          {/* Separator Line */}
+          <ThemedView style={styles.separatorLine} />
+        </ThemedView>
+      )}
 
       {/* Playlist Area */}
       {!isFullscreen && (
@@ -322,8 +560,11 @@ export default function HomeScreen() {
               params: { videoId: currentVideo.id }
             });
           }}
+          testState={testState}
+          onTestStateChange={setTestState}
         />
       )}
+
 
     </ThemedView>
   );
@@ -384,10 +625,16 @@ const styles = StyleSheet.create({
 
   // Player Area
   playerArea: {
-    height: 300, // Daha büyük player
-    backgroundColor: '#000000', // Tutarlı siyah
-    marginTop: 30, // Kameradan daha aşağıda
-    position: 'relative', // Overlay için
+    height: 300, // Fixed player height
+    maxHeight: 300, // Hard constraint to prevent expansion
+    width: '100%', // Prevent horizontal expansion
+    backgroundColor: '#000000', // Consistent black background
+    marginTop: 30, // Space from camera notch
+    position: 'relative', // For overlay positioning
+    overflow: 'hidden', // Prevent content from expanding beyond bounds
+    // Debug styling (commented out)
+    // borderWidth: 2,
+    // borderColor: '#ff0000',
   },
   topGradientOverlay: {
     position: 'absolute',
@@ -417,8 +664,9 @@ const styles = StyleSheet.create({
   videoInfoArea: {
     backgroundColor: '#000000',
     paddingHorizontal: 20,
-    paddingVertical: 12, // Alt üst eşit boşluk
-    marginTop: 0, // Normal boşluk
+    paddingVertical: 12, // Equal top and bottom spacing
+    marginTop: 0, // No additional margin to maintain player constraints
+    position: 'relative', // Ensure proper positioning without affecting player
   },
   titleContainer: {
     flexDirection: 'row',
@@ -537,5 +785,128 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  
+  // Debug Overlay Styles
+  debugOverlay: {
+    position: 'absolute',
+    top: 50,
+    right: 10,
+    width: 280,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+    zIndex: 9999,
+  },
+  debugToggle: {
+    position: 'absolute',
+    top: -15,
+    right: 10,
+    width: 30,
+    height: 30,
+    backgroundColor: '#000',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  debugToggleText: {
+    fontSize: 16,
+  },
+  debugPanel: {
+    padding: 12,
+  },
+  debugTitle: {
+    color: '#e0af92',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  debugSubtitle: {
+    color: '#e0af92',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  debugRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  debugLabel: {
+    color: 'white',
+    fontSize: 11,
+  },
+  debugValue: {
+    color: '#ccc',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  debugError: {
+    color: '#ff6b6b',
+  },
+  debugPaused: {
+    color: '#ffa500',
+  },
+  debugPlaying: {
+    color: '#4caf50',
+  },
+  debugReady: {
+    color: '#4caf50',
+  },
+  debugNotReady: {
+    color: '#ff6b6b',
+  },
+  debugButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    gap: 8,
+  },
+  debugButton: {
+    flex: 1,
+    backgroundColor: '#333',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  debugButtonText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  debugHistory: {
+    maxHeight: 100,
+  },
+  debugHistoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  debugHistoryTime: {
+    color: '#888',
+    fontSize: 9,
+    flex: 1,
+  },
+  debugHistorySource: {
+    color: '#aaa',
+    fontSize: 9,
+    flex: 1,
+    textAlign: 'center',
+  },
+  debugHistoryState: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'right',
   },
 });

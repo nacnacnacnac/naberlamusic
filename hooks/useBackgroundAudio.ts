@@ -1,0 +1,74 @@
+import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
+
+// Safely import expo-av with error handling
+let Audio: any = null;
+try {
+  Audio = require('expo-av').Audio;
+} catch (error) {
+  console.warn('expo-av not available:', error);
+}
+
+interface BackgroundAudioState {
+  isConfigured: boolean;
+  error: string | null;
+}
+
+export const useBackgroundAudio = (): BackgroundAudioState => {
+  const [state, setState] = useState<BackgroundAudioState>({
+    isConfigured: false,
+    error: null,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const configureAudioSession = async () => {
+      try {
+        // Only configure on native platforms
+        if (Platform.OS === 'web' || !Audio) {
+          if (isMounted) {
+            setState({ isConfigured: true, error: null });
+          }
+          return;
+        }
+
+        // Configure audio session for background playback
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_MIX_WITH_OTHERS,
+          shouldDuckAndroid: false,
+          allowsRecordingIOS: false,
+          interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+        });
+
+        if (__DEV__) {
+          console.log('[BackgroundAudio] Audio session configured successfully');
+        }
+
+        if (isMounted) {
+          setState({ isConfigured: true, error: null });
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown audio session error';
+        
+        if (__DEV__) {
+          console.error('[BackgroundAudio] Failed to configure audio session:', errorMessage);
+        }
+
+        if (isMounted) {
+          setState({ isConfigured: false, error: errorMessage });
+        }
+      }
+    };
+
+    configureAudioSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return state;
+};
