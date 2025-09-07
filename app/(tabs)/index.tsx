@@ -663,32 +663,36 @@ export default function HomeScreen() {
                           currentVideo?.id === playlistVideo.id && styles.currentPlaylistItem
                         ]}
                         onPress={() => {
-                          console.log('🎵 Playlist video tapped:', playlistVideo.title, 'ID:', playlistVideo.id);
-                          console.log('🎵 Available main videos:', videos.map(v => ({ id: v.id, title: v.name })));
+                          console.log('🎵 Playlist video tapped:', playlistVideo.title);
+                          console.log('🎵 Playlist video UUID:', playlistVideo.id);
+                          console.log('🎵 Playlist video Vimeo ID:', playlistVideo.vimeo_id);
                           
-                          // Find the video in the main videos array and play it
-                          const video = videos.find(v => v.id === playlistVideo.id);
+                          // Use vimeo_id if available, otherwise try to find by UUID
+                          const vimeoIdToUse = playlistVideo.vimeo_id || playlistVideo.id;
+                          
+                          // Try to find the video in main videos array by Vimeo ID
+                          const video = videos.find(v => v.id === vimeoIdToUse);
                           console.log('🎵 Found matching video:', video ? video.name : 'NOT FOUND');
                           
                           if (video) {
-                            console.log('🎵 Playing video:', video.name);
+                            console.log('🎵 Playing video from main list:', video.name);
                             playVideo(video);
                           } else {
-                            console.log('❌ Video not found in main list, trying to create from playlist data');
-                            // Create a video object from playlist data
+                            console.log('🎵 Creating synthetic video from playlist data');
+                            // Create a video object from playlist data using the correct Vimeo ID
                             const syntheticVideo = {
-                              id: playlistVideo.id,
+                              id: vimeoIdToUse,
                               name: playlistVideo.title,
                               description: '',
                               duration: playlistVideo.duration,
                               embed: {
-                                html: `<iframe src="https://player.vimeo.com/video/${playlistVideo.id}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+                                html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
                               },
                               pictures: {
                                 sizes: [{ link: playlistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
                               }
                             };
-                            console.log('🎵 Playing synthetic video:', syntheticVideo.name);
+                            console.log('🎵 Playing synthetic video:', syntheticVideo.name, 'with Vimeo ID:', vimeoIdToUse);
                             playVideo(syntheticVideo);
                           }
                         }}
