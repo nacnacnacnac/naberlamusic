@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Image } from 'expo-image';
@@ -77,6 +77,56 @@ export default function MusicPlayerTabBar({
   const pressEventsRef = useRef<ButtonPressEvent[]>([]);
   const lastVisualStateRef = useRef<'play' | 'pause'>(isPaused ? 'play' : 'pause');
   const pressStartTimeRef = useRef<number>(0);
+
+  // Logo animation values
+  const logoScale = useRef(new Animated.Value(1)).current;
+  const logoOpacity = useRef(new Animated.Value(1)).current;
+
+  // Logo heartbeat animation
+  const startLogoHeartbeat = () => {
+    Animated.sequence([
+      // First beat
+      Animated.timing(logoScale, {
+        toValue: 1.15,
+        duration: 120,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(logoScale, {
+        toValue: 0.95,
+        duration: 100,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      // Second beat
+      Animated.timing(logoScale, {
+        toValue: 1.1,
+        duration: 100,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(logoScale, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Repeat animation every 3 seconds
+      setTimeout(() => {
+        startLogoHeartbeat();
+      }, 3000);
+    });
+  };
+
+  // Start animation on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      startLogoHeartbeat();
+    }, 2000); // Start after 2 seconds
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // Track visual state changes and validate consistency
   useEffect(() => {
@@ -218,11 +268,18 @@ export default function MusicPlayerTabBar({
       <View style={styles.container}>
       {/* Left Logo */}
       <View style={styles.leftLogo}>
-        <Image
-          source={require('@/assets/images/naberla.svg')}
-          style={styles.logoImage}
-          contentFit="contain"
-        />
+        <Animated.View
+          style={{
+            transform: [{ scale: logoScale }],
+            opacity: logoOpacity,
+          }}
+        >
+          <Image
+            source={require('@/assets/images/naberla.svg')}
+            style={styles.logoImage}
+            contentFit="contain"
+          />
+        </Animated.View>
       </View>
 
       {/* Music Controls - Centered */}

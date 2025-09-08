@@ -317,7 +317,8 @@ export default function HomeScreen() {
     for (const playlist of userPlaylists) {
       if (playlist.videos && playlist.videos.length > 0) {
         const videoIndex = playlist.videos.findIndex((v: any) => 
-          v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id
+          v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id ||
+          v.id === currentVideo?.vimeo_id || v.vimeo_id === currentVideo?.vimeo_id
         );
         if (videoIndex !== -1) {
           currentPlaylist = playlist;
@@ -367,7 +368,8 @@ export default function HomeScreen() {
     for (const playlist of userPlaylists) {
       if (playlist.videos && playlist.videos.length > 0) {
         const videoIndex = playlist.videos.findIndex((v: any) => 
-          v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id
+          v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id ||
+          v.id === currentVideo?.vimeo_id || v.vimeo_id === currentVideo?.vimeo_id
         );
         if (videoIndex !== -1) {
           currentPlaylist = playlist;
@@ -684,7 +686,7 @@ export default function HomeScreen() {
                         key={`${playlist.id}-${playlistVideo.id}`}
                         style={[
                           styles.playlistItem,
-                          currentVideo?.id === playlistVideo.id && styles.currentPlaylistItem
+                          (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentPlaylistItem
                         ]}
                         onPress={() => {
                           // Use vimeo_id if available, otherwise try to find by UUID
@@ -709,7 +711,7 @@ export default function HomeScreen() {
                           <Text 
                             style={[
                               styles.playlistItemTitle,
-                              currentVideo?.id === playlistVideo.id && styles.currentPlaylistItemTitle
+                              (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentPlaylistItemTitle
                             ]} 
                             numberOfLines={1}
                           >
@@ -718,14 +720,14 @@ export default function HomeScreen() {
                           <Text 
                             style={[
                               styles.playlistItemDuration,
-                              currentVideo?.id === playlistVideo.id && styles.currentPlaylistItemDuration
+                              (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentPlaylistItemDuration
                             ]}
                           >
                             {Math.floor(playlistVideo.duration / 60)}:{(playlistVideo.duration % 60).toString().padStart(2, '0')}
                           </Text>
                         </View>
                         <View style={styles.playlistItemActions}>
-                          {currentVideo?.id === playlistVideo.id && (
+                          {(currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && (
                             <IconSymbol name="speaker.wave.2.fill" size={16} color="#e0af92" />
                           )}
                         </View>
