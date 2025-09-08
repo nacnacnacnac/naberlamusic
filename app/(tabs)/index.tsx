@@ -666,9 +666,11 @@ export default function HomeScreen() {
                           console.log('🎵 Playlist video tapped:', playlistVideo.title);
                           console.log('🎵 Playlist video UUID:', playlistVideo.id);
                           console.log('🎵 Playlist video Vimeo ID:', playlistVideo.vimeo_id);
+                          console.log('🎵 Full playlist video object:', JSON.stringify(playlistVideo, null, 2));
                           
                           // Use vimeo_id if available, otherwise try to find by UUID
                           const vimeoIdToUse = playlistVideo.vimeo_id || playlistVideo.id;
+                          console.log('🎵 Final Vimeo ID to use:', vimeoIdToUse);
                           
                           // Always create synthetic video from playlist data with correct Vimeo ID
                           console.log('🎵 Creating synthetic video from playlist data');
