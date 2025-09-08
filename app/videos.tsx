@@ -126,7 +126,7 @@ export default function PlaylistsScreen() {
             style={styles.playlistIcon}
             contentFit="contain"
           />
-          <ThemedText style={styles.emptyTitle}>A lonely playlist.</ThemedText>
+          <ThemedText style={styles.emptyTitle}>Looks a little quiet.</ThemedText>
           <ThemedText style={styles.emptyText}>
             Create awesome playlist to organize your music
           </ThemedText>
@@ -136,7 +136,7 @@ export default function PlaylistsScreen() {
           >
             <IconSymbol name="plus" size={20} color="#000000" />
             <ThemedText style={styles.createPlaylistButtonText}>
-              Create Your Awesome Playlist
+              Create Your Playlist
             </ThemedText>
           </TouchableOpacity>
         </ThemedView>
