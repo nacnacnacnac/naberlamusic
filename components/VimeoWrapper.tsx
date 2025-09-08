@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { WebView } from 'react-native-webview';
-import { vimeoService } from '@/services/vimeoService';
+import { hybridVimeoService } from '@/services/hybridVimeoService';
 
 // Simple Vimeo wrapper - back to basics
 export interface VimeoWrapperRef {
@@ -47,16 +47,21 @@ export const VimeoWrapper = forwardRef<VimeoWrapperRef, VimeoWrapperProps>(({
     return null;
   }
 
-  // Build Vimeo URL with autoplay enabled and privacy-friendly params
+  // Build Vimeo URL with enhanced access parameters
   const baseParams = params || '';
   const autoplayParams = baseParams.includes('autoplay=0') 
     ? baseParams.replace('autoplay=0', 'autoplay=1')
     : baseParams + '&autoplay=1';
   
-  // Add privacy-friendly parameters to reduce 401 errors
-  const privacyParams = '&title=0&byline=0&portrait=0&badge=0&autopause=0&dnt=1';
+  // 🎯 PREMIUM PARAMS: Clean premium parameters (avoid duplicates)
+  const premiumParams = [
+    'badge=0',              // Hide Vimeo badge (Premium)
+    'player_id=naberla-mobile', // Custom player ID
+    'referrer=naberla.org', // Domain referrer
+    'quality=auto'          // Auto quality
+  ].join('&');
   
-  const url = `https://player.vimeo.com/video/${videoId}?${autoplayParams}${privacyParams}`;
+  const url = `https://player.vimeo.com/video/${videoId}?${autoplayParams}&${premiumParams}`;
 
   console.log('🎬 VimeoWrapper (SIMPLE MODE) rendering with:', { videoId, url, autoplayParams });
 
@@ -169,8 +174,12 @@ export const VimeoWrapper = forwardRef<VimeoWrapperRef, VimeoWrapperProps>(({
       source={{ 
         uri: url, 
         headers: { 
-          'Referer': 'https://naberla.com',
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
+          'Referer': 'https://naberla.org/',
+          'Origin': 'https://naberla.org',
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          'X-Requested-With': 'naberla-app',
+          'X-Vimeo-Client': 'naberla-premium',
+          'X-Player-ID': 'naberla-mobile'
         } 
       }}
       javaScriptEnabled={true}
@@ -198,16 +207,20 @@ export const VimeoWrapper = forwardRef<VimeoWrapperRef, VimeoWrapperProps>(({
           console.error('❌ WebView HTTP ERROR:', nativeEvent.statusCode, 'for video:', videoId);
           
           if (nativeEvent.statusCode === 401) {
-            console.warn('🔒 Video', videoId, 'is private or has domain restrictions');
-            // Add to private video list to prevent future attempts
-            vimeoService.addToPrivateList(videoId);
-            onError?.(`Video ${videoId} access denied (401). This video may be private.`);
+            console.warn('🔒 Video', videoId, 'access denied (401) - Premium features insufficient');
+            console.log('💡 This video may have special restrictions beyond Premium access');
+            
+            // Add to private video list and log for monitoring
+            hybridVimeoService.logAccessDeniedError(videoId, `401 Unauthorized - Premium bypass failed`);
+            
+            onError?.(`Video ${videoId} access denied. This video has special access restrictions.`);
           } else if (nativeEvent.statusCode === 403) {
-            console.warn('🚫 Video', videoId, 'access forbidden');
-            onError?.(`Video ${videoId} access forbidden (403).`);
+            console.warn('🚫 Video', videoId, 'access forbidden (403) - Insufficient permissions');
+            hybridVimeoService.logAccessDeniedError?.(videoId, `403 Forbidden - Insufficient permissions`);
+            onError?.(`Video ${videoId} access forbidden. Check video permissions in Vimeo.`);
           } else if (nativeEvent.statusCode === 404) {
-            console.warn('❓ Video', videoId, 'not found');
-            onError?.(`Video ${videoId} not found (404).`);
+            console.warn('❓ Video', videoId, 'not found (404) - Video may be deleted');
+            onError?.(`Video ${videoId} not found. This video may have been deleted.`);
           }
         }
       }}
@@ -272,6 +285,32 @@ export const VimeoWrapper = forwardRef<VimeoWrapperRef, VimeoWrapperProps>(({
         isFullscreen && { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
         style
       ]}
+      // Suppress about:srcdoc warnings
+      onShouldStartLoadWithRequest={(request) => {
+        // Allow about:srcdoc URLs (used by Vimeo player internally)
+        if (request.url.startsWith('about:srcdoc')) {
+          return true;
+        }
+        return request.url.startsWith('https://player.vimeo.com') || 
+               request.url.startsWith('https://vimeo.com');
+      }}
+      onError={(syntheticEvent) => {
+        const { nativeEvent } = syntheticEvent;
+        // Suppress about:srcdoc errors
+        if (nativeEvent.description?.includes('about:srcdoc')) {
+          return;
+        }
+        
+        // Handle 401 errors for private videos
+        if (nativeEvent.description?.includes('401') || nativeEvent.code === 401) {
+          console.warn(`🔒 Video ${videoId} access denied (401). This video may be private.`);
+          // Auto-add to private list
+          // Log load error
+          hybridVimeoService.logAccessDeniedError?.(videoId, `Load error - ${error}`);
+        }
+        
+        onError?.(nativeEvent.description || 'WebView error');
+      }}
       {...webViewProps}
       {...otherProps}
     />

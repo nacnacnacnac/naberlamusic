@@ -12,7 +12,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { adminApiService } from '@/services/adminApiService';
-import { vimeoService } from '@/services/vimeoService';
+import { hybridVimeoService } from '@/services/hybridVimeoService';
 import Toast from '@/components/Toast';
 
 export default function DebugApiScreen() {
@@ -112,12 +112,56 @@ export default function DebugApiScreen() {
     }
   };
 
+  const testBackendTokens = async () => {
+    setLoading(true);
+    addResult('Testing Backend Token Service...');
+    
+    try {
+      const serviceInfo = hybridVimeoService.getServiceInfo();
+      addResult(`Backend tokens enabled: ${serviceInfo.useBackendTokens ? '✅ YES' : '❌ NO'}`);
+      addResult(`Service initialized: ${serviceInfo.isInitialized ? '✅ YES' : '❌ NO'}`);
+      
+      if (serviceInfo.useBackendTokens) {
+        addResult('🌐 Backend Configuration:');
+        const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 
+                          require('../app.json').expo.extra?.EXPO_PUBLIC_BACKEND_URL;
+        const appId = process.env.EXPO_PUBLIC_APP_ID || 
+                     require('../app.json').expo.extra?.EXPO_PUBLIC_APP_ID;
+        
+        addResult(`  Backend URL: ${backendUrl}`);
+        addResult(`  App ID: ${appId}`);
+        addResult(`  Token Info: ${JSON.stringify(serviceInfo.tokenInfo)}`);
+        
+        // Test backend token fetch
+        try {
+          const token = await hybridVimeoService.getCurrentToken();
+          addResult(`✅ Backend token fetch: SUCCESS`);
+          addResult(`  Token: ${token.substring(0, 15)}...`);
+        } catch (error) {
+          addResult(`❌ Backend token fetch: FAILED`);
+          addResult(`  Error: ${error}`);
+        }
+      } else {
+        addResult('📱 Using local token configuration');
+        const localToken = process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN || 
+                          require('../app.json').expo.extra?.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN;
+        addResult(`  Local token available: ${localToken && localToken !== 'your_new_vimeo_token_here' ? '✅ YES' : '❌ NO'}`);
+      }
+      
+    } catch (error) {
+      addResult(`❌ Backend token test failed: ${error}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const testVimeoConnection = async () => {
     setLoading(true);
     addResult('Testing Vimeo API connection...');
     
     try {
-      const token = process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN;
+      const token = process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN || 
+                   require('../app.json').expo.extra?.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN;
       addResult(`Token available: ${token ? '✅ YES' : '❌ NO'}`);
       
       if (!token) {
@@ -132,6 +176,52 @@ export default function DebugApiScreen() {
       
       if (isConnected) {
         addResult('🎉 Vimeo authentication successful!');
+        
+        // Test video access with enhanced filtering
+        addResult('Testing video access with enhanced filtering...');
+        try {
+          const videos = await vimeoService.getAllUserVideos();
+          addResult(`✅ Loaded ${videos.length} videos with enhanced access`);
+          
+          // Show video access statistics
+          const restrictedCount = videos.filter(v => v.hasEmbedRestriction).length;
+          const privateCount = videos.filter(v => v.isPasswordProtected || v.isPrivateView).length;
+          const publicCount = videos.length - restrictedCount - privateCount;
+          
+          addResult(`📊 Video Access Stats:`);
+          addResult(`   - Public videos: ${publicCount}`);
+          addResult(`   - Restricted embed: ${restrictedCount}`);
+          addResult(`   - Private/Password: ${privateCount}`);
+          addResult(`   - Total accessible: ${videos.length}`);
+          
+          // Show access denied statistics
+          const accessStats = await vimeoService.getAccessDeniedStats();
+          addResult(`🚨 Access Denied Monitoring:`);
+          addResult(`   - Error rate: ${accessStats.errorRate.toFixed(1)}%`);
+          addResult(`   - Blocked videos: ${accessStats.accessDeniedCount}`);
+          addResult(`   - Recent errors: ${accessStats.recentErrors.length}`);
+          
+          if (accessStats.recentErrors.length > 0) {
+            addResult(`   - Last 3 errors:`);
+            accessStats.recentErrors.slice(-3).forEach(error => {
+              addResult(`     ${error}`);
+            });
+          }
+          
+          // Check embed settings for first few videos
+          addResult(`🔍 Checking embed settings for first 3 videos:`);
+          videos.slice(0, 3).forEach((video, index) => {
+            addResult(`   ${index + 1}. ${video.title}`);
+            addResult(`      - ID: ${video.id}`);
+            addResult(`      - Embed Privacy: ${video.embedPrivacy || 'public'}`);
+            addResult(`      - Has Restrictions: ${video.hasEmbedRestriction ? 'YES' : 'NO'}`);
+            addResult(`      - Password Protected: ${video.isPasswordProtected ? 'YES' : 'NO'}`);
+            addResult(`      - Private View: ${video.isPrivateView ? 'YES' : 'NO'}`);
+          });
+          
+        } catch (videoError: any) {
+          addResult(`❌ Video access test failed: ${videoError.message}`);
+        }
       }
     } catch (error: any) {
       addResult(`❌ Vimeo connection error: ${error.message}`);
@@ -142,10 +232,10 @@ export default function DebugApiScreen() {
 
   const testDirectApiCall = async () => {
     setLoading(true);
-    addResult('Testing direct API call...');
+    addResult('Testing direct naberla.org API call...');
     
     try {
-      const response = await fetch('https://igami-worker.ugurcan-b84.workers.dev/api/playlists', {
+      const response = await fetch('https://naberla.org/api/playlists', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -156,13 +246,219 @@ export default function DebugApiScreen() {
       
       if (response.ok) {
         const data = await response.json();
-        addResult(`✅ Direct API call success: ${JSON.stringify(data, null, 2)}`);
+        addResult(`✅ Naberla.org API call success: Found ${data.playlists?.length || 0} playlists`);
+        if (data.playlists?.[0]) {
+          addResult(`First playlist: "${data.playlists[0].name}" with ${data.playlists[0].videos?.length || 0} videos`);
+        }
       } else {
         const errorText = await response.text();
-        addResult(`❌ Direct API call failed: ${errorText}`);
+        addResult(`❌ Naberla.org API call failed: ${errorText}`);
       }
     } catch (error: any) {
-      addResult(`❌ Direct API call error: ${error.message}`);
+      addResult(`❌ Naberla.org API call error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetToOriginalState = async () => {
+    setLoading(true);
+    addResult('🔄 Resetting to original working state...');
+    
+    try {
+      // Clear all the filtering and error tracking we added
+      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      
+      addResult('Clearing private video list...');
+      await AsyncStorage.default.removeItem('private_video_ids');
+      
+      addResult('Clearing access denied log...');
+      await AsyncStorage.default.removeItem('access_denied_log');
+      
+      addResult('🔍 DEBUG: Clearing video cache...');
+      try {
+        await hybridVimeoService.clearCache();
+        addResult('✅ Video cache cleared');
+      } catch (error) {
+        addResult(`🔍 DEBUG: ❌ Reset error: ${error}`);
+      }
+      
+      addResult('✅ Reset complete - back to original working state!');
+      addResult('💡 Now try loading videos again - should work like before');
+      showToast('Reset to original state complete!');
+    } catch (error: any) {
+      addResult(`❌ Reset error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testDomainBypass = async () => {
+    setLoading(true);
+    addResult('Testing domain bypass methods...');
+    
+    try {
+      // Test different embed URLs for a sample video
+      const sampleVideoId = '140178314'; // Use a known video ID
+      
+      addResult(`🔍 Testing different embed methods for video ${sampleVideoId}:`);
+      
+      // Method 1: Standard embed
+      const standardUrl = `https://player.vimeo.com/video/${sampleVideoId}?autoplay=0&title=0&byline=0&portrait=0`;
+      addResult(`   1. Standard: ${standardUrl}`);
+      
+      // Method 2: Premium features
+      const premiumUrl = vimeoService.getEmbedUrl(sampleVideoId, { 
+        autoplay: true, 
+        usePremiumFeatures: true 
+      });
+      addResult(`   2. Premium Features: ${premiumUrl}`);
+      
+      // Method 3: Domain bypass
+      const bypassUrl = vimeoService.getDomainBypassUrl(sampleVideoId);
+      addResult(`   3. Domain Bypass: ${bypassUrl}`);
+      
+      // Method 4+: Alternative URLs
+      const altUrls = vimeoService.getAlternativeUrls(sampleVideoId);
+      altUrls.forEach((url, index) => {
+        addResult(`   ${index + 4}. Alternative ${index + 1}: ${url}`);
+      });
+      
+      addResult('💡 Try these URLs manually in a browser to see which works');
+      addResult('✅ Domain bypass test completed');
+      
+    } catch (error: any) {
+      addResult(`❌ Domain bypass test error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkVideoAccess = async () => {
+    setLoading(true);
+    addResult('Checking video access status...');
+    
+    try {
+      // Check multiple problematic videos
+      const problemVideos = ['287272607', '530776691'];
+      
+      for (const videoId of problemVideos) {
+        addResult(`🔍 Checking access for video ${videoId}:`);
+        
+        // Check if video exists in API
+        try {
+          addResult(`   Testing API access...`);
+          const videoData = await vimeoService.getVideo(videoId);
+          addResult(`   ✅ API Access: SUCCESS`);
+          addResult(`   Title: ${videoData.title}`);
+          addResult(`   Duration: ${videoData.duration}s`);
+        } catch (apiError: any) {
+          addResult(`   ❌ API Access: FAILED - ${apiError.message}`);
+          if (apiError.message?.includes('401')) {
+            addResult(`   💡 Token doesn't have access to this video via API either`);
+          }
+        }
+        
+        const accessStatus = await vimeoService.getVideoAccessStatus(videoId);
+        
+        if (accessStatus.accessible) {
+          addResult(`   ✅ Local Status: Accessible`);
+        } else {
+          addResult(`   ❌ Local Status: NOT accessible`);
+          addResult(`     Reason: ${accessStatus.reason}`);
+          addResult(`     Last Error: ${accessStatus.lastError}`);
+          addResult(`     Error Count: ${accessStatus.errorCount}`);
+        }
+        
+        addResult(''); // Empty line for separation
+      }
+      
+      // Check overall access denied stats
+      const stats = await vimeoService.getAccessDeniedStats();
+      addResult(`📊 Overall Access Stats:`);
+      addResult(`   Total blocked videos: ${stats.accessDeniedCount}`);
+      addResult(`   Error rate: ${stats.errorRate.toFixed(1)}%`);
+      addResult(`   Recent errors: ${stats.recentErrors.length}`);
+      
+      if (stats.recentErrors.length > 0) {
+        addResult(`   Recent error examples:`);
+        stats.recentErrors.slice(-5).forEach(error => {
+          addResult(`     - ${error}`);
+        });
+      }
+      
+    } catch (error: any) {
+      addResult(`❌ Video access check error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkTokenPermissions = async () => {
+    setLoading(true);
+    addResult('Checking Vimeo token permissions...');
+    
+    try {
+      // Test basic connection first
+      const isConnected = await vimeoService.testConnection();
+      addResult(`🔗 Basic Connection: ${isConnected ? '✅ SUCCESS' : '❌ FAILED'}`);
+      
+      if (!isConnected) {
+        addResult('❌ Cannot proceed - basic connection failed');
+        return;
+      }
+      
+      // Try to get user info with detailed scopes
+      addResult('🔍 Testing token scopes...');
+      
+      try {
+        // Test /me endpoint for user info
+        const response = await fetch('https://api.vimeo.com/me', {
+          headers: {
+            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN || require('../app.json').expo.extra?.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN}`,
+            'Accept': 'application/vnd.vimeo.*+json;version=3.4'
+          }
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          addResult(`✅ User Data Access: SUCCESS`);
+          addResult(`   User: ${userData.name}`);
+          addResult(`   Account: ${userData.account}`);
+          addResult(`   Available Scopes: ${userData.available_scopes || 'Not provided'}`);
+          
+          // Test video list access
+          addResult('🎬 Testing video list access...');
+          const videoResponse = await fetch('https://api.vimeo.com/me/videos?per_page=1', {
+            headers: {
+              'Authorization': `Bearer ${process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN || require('../app.json').expo.extra?.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN}`,
+              'Accept': 'application/vnd.vimeo.*+json;version=3.4'
+            }
+          });
+          
+          if (videoResponse.ok) {
+            const videoData = await videoResponse.json();
+            addResult(`✅ Video List Access: SUCCESS`);
+            addResult(`   Total Videos: ${videoData.total}`);
+            addResult(`   Can access video metadata: YES`);
+          } else {
+            addResult(`❌ Video List Access: FAILED (${videoResponse.status})`);
+          }
+          
+        } else {
+          addResult(`❌ User Data Access: FAILED (${response.status})`);
+          const errorData = await response.text();
+          addResult(`   Error: ${errorData}`);
+        }
+        
+      } catch (error: any) {
+        addResult(`❌ Token permission test failed: ${error.message}`);
+      }
+      
+      addResult('💡 If token has limited scopes, some videos may be inaccessible');
+      
+    } catch (error: any) {
+      addResult(`❌ Token permission check error: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -222,7 +518,7 @@ export default function DebugApiScreen() {
             onPress={testDirectApiCall}
             disabled={loading}
           >
-            <ThemedText style={styles.testButtonText}>3. Test Direct API Call</ThemedText>
+            <ThemedText style={styles.testButtonText}>3. Test Naberla.org API</ThemedText>
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -255,6 +551,46 @@ export default function DebugApiScreen() {
             disabled={loading}
           >
             <ThemedText style={styles.testButtonText}>7. Sync with Admin</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.testButton, { backgroundColor: '#10B981' }, loading && styles.testButtonDisabled]}
+            onPress={resetToOriginalState}
+            disabled={loading}
+          >
+            <ThemedText style={styles.testButtonText}>8. 🔄 Reset to Original State</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.testButton, { backgroundColor: '#8B5CF6' }, loading && styles.testButtonDisabled]}
+            onPress={testDomainBypass}
+            disabled={loading}
+          >
+            <ThemedText style={styles.testButtonText}>9. 🌐 Test Domain Bypass</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.testButton, { backgroundColor: '#10B981' }, loading && styles.testButtonDisabled]}
+            onPress={testBackendTokens}
+            disabled={loading}
+          >
+            <ThemedText style={styles.testButtonText}>10. 🔗 Test Backend Tokens</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.testButton, { backgroundColor: '#F59E0B' }, loading && styles.testButtonDisabled]}
+            onPress={checkVideoAccess}
+            disabled={loading}
+          >
+            <ThemedText style={styles.testButtonText}>11. 🔍 Check Video Access</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.testButton, { backgroundColor: '#EF4444' }, loading && styles.testButtonDisabled]}
+            onPress={checkTokenPermissions}
+            disabled={loading}
+          >
+            <ThemedText style={styles.testButtonText}>12. 🔑 Check Token Permissions</ThemedText>
           </TouchableOpacity>
         </ThemedView>
 

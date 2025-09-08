@@ -648,6 +648,23 @@ export default function HomeScreen() {
               </ThemedText>
             </ThemedView>
             <View style={styles.headerActions}>
+              {/* Debug Icon */}
+              <TouchableOpacity 
+                style={styles.debugButton}
+                onPress={() => router.push('/debug-api')}
+              >
+                <IconSymbol name="wrench.and.screwdriver" size={16} color="#8B5CF6" />
+              </TouchableOpacity>
+              
+              {/* Admin Icon */}
+              <TouchableOpacity 
+                style={styles.adminButton}
+                onPress={() => router.push('/admin-settings')}
+              >
+                <IconSymbol name="gear" size={16} color="#EF4444" />
+              </TouchableOpacity>
+              
+              {/* Add to Playlist Icon */}
               <TouchableOpacity 
                 style={styles.addToPlaylistButton}
                 onPress={() => handleAddToPlaylist(currentVideo)}
@@ -971,7 +988,27 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+  },
+  debugButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#8B5CF6',
+  },
+  adminButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EF4444',
   },
   addToPlaylistButton: {
     width: 36,
@@ -981,7 +1018,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#e0af92',
   },
 
   // Playlist Area

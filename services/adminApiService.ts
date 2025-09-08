@@ -54,22 +54,33 @@ class AdminApiService {
       console.log('📋 Playlists data:', playlistsData);
 
       // Convert admin format to mobile app format
-      const playlists: Playlist[] = playlistsData.map((adminPlaylist: AdminPlaylist) => ({
-        id: adminPlaylist.id,
-        name: adminPlaylist.name,
-        description: adminPlaylist.description,
-        videos: (adminPlaylist.videos || []).map(video => ({
-          id: video.id,
-          title: video.title,
-          duration: video.duration,
-          thumbnail: video.thumbnail,
-          addedAt: video.addedAt,
-          vimeo_id: video.vimeo_id, // Include vimeo_id
-        })),
-        createdAt: adminPlaylist.createdAt,
-        updatedAt: adminPlaylist.updatedAt,
-        thumbnail: adminPlaylist.thumbnail,
-      }));
+      const playlists: Playlist[] = playlistsData.map((adminPlaylist: AdminPlaylist) => {
+        // Temporarily disable private video filtering to test with new token
+        // const knownPrivateIds = ['140178314', '177249678', '178164054'];
+        // const filteredVideos = (adminPlaylist.videos || []).filter(video => 
+        //   !knownPrivateIds.includes(video.id)
+        // );
+        
+        const allVideos = adminPlaylist.videos || [];
+        console.log(`🔍 Playlist "${adminPlaylist.name}": ${allVideos.length} total videos (filtering disabled for token test)`);
+        
+        return {
+          id: adminPlaylist.id,
+          name: adminPlaylist.name,
+          description: adminPlaylist.description,
+          videos: allVideos.map(video => ({
+            id: video.id,
+            title: video.title,
+            duration: video.duration,
+            thumbnail: video.thumbnail,
+            addedAt: video.addedAt,
+            vimeo_id: video.vimeo_id, // Include vimeo_id
+          })),
+          createdAt: adminPlaylist.createdAt,
+          updatedAt: adminPlaylist.updatedAt,
+          thumbnail: adminPlaylist.thumbnail,
+        };
+      });
 
       console.log(`✅ Fetched ${playlists.length} playlists from admin API`);
       return playlists;

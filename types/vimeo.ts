@@ -615,6 +615,9 @@ export interface SimplifiedVimeoVideo {
   plays: number;
   likes: number;
   hasEmbedRestriction?: boolean;
+  isPasswordProtected?: boolean;
+  isPrivateView?: boolean;
+  embedPrivacy?: string;
 }
 
 export interface VimeoPlaylist {

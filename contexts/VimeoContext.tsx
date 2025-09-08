@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Alert } from 'react-native';
-import { vimeoService } from '@/services/vimeoService';
+import { hybridVimeoService } from '@/services/hybridVimeoService';
 import { VimeoConfig, SimplifiedVimeoVideo, VimeoError } from '@/types/vimeo';
 import { remoteConfigService, RemoteConfig } from '@/services/remoteConfigService';
 
@@ -71,35 +71,23 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
 
   const initializeFromStorage = async () => {
     try {
-      // Try to load saved configuration first
-      let config = await vimeoService.loadSavedConfig();
+      // Initialize hybrid service (handles backend/local tokens automatically)
+      console.log('🔧 Initializing Vimeo with hybrid service');
+      await hybridVimeoService.initialize();
       
-      // If no saved config, use environment token
-      if (!config) {
-        console.log('📝 No saved config found, using environment token');
-        const envToken = process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN;
-        if (!envToken) {
-          throw new Error('Vimeo access token not found in environment variables');
-        }
-        
-        config = {
-          accessToken: envToken,
-          userId: 'naberla-user',
-          userName: 'Naber LA User'
-        };
-        
-        // Save the default config for future use
-        await vimeoService.initialize(config);
-      }
-      
-      console.log('🔧 Using Vimeo configuration');
-      await vimeoService.initialize(config);
-      setConfig(config);
+      // Set a dummy config for compatibility
+      const dummyConfig = {
+        accessToken: 'hybrid-managed',
+        userId: 'hybrid-user',
+        userName: 'Hybrid User'
+      };
+      setConfig(dummyConfig);
       setIsConfigured(true);
       
       // 🚀 OPTIMIZATION: Only load cached videos, no API calls
       console.log('⚡ Loading cached videos only (optimized for performance)');
-      const cachedVideos = await vimeoService.getCachedVideos();
+      console.log('🔍 DEBUG: initializeFromStorage calling hybridVimeoService.getAllUserVideos()');
+      const cachedVideos = await hybridVimeoService.getAllUserVideos();
       if (cachedVideos.length > 0) {
         // Apply remote config filtering to cached videos
         const filteredVideos = remoteConfigService.filterVideos(cachedVideos);
@@ -110,7 +98,8 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       }
       
     } catch (err) {
-      console.error('Error initializing Vimeo:', err);
+      console.error('🔍 DEBUG: Error in initializeFromStorage:', err);
+      console.error('🔍 DEBUG: Error details:', JSON.stringify(err));
       setIsConfigured(true); // Mark as configured to avoid setup loop
     }
   };
@@ -173,17 +162,27 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       setError(null);
       
       // First get all videos
-      const allVideos = await vimeoService.getAllUserVideos();
+      console.log('🔍 DEBUG: About to call hybridVimeoService.getAllUserVideos()');
+      const allVideos = await hybridVimeoService.getAllUserVideos();
       console.log(`📥 Loaded ${allVideos.length} total videos from Vimeo`);
       
-      // Then filter to only public videos
-      console.log('🔍 Filtering out private videos...');
-      const publicVideos = await vimeoService.getPublicVideos();
-      console.log(`✅ Found ${publicVideos.length} public videos (filtered out ${allVideos.length - publicVideos.length} private)`);
+      // Apply remote config filtering directly to all videos (no need for separate public filter)
+      console.log('🔍 Applying remote config filtering...');
+      let filteredVideos = remoteConfigService.filterVideos(allVideos);
       
-      // Apply remote config filtering
-      const filteredVideos = remoteConfigService.filterVideos(publicVideos);
-      console.log(`🎛️ Remote config filtered to ${filteredVideos.length} videos`);
+      // Filter out known problematic videos (401 errors)
+      const problematicVideoIds = ['287273954', '287272607', '530776691', '379773967'];
+      const beforeCount = filteredVideos.length;
+      filteredVideos = filteredVideos.filter(video => {
+        const videoId = video.uri.replace('/videos/', '');
+        return !problematicVideoIds.includes(videoId);
+      });
+      
+      if (beforeCount !== filteredVideos.length) {
+        console.log(`🚫 Filtered out ${beforeCount - filteredVideos.length} problematic videos (401 errors)`);
+      }
+      
+      console.log(`✅ Found ${filteredVideos.length} playable videos after filtering`);
       
       setVideos(filteredVideos);
       

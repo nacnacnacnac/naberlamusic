@@ -48,6 +48,8 @@ interface StateTransition {
 const isDev = __DEV__;
 const log = (prefix: string) => (msg: string, data?: any) => {
   if (!isDev) return;
+  // Suppress about:srcdoc warnings
+  if (msg.includes('about:srcdoc')) return;
   console.log(prefix + msg, data ?? '');
 };
 const logError = (prefix: string) => (msg: string, data?: any) => {
@@ -917,7 +919,7 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     }
   }, [videoId, video.id, video.title, onError]);
 
-  // Generate params string for VimeoWrapper - stable params to prevent reloading
+  // Generate params string for VimeoWrapper - clean premium params
   const params = useMemo(() => {
     const paramsList = [
       'autoplay=0', // Always start with autoplay=0 to prevent unwanted auto-start
@@ -930,7 +932,9 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       'dnt=1',
       'playsinline=1',
       'pip=0',
-      'transparent=0'
+      'transparent=0',
+      // 🎯 VIMEO PREMIUM: Clean premium features (no duplicates)
+      'app_id=naberla'       // Custom app ID (only here, not in wrapper)
     ];
     
     // Add saved position if available
@@ -940,7 +944,7 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     }
     
     const paramsString = paramsList.join('&');
-    playerDebugLog.state('Stable Vimeo params:', paramsString);
+    playerDebugLog.state('Clean Vimeo Premium params:', paramsString);
     
     return paramsString;
   }, [savedPosition]); // Remove isPaused dependency to prevent reloading
@@ -1066,9 +1070,13 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     playerDebugLog.state('Player ready in simplified mode');
   };
 
-  // Handle wrapper error event
+  // 🔄 ORIGINAL SIMPLE ERROR HANDLING: Back to basic approach that worked
   const handleWrapperError = (error: string) => {
     playerDebugLog.error('Wrapper error:', error);
+    
+    // Simple error handling like original - no complex retry logic
+    console.warn(`❌ Video ${video.id} error: ${error}`);
+    
     setIsLoading(false);
     setHasError(true);
     setIsPlayerReady(false);

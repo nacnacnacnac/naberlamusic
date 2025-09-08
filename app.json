@@ -6,6 +6,14 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon-1024x1024.png",
     "scheme": "naberla",
+    "linking": {
+      "prefixes": ["naberla://"],
+      "config": {
+        "screens": {
+          "oauth-callback": "oauth/callback"
+        }
+      }
+    },
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -112,7 +120,11 @@
       "router": {},
       "eas": {
         "projectId": "8316266b-416f-49cc-b9a5-56082e2914d8"
-      }
+      },
+      "EXPO_PUBLIC_VIMEO_ACCESS_TOKEN": "f0e1fe38a2b99765df33777ff57e3aaa",
+      "EXPO_PUBLIC_USE_BACKEND_TOKENS": "true",
+      "EXPO_PUBLIC_BACKEND_URL": "https://api.naberla.org",
+      "EXPO_PUBLIC_APP_ID": "naber-la-mobile"
     },
     "owner": "nacnac"
   }

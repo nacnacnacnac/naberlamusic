@@ -36,23 +36,48 @@ class HybridPlaylistService {
 
   /**
    * Get all playlists (admin playlists + user playlists combined)
+   * Uses cache-first approach for better performance
    */
   async getPlaylists(): Promise<Playlist[]> {
     try {
-      // Always try to get admin playlists (global playlists for all users)
+      // First, get cached admin playlists for immediate display
+      const cachedAdminPlaylists = await this.getCachedAdminPlaylists();
+      const userPlaylists = await this.getUserPlaylists();
+      
+      // If we have cached data, return it immediately
+      if (cachedAdminPlaylists.length > 0) {
+        console.log('📦 Using cached admin playlists:', cachedAdminPlaylists.length);
+        
+        // Return cached data immediately
+        const prefixedCachedPlaylists = cachedAdminPlaylists.map(playlist => ({
+          ...playlist,
+          id: `admin_${playlist.id}`,
+          isAdminPlaylist: true
+        }));
+        
+        const prefixedUserPlaylists = userPlaylists.map(playlist => ({
+          ...playlist,
+          id: playlist.id.startsWith('user_') ? playlist.id : `user_${playlist.id}`,
+          isAdminPlaylist: false
+        }));
+        
+        const cachedResult = [...prefixedCachedPlaylists, ...prefixedUserPlaylists];
+        
+        // Fetch fresh data in background (don't await)
+        this.refreshAdminPlaylistsInBackground();
+        
+        return cachedResult;
+      }
+      
+      // No cache, fetch from API (first time)
+      console.log('🌐 No cache found, fetching from API...');
       const adminPlaylists = await adminApiService.getPlaylists();
       console.log('📡 Fetched admin playlists:', adminPlaylists.length);
       
-      // Cache admin playlists separately
+      // Cache for next time
       await this.cacheAdminPlaylistsLocally(adminPlaylists);
       
-      // Get user's local playlists
-      const userPlaylists = await this.getUserPlaylists();
-      console.log('📱 Fetched user playlists:', userPlaylists.length);
-      
-      // Combine admin playlists (global) + user playlists (local)
-      // Admin playlists first, then user playlists
-      // Add prefix to distinguish admin vs user playlists and avoid duplicate keys
+      // Combine and return
       const prefixedAdminPlaylists = adminPlaylists.map(playlist => ({
         ...playlist,
         id: `admin_${playlist.id}`,
@@ -65,9 +90,8 @@ class HybridPlaylistService {
         isAdminPlaylist: false
       }));
       
-      const allPlaylists = [...prefixedAdminPlaylists, ...prefixedUserPlaylists];
+      return [...prefixedAdminPlaylists, ...prefixedUserPlaylists];
       
-      return allPlaylists;
     } catch (error) {
       console.warn('⚠️ Admin API failed, showing only user playlists:', error);
       // If admin API fails, show only user's local playlists
@@ -96,6 +120,22 @@ class HybridPlaylistService {
   }
 
   /**
+   * Get cached admin playlists
+   */
+  private async getCachedAdminPlaylists(): Promise<Playlist[]> {
+    try {
+      const cachedData = await AsyncStorage.getItem(this.ADMIN_CACHE_KEY);
+      if (cachedData) {
+        const playlists = JSON.parse(cachedData);
+        return Array.isArray(playlists) ? playlists : [];
+      }
+    } catch (error) {
+      console.error('Error getting cached admin playlists:', error);
+    }
+    return [];
+  }
+
+  /**
    * Cache admin playlists separately
    */
   private async cacheAdminPlaylistsLocally(playlists: Playlist[]): Promise<void> {
@@ -104,6 +144,20 @@ class HybridPlaylistService {
       console.log('💾 Cached admin playlists:', playlists.length);
     } catch (error) {
       console.error('Error caching admin playlists:', error);
+    }
+  }
+
+  /**
+   * Refresh admin playlists in background
+   */
+  private async refreshAdminPlaylistsInBackground(): Promise<void> {
+    try {
+      console.log('🔄 Refreshing admin playlists in background...');
+      const freshPlaylists = await adminApiService.getPlaylists();
+      await this.cacheAdminPlaylistsLocally(freshPlaylists);
+      console.log('✅ Background refresh completed:', freshPlaylists.length);
+    } catch (error) {
+      console.warn('⚠️ Background refresh failed:', error);
     }
   }
 
