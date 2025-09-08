@@ -670,31 +670,22 @@ export default function HomeScreen() {
                           // Use vimeo_id if available, otherwise try to find by UUID
                           const vimeoIdToUse = playlistVideo.vimeo_id || playlistVideo.id;
                           
-                          // Try to find the video in main videos array by Vimeo ID
-                          const video = videos.find(v => v.id === vimeoIdToUse);
-                          console.log('🎵 Found matching video:', video ? video.name : 'NOT FOUND');
-                          
-                          if (video) {
-                            console.log('🎵 Playing video from main list:', video.name);
-                            playVideo(video);
-                          } else {
-                            console.log('🎵 Creating synthetic video from playlist data');
-                            // Create a video object from playlist data using the correct Vimeo ID
-                            const syntheticVideo = {
-                              id: vimeoIdToUse,
-                              name: playlistVideo.title,
-                              description: '',
-                              duration: playlistVideo.duration,
-                              embed: {
-                                html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
-                              },
-                              pictures: {
-                                sizes: [{ link: playlistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
-                              }
-                            };
-                            console.log('🎵 Playing synthetic video:', syntheticVideo.name, 'with Vimeo ID:', vimeoIdToUse);
-                            playVideo(syntheticVideo);
-                          }
+                          // Always create synthetic video from playlist data with correct Vimeo ID
+                          console.log('🎵 Creating synthetic video from playlist data');
+                          const syntheticVideo = {
+                            id: vimeoIdToUse,
+                            name: playlistVideo.title,
+                            description: '',
+                            duration: playlistVideo.duration,
+                            embed: {
+                              html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+                            },
+                            pictures: {
+                              sizes: [{ link: playlistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+                            }
+                          };
+                          console.log('🎵 Playing synthetic video:', syntheticVideo.name, 'with Vimeo ID:', vimeoIdToUse);
+                          playVideo(syntheticVideo);
                         }}
                         activeOpacity={0.7}
                       >
