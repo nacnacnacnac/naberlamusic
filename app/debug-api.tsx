@@ -12,6 +12,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { adminApiService } from '@/services/adminApiService';
+import { vimeoService } from '@/services/vimeoService';
 import Toast from '@/components/Toast';
 
 export default function DebugApiScreen() {
@@ -111,6 +112,34 @@ export default function DebugApiScreen() {
     }
   };
 
+  const testVimeoConnection = async () => {
+    setLoading(true);
+    addResult('Testing Vimeo API connection...');
+    
+    try {
+      const token = process.env.EXPO_PUBLIC_VIMEO_ACCESS_TOKEN;
+      addResult(`Token available: ${token ? '✅ YES' : '❌ NO'}`);
+      
+      if (!token) {
+        addResult('❌ Please set EXPO_PUBLIC_VIMEO_ACCESS_TOKEN in .env file');
+        return;
+      }
+      
+      addResult(`Token preview: ${token.substring(0, 10)}...`);
+      
+      const isConnected = await vimeoService.testConnection();
+      addResult(`Vimeo API connection: ${isConnected ? '✅ SUCCESS' : '❌ FAILED'}`);
+      
+      if (isConnected) {
+        addResult('🎉 Vimeo authentication successful!');
+      }
+    } catch (error: any) {
+      addResult(`❌ Vimeo connection error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const testDirectApiCall = async () => {
     setLoading(true);
     addResult('Testing direct API call...');
@@ -174,10 +203,18 @@ export default function DebugApiScreen() {
           
           <TouchableOpacity
             style={[styles.testButton, loading && styles.testButtonDisabled]}
+            onPress={testVimeoConnection}
+            disabled={loading}
+          >
+            <ThemedText style={styles.testButtonText}>1. Test Vimeo API Connection</ThemedText>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.testButton, loading && styles.testButtonDisabled]}
             onPress={testAdminApiConnection}
             disabled={loading}
           >
-            <ThemedText style={styles.testButtonText}>1. Test Admin API Connection</ThemedText>
+            <ThemedText style={styles.testButtonText}>2. Test Admin API Connection</ThemedText>
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -185,7 +222,7 @@ export default function DebugApiScreen() {
             onPress={testDirectApiCall}
             disabled={loading}
           >
-            <ThemedText style={styles.testButtonText}>2. Test Direct API Call</ThemedText>
+            <ThemedText style={styles.testButtonText}>3. Test Direct API Call</ThemedText>
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -193,7 +230,7 @@ export default function DebugApiScreen() {
             onPress={enableAdminApi}
             disabled={loading}
           >
-            <ThemedText style={styles.testButtonText}>3. Enable Admin API</ThemedText>
+            <ThemedText style={styles.testButtonText}>4. Enable Admin API</ThemedText>
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -201,7 +238,7 @@ export default function DebugApiScreen() {
             onPress={testFetchPlaylists}
             disabled={loading}
           >
-            <ThemedText style={styles.testButtonText}>4. Fetch Admin Playlists</ThemedText>
+            <ThemedText style={styles.testButtonText}>5. Fetch Admin Playlists</ThemedText>
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -209,7 +246,7 @@ export default function DebugApiScreen() {
             onPress={testHybridService}
             disabled={loading}
           >
-            <ThemedText style={styles.testButtonText}>5. Test Hybrid Service</ThemedText>
+            <ThemedText style={styles.testButtonText}>6. Test Hybrid Service</ThemedText>
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -217,7 +254,7 @@ export default function DebugApiScreen() {
             onPress={syncWithAdmin}
             disabled={loading}
           >
-            <ThemedText style={styles.testButtonText}>6. Sync with Admin</ThemedText>
+            <ThemedText style={styles.testButtonText}>7. Sync with Admin</ThemedText>
           </TouchableOpacity>
         </ThemedView>
 
