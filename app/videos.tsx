@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, RefreshControl, StatusBar, Alert } from 'react-native';
+import { StyleSheet, FlatList, ScrollView, TouchableOpacity, RefreshControl, StatusBar, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { playlistService } from '@/services/playlistService';
+import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { Playlist } from '@/types/playlist';
 import SwipeablePlaylistItem from '@/components/SwipeablePlaylistItem';
 
@@ -28,8 +28,10 @@ export default function PlaylistsScreen() {
   const loadPlaylists = async () => {
     try {
       setIsLoading(true);
-      const allPlaylists = await playlistService.getPlaylists();
-      setPlaylists(allPlaylists);
+      // Only show user's personal playlists in this screen
+      const userPlaylists = await hybridPlaylistService.getUserPlaylists();
+      console.log('📱 Loaded user playlists for videos screen:', userPlaylists.length);
+      setPlaylists(userPlaylists);
     } catch (error) {
       console.error('Error loading playlists:', error);
       Alert.alert('Hata', 'Playlist\'ler yüklenirken bir hata oluştu.');
@@ -106,7 +108,7 @@ export default function PlaylistsScreen() {
         </ThemedView>
         <ThemedView style={styles.headerStats}>
           <ThemedText style={styles.playlistCount}>
-            {playlists.length} playlist
+            {playlists.length} playlist{playlists.length !== 1 ? 's' : ''}
           </ThemedText>
           <TouchableOpacity 
             style={styles.createButton}
@@ -124,25 +126,23 @@ export default function PlaylistsScreen() {
             style={styles.playlistIcon}
             contentFit="contain"
           />
-          <ThemedText style={styles.emptyTitle}>No playlists yet</ThemedText>
+          <ThemedText style={styles.emptyTitle}>A lonely playlist.</ThemedText>
           <ThemedText style={styles.emptyText}>
-            Create playlists to organize your videos
+            Create awesome playlist to organize your music
           </ThemedText>
           <TouchableOpacity 
             style={styles.createPlaylistButton}
             onPress={handleCreatePlaylist}
           >
-            <IconSymbol name="plus" size={20} color="white" />
+            <IconSymbol name="plus" size={20} color="#000000" />
             <ThemedText style={styles.createPlaylistButtonText}>
-              Create Your First Playlist
+              Create Your Awesome Playlist
             </ThemedText>
           </TouchableOpacity>
         </ThemedView>
       ) : (
-        <FlatList
-          data={playlists}
-          renderItem={renderPlaylistItem}
-          keyExtractor={(item) => item.id}
+        <ScrollView
+          style={styles.flatList}
           contentContainerStyle={styles.playlistList}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -153,7 +153,13 @@ export default function PlaylistsScreen() {
               tintColor="#e0af92"
             />
           }
-        />
+        >
+          {playlists.map((item) => (
+            <React.Fragment key={item.id}>
+              {renderPlaylistItem({ item })}
+            </React.Fragment>
+          ))}
+        </ScrollView>
       )}
     </ThemedView>
   );
@@ -171,10 +177,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 60, // Safe area
-    paddingBottom: 20,
+    paddingTop: 50, // Safe area azaltıldı
+    paddingBottom: 15, // Alt padding de azaltıldı
     borderBottomWidth: 1,
-    borderBottomColor: '#333333',
+    borderBottomColor: '#1a1a1a', // Daha koyu gri çizgi
+    flexShrink: 0, // Header sabit boyutta kalsın
   },
   headerLeft: {
     flexDirection: 'row',
@@ -183,7 +190,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
-    marginRight: 10,
+    marginRight: 5, // My Playlists ve ok daha yakın
   },
   headerTitle: {
     color: 'white',
@@ -195,7 +202,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end', // Sağa hizala
-    gap: 20, // Aralarında boşluk
+    gap: 10, // + iconu biraz daha yanaşsın
   },
   playlistCount: {
     color: '#e0af92',
@@ -235,11 +242,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#666666', // Koyu gri
+    fontSize: 14, // Küçültüldü
     textAlign: 'center',
     marginBottom: 30,
-    lineHeight: 22,
+    lineHeight: 18, // Line height da küçültüldü
   },
   createPlaylistButton: {
     flexDirection: 'row',
@@ -250,12 +257,16 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   createPlaylistButtonText: {
-    color: 'white',
+    color: '#000000', // Siyah yazı
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
   },
   playlistList: {
     padding: 20,
+    paddingBottom: 40,
+  },
+  flatList: {
+    flex: 1,
   },
 });

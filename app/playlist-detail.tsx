@@ -5,7 +5,7 @@ import { router, useLocalSearchParams, Stack, useFocusEffect } from 'expo-router
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { playlistService } from '@/services/playlistService';
+import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { Playlist } from '@/types/playlist';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
 
@@ -20,7 +20,7 @@ export default function PlaylistDetailScreen() {
     
     try {
       setIsLoading(true);
-      const playlistData = await playlistService.getPlaylist(playlistId);
+      const playlistData = await hybridPlaylistService.getPlaylist(playlistId);
       setPlaylist(playlistData);
       setVideos(playlistData?.videos || []);
     } catch (error) {

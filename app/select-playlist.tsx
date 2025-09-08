@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
   StatusBar,
+  View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -53,12 +54,68 @@ export default function SelectPlaylistScreen() {
     try {
       setAddingToPlaylist(playlistId);
       
-      const video = getVideo(videoId);
+      console.log('🎵 Adding video to playlist - videoId:', videoId, 'videoTitle:', videoTitle);
+      
+      let video = getVideo(videoId);
+      console.log('🎵 Found video in Vimeo context:', video);
+      
       if (!video) {
-        Alert.alert('Error', 'Video not found.');
-        return;
+        console.log('🎵 Video not found in Vimeo context, searching in admin playlists...');
+        
+        // Try to find video in admin playlists
+        const allPlaylists = await hybridPlaylistService.getPlaylists();
+        let foundVideo = null;
+        
+        for (const playlist of allPlaylists) {
+          if (playlist.isAdminPlaylist && playlist.videos) {
+            const adminVideo = playlist.videos.find(v => v.id === videoId || v.vimeo_id === videoId);
+            if (adminVideo) {
+              console.log('🎵 Found video in admin playlist:', {
+                id: adminVideo.id,
+                vimeo_id: adminVideo.vimeo_id,
+                title: adminVideo.title,
+                duration: adminVideo.duration,
+                thumbnail: adminVideo.thumbnail
+              });
+              foundVideo = {
+                id: adminVideo.vimeo_id || adminVideo.id,
+                name: adminVideo.title || videoTitle || 'Unknown Video',
+                title: adminVideo.title || videoTitle || 'Unknown Video', // Add both name and title
+                description: '',
+                duration: adminVideo.duration || 0,
+                embed: {
+                  html: `<iframe src="https://player.vimeo.com/video/${adminVideo.vimeo_id || adminVideo.id}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+                },
+                pictures: {
+                  sizes: [{ link: adminVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+                }
+              };
+              console.log('🎵 Created foundVideo:', foundVideo);
+              break;
+            }
+          }
+        }
+        
+        if (foundVideo) {
+          video = foundVideo;
+        } else {
+          console.log('🎵 Video not found anywhere, creating synthetic video');
+          // Create synthetic video object if not found anywhere
+          video = {
+            id: videoId,
+            name: videoTitle || 'Unknown Video',
+            description: '',
+            duration: 0,
+            embed: {
+              html: `<iframe src="https://player.vimeo.com/video/${videoId}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+            },
+            pictures: {
+              sizes: [{ link: 'https://via.placeholder.com/640x360' }]
+            }
+          };
+        }
       }
-
+      
       await hybridPlaylistService.addVideoToPlaylist(playlistId, video);
       
       const playlist = playlists.find(p => p.id === playlistId);
@@ -134,78 +191,82 @@ export default function SelectPlaylistScreen() {
       </ThemedView>
 
       {/* Playlists */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Create New Playlist */}
-        <TouchableOpacity
-          style={styles.createNewButton}
-          onPress={handleCreateNewPlaylist}
-        >
-          <ThemedView style={styles.createNewIcon}>
-            <IconSymbol name="plus" size={20} color="#e0af92" />
-          </ThemedView>
-          <ThemedView style={styles.createNewContent}>
-            <ThemedText style={styles.createNewTitle}>Create New Playlist</ThemedText>
-            <ThemedText style={styles.createNewSubtitle}>
-              Create a new playlist for this video
-            </ThemedText>
-          </ThemedView>
-          <IconSymbol name="chevron.right" size={16} color="#e0af92" />
-        </TouchableOpacity>
-
-        {/* Existing Playlists */}
-        {playlists.length > 0 && (
-          <ThemedView style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Existing Playlists</ThemedText>
-            
-            {playlists.map((playlist) => (
+      <FlatList
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        data={[{ id: 'create-new', type: 'create' }, ...playlists.map(p => ({ ...p, type: 'playlist' }))]}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => {
+          if (item.type === 'create') {
+            return (
               <TouchableOpacity
-                key={playlist.id}
-                style={styles.playlistItem}
-                onPress={() => handleAddToPlaylist(playlist.id)}
-                disabled={addingToPlaylist === playlist.id}
+                style={styles.createNewButton}
+                onPress={handleCreateNewPlaylist}
               >
-                <ThemedView style={styles.playlistThumbnail}>
-                  {playlist.thumbnail ? (
-                    <ThemedView style={styles.thumbnailPlaceholder}>
-                      <Image 
-                        source={require('@/assets/images/playlist.svg')}
-                        style={styles.playlistThumbnailIcon}
-                        contentFit="contain"
-                      />
-                    </ThemedView>
-                  ) : (
-                    <ThemedView style={styles.thumbnailPlaceholder}>
-                      <Image 
-                        source={require('@/assets/images/playlist.svg')}
-                        style={styles.playlistThumbnailIcon}
-                        contentFit="contain"
-                      />
-                    </ThemedView>
-                  )}
+                <ThemedView style={styles.createNewIcon}>
+                  <IconSymbol name="plus" size={20} color="#e0af92" />
                 </ThemedView>
-                
-                <ThemedView style={styles.playlistContent}>
-                  <ThemedText style={styles.playlistName} numberOfLines={1}>
-                    {playlist.name}
-                  </ThemedText>
-                  <ThemedText style={styles.playlistInfo}>
-                    {playlist.videos.length} video • {playlistService.formatDuration(
-                      playlistService.getPlaylistDuration(playlist)
-                    )}
+                <ThemedView style={styles.createNewContent}>
+                  <ThemedText style={styles.createNewTitle}>Create New Playlist</ThemedText>
+                  <ThemedText style={styles.createNewSubtitle}>
+                    Create a new playlist for this video
                   </ThemedText>
                 </ThemedView>
-
-                {addingToPlaylist === playlist.id ? (
-                  <ActivityIndicator size="small" color="#e0af92" />
-                ) : (
-                  <IconSymbol name="plus.circle" size={20} color="#e0af92" />
-                )}
+                <IconSymbol name="chevron.right" size={16} color="#e0af92" />
               </TouchableOpacity>
-            ))}
-          </ThemedView>
-        )}
+            );
+          }
+          
+          const playlist = item as Playlist & { type: 'playlist' };
+          return (
+            <TouchableOpacity
+              style={styles.playlistItem}
+              onPress={() => handleAddToPlaylist(playlist.id)}
+              disabled={addingToPlaylist === playlist.id || playlist.isAdminPlaylist}
+            >
+              <ThemedView style={styles.playlistThumbnail}>
+                <ThemedView style={styles.thumbnailPlaceholder}>
+                  <Image 
+                    source={require('@/assets/images/playlist.svg')}
+                    style={styles.playlistThumbnailIcon}
+                    contentFit="contain"
+                  />
+                </ThemedView>
+              </ThemedView>
+              
+              <ThemedView style={styles.playlistContent}>
+                <ThemedText style={styles.playlistName} numberOfLines={1}>
+                  {playlist.name}
+                  {playlist.isAdminPlaylist && (
+                    <ThemedText style={styles.adminBadge}> • Admin</ThemedText>
+                  )}
+                </ThemedText>
+                <ThemedText style={styles.playlistInfo}>
+                  {playlist.videos?.length || 0} video{(playlist.videos?.length || 0) !== 1 ? 's' : ''}
+                  {playlist.videos && playlist.videos.length > 0 && (
+                    <ThemedText>
+                      {' • '}{hybridPlaylistService.formatDuration(hybridPlaylistService.getPlaylistDuration(playlist))}
+                    </ThemedText>
+                  )}
+                </ThemedText>
+              </ThemedView>
 
-        {playlists.length === 0 && (
+              {addingToPlaylist === playlist.id ? (
+                <ActivityIndicator size="small" color="#e0af92" />
+              ) : playlist.isAdminPlaylist ? (
+                <IconSymbol name="lock" size={20} color="#666666" />
+              ) : (
+                <IconSymbol name="plus.circle" size={20} color="#e0af92" />
+              )}
+            </TouchableOpacity>
+          );
+        }}
+        ListHeaderComponent={playlists.length > 0 ? (
+          <ThemedView style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>Playlists</ThemedText>
+          </ThemedView>
+        ) : null}
+        ListEmptyComponent={
           <ThemedView style={styles.emptyState}>
             <Image 
               source={require('@/assets/images/playlist.svg')}
@@ -217,8 +278,9 @@ export default function SelectPlaylistScreen() {
               Click the button above to create your first playlist
             </ThemedText>
           </ThemedView>
-        )}
-      </ScrollView>
+        }
+        contentContainerStyle={styles.listContainer}
+      />
 
       {/* Toast Notification */}
       <Toast
@@ -299,6 +361,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     borderRadius: 12,
     marginTop: 20,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#333333',
   },
@@ -327,7 +390,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   section: {
-    marginTop: 30,
+    marginTop: 40,
   },
   sectionTitle: {
     color: 'white',
@@ -403,5 +466,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  listContainer: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
+  adminBadge: {
+    color: '#666666',
+    fontSize: 12,
+    fontWeight: '400',
   },
 });

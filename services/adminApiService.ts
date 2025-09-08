@@ -181,7 +181,7 @@ class AdminApiService {
    */
   async addVideoToPlaylist(playlistId: string, video: SimplifiedVimeoVideo): Promise<void> {
     try {
-      console.log(`🔄 Adding video "${video.title}" to playlist ${playlistId} via admin API...`);
+      console.log(`🔄 Adding video "${video.name || video.title}" to playlist ${playlistId} via admin API...`);
       
       const response = await fetch(`${this.baseUrl}/api/playlists/${playlistId}/videos`, {
         method: 'POST',
@@ -190,9 +190,9 @@ class AdminApiService {
         },
         body: JSON.stringify({
           videoId: video.id,
-          title: video.title,
-          duration: video.duration,
-          thumbnail: video.thumbnail,
+          title: video.name || video.title || 'Unknown Video',
+          duration: video.duration || 0,
+          thumbnail: video.pictures?.sizes?.[0]?.link || video.thumbnail || 'https://via.placeholder.com/640x360',
         }),
       });
 
@@ -206,12 +206,13 @@ class AdminApiService {
         throw new Error(result.error || 'Failed to add video to playlist');
       }
 
-      console.log(`✅ Added video "${video.title}" to playlist via admin API`);
+      console.log(`✅ Added video "${video.name || video.title}" to playlist via admin API`);
     } catch (error) {
       console.error(`❌ Error adding video to playlist via admin API:`, error);
       throw error;
     }
   }
+
 
   /**
    * Remove video from playlist via admin panel

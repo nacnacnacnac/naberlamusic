@@ -4,7 +4,8 @@ import { SimplifiedVimeoVideo } from '@/types/vimeo';
 import { adminApiService } from './adminApiService';
 
 class HybridPlaylistService {
-  private readonly STORAGE_KEY = 'naber_la_playlists';
+  private readonly STORAGE_KEY = 'naber_la_user_playlists'; // Only user playlists
+  private readonly ADMIN_CACHE_KEY = 'naber_la_admin_cache'; // Admin playlists cache
   private readonly SYNC_KEY = 'naber_la_last_sync';
   private readonly USE_ADMIN_API_KEY = 'naber_la_use_admin_api';
 
@@ -34,29 +35,51 @@ class HybridPlaylistService {
   }
 
   /**
-   * Get all playlists (hybrid: admin API + local fallback)
+   * Get all playlists (admin playlists + user playlists combined)
    */
   async getPlaylists(): Promise<Playlist[]> {
-    const useAdminApi = await this.shouldUseAdminApi();
-    
-    if (useAdminApi) {
-      try {
-        // Try admin API first
-        const adminPlaylists = await adminApiService.getPlaylists();
-        
-        // Cache admin playlists locally for offline access
-        await this.cachePlaylistsLocally(adminPlaylists);
-        
-        return adminPlaylists;
-      } catch (error) {
-        console.warn('⚠️ Admin API failed, falling back to local storage:', error);
-        // Fall back to local storage
-        return await this.getLocalPlaylists();
-      }
-    } else {
-      // Use local storage only
-      return await this.getLocalPlaylists();
+    try {
+      // Always try to get admin playlists (global playlists for all users)
+      const adminPlaylists = await adminApiService.getPlaylists();
+      console.log('📡 Fetched admin playlists:', adminPlaylists.length);
+      
+      // Cache admin playlists separately
+      await this.cacheAdminPlaylistsLocally(adminPlaylists);
+      
+      // Get user's local playlists
+      const userPlaylists = await this.getUserPlaylists();
+      console.log('📱 Fetched user playlists:', userPlaylists.length);
+      
+      // Combine admin playlists (global) + user playlists (local)
+      // Admin playlists first, then user playlists
+      // Add prefix to distinguish admin vs user playlists and avoid duplicate keys
+      const prefixedAdminPlaylists = adminPlaylists.map(playlist => ({
+        ...playlist,
+        id: `admin_${playlist.id}`,
+        isAdminPlaylist: true
+      }));
+      
+      const prefixedUserPlaylists = userPlaylists.map(playlist => ({
+        ...playlist,
+        id: playlist.id.startsWith('user_') ? playlist.id : `user_${playlist.id}`,
+        isAdminPlaylist: false
+      }));
+      
+      const allPlaylists = [...prefixedAdminPlaylists, ...prefixedUserPlaylists];
+      
+      return allPlaylists;
+    } catch (error) {
+      console.warn('⚠️ Admin API failed, showing only user playlists:', error);
+      // If admin API fails, show only user's local playlists
+      return await this.getUserPlaylists();
     }
+  }
+
+  /**
+   * Get user's personal playlists (local only)
+   */
+  async getUserPlaylists(): Promise<Playlist[]> {
+    return await this.getLocalPlaylists();
   }
 
   /**
@@ -73,7 +96,19 @@ class HybridPlaylistService {
   }
 
   /**
-   * Cache playlists locally
+   * Cache admin playlists separately
+   */
+  private async cacheAdminPlaylistsLocally(playlists: Playlist[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this.ADMIN_CACHE_KEY, JSON.stringify(playlists));
+      console.log('💾 Cached admin playlists:', playlists.length);
+    } catch (error) {
+      console.error('Error caching admin playlists:', error);
+    }
+  }
+
+  /**
+   * Cache playlists locally (deprecated - keeping for compatibility)
    */
   private async cachePlaylistsLocally(playlists: Playlist[]): Promise<void> {
     try {
@@ -85,50 +120,39 @@ class HybridPlaylistService {
   }
 
   /**
-   * Get a specific playlist by ID
+   * Get a specific playlist by ID (handles prefixed IDs)
    */
   async getPlaylist(id: string): Promise<Playlist | null> {
-    const useAdminApi = await this.shouldUseAdminApi();
-    
-    if (useAdminApi) {
+    if (id.startsWith('admin_')) {
+      // Admin playlist - get from API
+      const actualId = id.replace('admin_', '');
       try {
-        return await adminApiService.getPlaylist(id);
+        const playlist = await adminApiService.getPlaylist(actualId);
+        return playlist ? { ...playlist, id: `admin_${playlist.id}`, isAdminPlaylist: true } : null;
       } catch (error) {
-        console.warn('⚠️ Admin API failed, falling back to local storage:', error);
-        // Fall back to local storage
-        const playlists = await this.getLocalPlaylists();
-        return playlists.find(p => p.id === id) || null;
+        console.warn('⚠️ Admin API failed for playlist:', actualId, error);
+        return null;
       }
+    } else if (id.startsWith('user_')) {
+      // User playlist - get from local storage
+      const actualId = id.replace('user_', '');
+      const playlists = await this.getLocalPlaylists();
+      const playlist = playlists.find(p => p.id === actualId);
+      return playlist ? { ...playlist, id: `user_${playlist.id}`, isAdminPlaylist: false } : null;
     } else {
+      // Legacy playlist without prefix - check local storage
       const playlists = await this.getLocalPlaylists();
       return playlists.find(p => p.id === id) || null;
     }
   }
 
   /**
-   * Create a new playlist
+   * Create a new user playlist (always local)
    */
   async createPlaylist(name: string, description?: string): Promise<Playlist> {
-    const useAdminApi = await this.shouldUseAdminApi();
-    
-    if (useAdminApi) {
-      try {
-        const playlist = await adminApiService.createPlaylist(name, description);
-        
-        // Also save locally for offline access
-        const localPlaylists = await this.getLocalPlaylists();
-        localPlaylists.push(playlist);
-        await this.cachePlaylistsLocally(localPlaylists);
-        
-        return playlist;
-      } catch (error) {
-        console.warn('⚠️ Admin API failed, creating locally:', error);
-        // Fall back to local creation
-        return await this.createLocalPlaylist(name, description);
-      }
-    } else {
-      return await this.createLocalPlaylist(name, description);
-    }
+    // User playlists are always created locally
+    console.log('📱 Creating user playlist locally:', name);
+    return await this.createLocalPlaylist(name, description);
   }
 
   /**
@@ -232,19 +256,20 @@ class HybridPlaylistService {
    * Add a video to playlist
    */
   async addVideoToPlaylist(playlistId: string, video: SimplifiedVimeoVideo): Promise<void> {
-    const useAdminApi = await this.shouldUseAdminApi();
+    console.log('🔍 Debug addVideoToPlaylist:', { playlistId, videoTitle: video.name || video.title });
     
-    if (useAdminApi) {
-      try {
-        await adminApiService.addVideoToPlaylist(playlistId, video);
-        
-        // Also update local cache
-        await this.addVideoToLocalPlaylist(playlistId, video);
-      } catch (error) {
-        console.warn('⚠️ Admin API failed, adding video locally:', error);
-        await this.addVideoToLocalPlaylist(playlistId, video);
-      }
+    // Check if this is an admin playlist or user playlist based on prefix
+    if (playlistId.startsWith('admin_')) {
+      console.log('❌ Attempted to add video to admin playlist:', playlistId);
+      throw new Error('Cannot add videos to admin playlists. Only admins can modify global playlists.');
+    } else if (playlistId.startsWith('user_')) {
+      // Remove prefix and add to user's local playlist
+      const actualPlaylistId = playlistId.replace('user_', '');
+      console.log('📱 Adding video to user playlist locally:', actualPlaylistId);
+      await this.addVideoToLocalPlaylist(actualPlaylistId, video);
     } else {
+      // Legacy playlist without prefix - treat as user playlist
+      console.log('📱 Adding video to legacy user playlist locally:', playlistId);
       await this.addVideoToLocalPlaylist(playlistId, video);
     }
   }
@@ -268,22 +293,29 @@ class HybridPlaylistService {
 
     const playlistVideo: PlaylistVideo = {
       id: video.id,
-      title: video.title,
-      duration: video.duration,
-      thumbnail: video.thumbnail,
+      title: video.name || video.title || 'Unknown Video',
+      duration: video.duration || 0,
+      thumbnail: video.pictures?.sizes?.[0]?.link || video.thumbnail || 'https://via.placeholder.com/640x360',
       addedAt: new Date().toISOString(),
+      vimeo_id: video.id
     };
+    
+    console.log('💾 Adding video to local playlist:', {
+      playlistId,
+      videoTitle: playlistVideo.title,
+      videoDuration: playlistVideo.duration
+    });
 
     playlist.videos.push(playlistVideo);
     playlist.updatedAt = new Date().toISOString();
     
     // Update thumbnail if this is the first video
     if (playlist.videos.length === 1) {
-      playlist.thumbnail = video.thumbnail;
+      playlist.thumbnail = playlistVideo.thumbnail;
     }
 
     await this.cachePlaylistsLocally(playlists);
-    console.log('✅ Added video to local playlist:', video.title, '→', playlist.name);
+    console.log('✅ Added video to local playlist:', playlistVideo.title, '→', playlist.name);
   }
 
   /**
@@ -361,13 +393,47 @@ class HybridPlaylistService {
   }
 
   /**
-   * Clear all playlists
+   * Delete a playlist
+   */
+  async deletePlaylist(playlistId: string): Promise<void> {
+    console.log('🗑️ Deleting playlist:', playlistId);
+    
+    if (playlistId.startsWith('admin_')) {
+      throw new Error('Cannot delete admin playlists. Only admins can delete global playlists.');
+    } else if (playlistId.startsWith('user_')) {
+      // Remove prefix and delete from local storage
+      const actualPlaylistId = playlistId.replace('user_', '');
+      await this.deleteLocalPlaylist(actualPlaylistId);
+    } else {
+      // Legacy playlist without prefix - delete from local storage
+      await this.deleteLocalPlaylist(playlistId);
+    }
+  }
+
+  /**
+   * Delete playlist from local storage
+   */
+  private async deleteLocalPlaylist(playlistId: string): Promise<void> {
+    try {
+      const playlists = await this.getLocalPlaylists();
+      const updatedPlaylists = playlists.filter(p => p.id !== playlistId);
+      await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedPlaylists));
+      console.log('✅ Deleted local playlist:', playlistId);
+    } catch (error) {
+      console.error('Error deleting local playlist:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clear all playlists (both user and admin cache)
    */
   async clearAllPlaylists(): Promise<void> {
     try {
       await AsyncStorage.removeItem(this.STORAGE_KEY);
+      await AsyncStorage.removeItem(this.ADMIN_CACHE_KEY);
       await AsyncStorage.removeItem(this.SYNC_KEY);
-      console.log('✅ Cleared all local playlists');
+      console.log('✅ Cleared all local playlists and admin cache');
     } catch (error) {
       console.error('Error clearing playlists:', error);
       throw error;

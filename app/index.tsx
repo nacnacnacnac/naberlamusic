@@ -1,14 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Redirect, router, useFocusEffect } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
-import { View, ActivityIndicator, StyleSheet, Image } from 'react-native';
+import { router } from 'expo-router';
+import { View, StyleSheet, Image } from 'react-native';
 
 export default function Index() {
   console.log('Index: Component rendering');
-  const { isSignedIn, isLoading: authLoading } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
-  
-  console.log('Index: Auth - isLoading:', authLoading, 'isSignedIn:', isSignedIn);
 
   // Wait for component to mount properly
   useEffect(() => {
@@ -19,18 +15,13 @@ export default function Index() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Navigate only after component is mounted and auth is ready
+  // Navigate to login page first (no auth needed, just for UI flow)
   useEffect(() => {
-    if (isMounted && !authLoading) {
-      if (isSignedIn) {
-        console.log('Index: User signed in, navigating to tabs');
-        router.replace('/(tabs)');
-      } else {
-        console.log('Index: User not signed in, navigating to login');
-        router.replace('/login');
-      }
+    if (isMounted) {
+      console.log('Index: Navigating to login page');
+      router.replace('/login');
     }
-  }, [isSignedIn, authLoading, isMounted]);
+  }, [isMounted]);
 
   // Show loading with animated gif while determining state
   return (

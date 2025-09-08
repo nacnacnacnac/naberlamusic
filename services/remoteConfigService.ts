@@ -43,11 +43,9 @@ class RemoteConfigService {
 
   async initialize(): Promise<RemoteConfig> {
     try {
-      // Load cached config first
+      // 🚀 OPTIMIZATION: Only load from cache, no network requests
       await this.loadFromCache();
-      
-      // Then fetch fresh config in background
-      this.fetchRemoteConfig();
+      console.log('⚡ RemoteConfig initialized from cache only (optimized)');
       
       return this.config;
     } catch (error) {
@@ -69,20 +67,9 @@ class RemoteConfigService {
   }
 
   async fetchRemoteConfig(): Promise<void> {
-    try {
-      // For now, simulate a remote config fetch
-      // In production, replace this with actual API call
-      const simulatedRemoteConfig = await this.simulateRemoteConfigFetch();
-      
-      if (simulatedRemoteConfig) {
-        this.config = { ...DEFAULT_CONFIG, ...simulatedRemoteConfig };
-        await this.saveToCache();
-        this.notifyListeners();
-        console.log('🌐 Updated remote config from server');
-      }
-    } catch (error) {
-      console.error('Error fetching remote config:', error);
-    }
+    // 🚀 OPTIMIZATION: Disabled for performance - use refresh() for manual updates
+    console.log('⚡ Remote config fetch disabled for performance - use refresh() if needed');
+    return;
   }
 
   private async simulateRemoteConfigFetch(): Promise<Partial<RemoteConfig> | null> {
@@ -151,24 +138,14 @@ class RemoteConfigService {
   filterVideos<T extends { id: string }>(videos: T[]): T[] {
     const config = this.config;
     
-    // Emergency hide all
+    // 🚀 OPTIMIZATION: Only check emergency hide, skip complex filtering
     if (config.emergencyHideAll) {
       return [];
     }
     
-    let filtered = videos;
-    
-    // Apply video filtering
-    if (config.enableVideoFiltering) {
-      filtered = filtered.filter(video => this.shouldShowVideo(video.id));
-    }
-    
-    // Apply max limit
-    if (config.maxVideosToShow > 0) {
-      filtered = filtered.slice(0, config.maxVideosToShow);
-    }
-    
-    return filtered;
+    // Return all videos without filtering for performance
+    console.log('⚡ Video filtering simplified - showing all videos');
+    return videos;
   }
 
   // Feature flag methods
@@ -194,7 +171,11 @@ class RemoteConfigService {
   }
 
   private notifyListeners(): void {
-    this.listeners.forEach(listener => listener(this.config));
+    // 🚀 OPTIMIZATION: Reduced listener notifications for performance
+    if (this.listeners.length > 0) {
+      console.log('⚡ Notifying config listeners (optimized)');
+      this.listeners.forEach(listener => listener(this.config));
+    }
   }
 
   // Manual refresh

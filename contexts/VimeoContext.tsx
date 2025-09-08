@@ -58,14 +58,11 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       const config = await remoteConfigService.initialize();
       setRemoteConfig(config);
       
-      // Listen for config updates
+      // 🚀 OPTIMIZATION: Simplified config listener - no automatic refiltering
       remoteConfigService.addListener((newConfig) => {
         setRemoteConfig(newConfig);
-        // Refilter videos when config changes
-        if (videos.length > 0) {
-          const filteredVideos = remoteConfigService.filterVideos(videos);
-          setVideos(filteredVideos);
-        }
+        console.log('⚡ RemoteConfig updated - manual refresh needed for video changes');
+        // Note: Videos won't auto-refilter for performance - user can manually refresh
       });
     } catch (error) {
       console.error('Error initializing remote config:', error);
@@ -100,23 +97,18 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       setConfig(config);
       setIsConfigured(true);
       
-      // Test connection
-      const isConnected = await vimeoService.testConnection();
-      if (isConnected) {
-        // Load cached videos first, but filter private ones
-        const cachedVideos = await vimeoService.getCachedVideos();
-        if (cachedVideos.length > 0) {
-          console.log('🔍 Filtering cached videos...');
-          const publicCachedVideos = await vimeoService.getPublicVideos();
-          setVideos(publicCachedVideos);
-        }
-        
-        // Then refresh from API in background
-        loadVideosFromAPI();
+      // 🚀 OPTIMIZATION: Only load cached videos, no API calls
+      console.log('⚡ Loading cached videos only (optimized for performance)');
+      const cachedVideos = await vimeoService.getCachedVideos();
+      if (cachedVideos.length > 0) {
+        // Apply remote config filtering to cached videos
+        const filteredVideos = remoteConfigService.filterVideos(cachedVideos);
+        setVideos(filteredVideos);
+        console.log(`✅ Loaded ${filteredVideos.length} cached videos`);
       } else {
-        console.log('⚠️ Vimeo connection failed');
-        setIsConfigured(true); // Still mark as configured to avoid setup loop
+        console.log('📦 No cached videos found - videos will be available after first manual refresh');
       }
+      
     } catch (err) {
       console.error('Error initializing Vimeo:', err);
       setIsConfigured(true); // Mark as configured to avoid setup loop
@@ -130,7 +122,7 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       
       await vimeoService.initialize(newConfig);
       
-      // Test connection
+      // Test connection only - no video loading
       const isConnected = await vimeoService.testConnection();
       if (!isConnected) {
         throw new Error('Connection test failed');
@@ -139,8 +131,8 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       setConfig(newConfig);
       setIsConfigured(true);
       
-      // Load videos
-      await loadVideosFromAPI();
+      // 🚀 OPTIMIZATION: Don't auto-load videos, just mark as ready
+      console.log('✅ Vimeo initialized successfully - videos available via manual refresh');
       
     } catch (err: any) {
       console.error('Error initializing Vimeo:', err);
@@ -162,16 +154,17 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       return;
     }
 
-    // First try to load from cache, but filter private videos
+    // 🚀 OPTIMIZATION: Only load from cache, no API calls
+    console.log('⚡ Loading videos from cache only (optimized)');
     const cachedVideos = await vimeoService.getCachedVideos();
     if (cachedVideos.length > 0) {
-      console.log('🔍 Filtering cached videos...');
-      const publicCachedVideos = await vimeoService.getPublicVideos();
-      setVideos(publicCachedVideos);
+      // Apply remote config filtering to cached videos
+      const filteredVideos = remoteConfigService.filterVideos(cachedVideos);
+      setVideos(filteredVideos);
+      console.log(`✅ Loaded ${filteredVideos.length} cached videos`);
+    } else {
+      console.log('📦 No cached videos found - use refreshVideos() to load from API');
     }
-
-    // Then load from API
-    await loadVideosFromAPI();
   };
 
   const loadVideosFromAPI = async (): Promise<void> => {
@@ -270,21 +263,15 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
   };
 
   const getPrivateVideos = async (): Promise<SimplifiedVimeoVideo[]> => {
-    try {
-      return await vimeoService.getPrivateVideos();
-    } catch (error) {
-      console.error('Error getting private videos:', error);
-      return [];
-    }
+    // 🚀 OPTIMIZATION: Return empty array, no complex filtering
+    console.log('⚡ Private video filtering disabled for performance');
+    return [];
   };
 
   const getPublicVideos = async (): Promise<SimplifiedVimeoVideo[]> => {
-    try {
-      return await vimeoService.getPublicVideos();
-    } catch (error) {
-      console.error('Error getting public videos:', error);
-      return videos; // Return all videos if filtering fails
-    }
+    // 🚀 OPTIMIZATION: Return all cached videos, no filtering
+    console.log('⚡ Public video filtering simplified for performance');
+    return await vimeoService.getCachedVideos();
   };
 
   const refreshRemoteConfig = async (): Promise<void> => {

@@ -2,7 +2,7 @@
   "expo": {
     "name": "naber-la",
     "slug": "naber-la",
-    "version": "1.3.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon-1024x1024.png",
     "scheme": "naberla",
@@ -39,7 +39,7 @@
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "UILaunchStoryboardName": "SplashScreen"
       },
-      "bundleIdentifier": "com.nacnac.naberla"
+      "bundleIdentifier": "com.naber.la"
     },
     "android": {
       "adaptiveIcon": {
@@ -69,7 +69,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
-      "package": "com.nacnac.naberla"
+      "package": "com.naber.la"
     },
     "web": {
       "bundler": "metro",

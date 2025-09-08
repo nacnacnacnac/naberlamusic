@@ -46,12 +46,65 @@ export default function CreatePlaylistScreen() {
       // Video varsa playlist'e ekle
       if (videoId && videoTitle) {
         try {
-          const video = getVideo(videoId);
+          let video = getVideo(videoId);
+          console.log('🎵 Found video in Vimeo context for create playlist:', video);
+          
+          if (!video) {
+            console.log('🎵 Video not found in Vimeo context, searching in admin playlists...');
+            
+            // Try to find video in admin playlists
+            const allPlaylists = await hybridPlaylistService.getPlaylists();
+            let foundVideo = null;
+            
+            for (const playlist of allPlaylists) {
+              if (playlist.isAdminPlaylist && playlist.videos) {
+                const adminVideo = playlist.videos.find(v => v.id === videoId || v.vimeo_id === videoId);
+                if (adminVideo) {
+                  console.log('🎵 Found video in admin playlist for create:', adminVideo);
+                  foundVideo = {
+                    id: adminVideo.vimeo_id || adminVideo.id,
+                    name: adminVideo.title || videoTitle || 'Unknown Video',
+                    title: adminVideo.title || videoTitle || 'Unknown Video',
+                    description: '',
+                    duration: adminVideo.duration || 0,
+                    embed: {
+                      html: `<iframe src="https://player.vimeo.com/video/${adminVideo.vimeo_id || adminVideo.id}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+                    },
+                    pictures: {
+                      sizes: [{ link: adminVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+                    }
+                  };
+                  break;
+                }
+              }
+            }
+            
+            if (foundVideo) {
+              video = foundVideo;
+            } else {
+              // Create synthetic video if not found anywhere
+              video = {
+                id: videoId,
+                name: videoTitle || 'Unknown Video',
+                title: videoTitle || 'Unknown Video',
+                description: '',
+                duration: 0,
+                embed: {
+                  html: `<iframe src="https://player.vimeo.com/video/${videoId}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+                },
+                pictures: {
+                  sizes: [{ link: 'https://via.placeholder.com/640x360' }]
+                }
+              };
+            }
+          }
+          
           if (video) {
-            await hybridPlaylistService.addVideoToPlaylist(newPlaylist.id, video);
+            console.log('🎵 Adding video to new playlist:', video.name || video.title);
+            await hybridPlaylistService.addVideoToPlaylist(`user_${newPlaylist.id}`, video);
           }
         } catch (error) {
-          console.log('Video not found, creating playlist without video');
+          console.error('Error adding video to new playlist:', error);
           // Video bulunamasa bile playlist oluşturulur
         }
       }
@@ -113,8 +166,8 @@ export default function CreatePlaylistScreen() {
               style={styles.textInput}
               value={playlistName}
               onChangeText={setPlaylistName}
-              placeholder="e.g: Favorites, Work Music..."
-              placeholderTextColor="#e0af92"
+              placeholder="e.g: Chill, Car, Pompa..."
+              placeholderTextColor="#666666"
               maxLength={50}
               autoFocus={false}
             />
@@ -132,9 +185,9 @@ export default function CreatePlaylistScreen() {
             disabled={isCreating || !playlistName.trim()}
           >
             {isCreating ? (
-              <ActivityIndicator color="white" size="small" />
+              <ActivityIndicator color="#000000" size="small" />
             ) : (
-              <IconSymbol name="plus" size={20} color="white" />
+              <IconSymbol name="plus" size={20} color="#000000" />
             )}
             <ThemedText style={styles.buttonText}>
               {isCreating ? 'Creating...' : 'Create Playlist'}
@@ -242,7 +295,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   inputHint: {
-    color: '#e0af92',
+    color: '#666666', // Koyu gri
     fontSize: 12,
     marginTop: 6,
     textAlign: 'right',
@@ -268,7 +321,7 @@ const styles = StyleSheet.create({
     borderColor: '#333333',
   },
   buttonText: {
-    color: 'white',
+    color: '#000000', // Siyah yazı vurgu renkli button için
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,

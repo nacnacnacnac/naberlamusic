@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Video } from 'expo-av';
 import { router, useFocusEffect } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -61,7 +61,6 @@ const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { videos, isConfigured, isLoading, refreshVideos } = useVimeo();
-  const { user, signOut } = useAuth();
   const [currentVideo, setCurrentVideo] = useState<SimplifiedVimeoVideo | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = useState<number>(-1);
@@ -155,10 +154,17 @@ export default function HomeScreen() {
   // Toggle user playlist expansion
   const togglePlaylistExpansion = (playlistId: string) => {
     const newExpanded = new Set(expandedPlaylists);
+    const isExpanding = !newExpanded.has(playlistId);
+    
     if (newExpanded.has(playlistId)) {
       newExpanded.delete(playlistId);
     } else {
+      // Close all other playlists when opening a new one
+      newExpanded.clear();
       newExpanded.add(playlistId);
+      
+      // Scroll to top when expanding a playlist
+      playlistScrollRef.current?.scrollTo({ y: 0, animated: true });
     }
     setExpandedPlaylists(newExpanded);
   };
@@ -166,21 +172,14 @@ export default function HomeScreen() {
   // Refresh playlists when returning from other screens
   const refreshPlaylists = async () => {
     try {
-      const playlists = await playlistService.getPlaylists();
+      const playlists = await hybridPlaylistService.getPlaylists();
       setUserPlaylists(playlists);
     } catch (error) {
       console.error('Error refreshing playlists:', error);
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.replace('/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
+  // Sign out functionality removed - no auth system
 
   const playVideo = (video: SimplifiedVimeoVideo) => {
     const videoIndex = videos.findIndex(v => v.id === video.id);
@@ -309,29 +308,103 @@ export default function HomeScreen() {
   };
 
   const playNextVideo = () => {
-    console.log('🎵 PLAY NEXT VIDEO CALLED - videos.length:', videos.length);
-    if (videos.length === 0) return;
+    console.log('🎵 PLAY NEXT VIDEO CALLED - videos.length:', videos.length, 'currentIndex:', currentVideoIndex);
     
-    const nextIndex = (currentVideoIndex + 1) % videos.length; // Loop back to first video
-    const nextVideo = videos[nextIndex];
+    // Find current video in playlists
+    let currentPlaylist = null;
+    let currentVideoIndexInPlaylist = -1;
     
-    console.log('🎵 Playing next video:', nextVideo.title, 'at index:', nextIndex);
+    for (const playlist of userPlaylists) {
+      if (playlist.videos && playlist.videos.length > 0) {
+        const videoIndex = playlist.videos.findIndex((v: any) => 
+          v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id
+        );
+        if (videoIndex !== -1) {
+          currentPlaylist = playlist;
+          currentVideoIndexInPlaylist = videoIndex;
+          break;
+        }
+      }
+    }
+    
+    if (!currentPlaylist || !currentPlaylist.videos || currentPlaylist.videos.length === 0) {
+      console.log('🎵 No playlist found or playlist empty');
+      return;
+    }
+    
+    const nextIndex = (currentVideoIndexInPlaylist + 1) % currentPlaylist.videos.length;
+    const nextPlaylistVideo = currentPlaylist.videos[nextIndex];
+    
+    // Convert playlist video to Vimeo format
+    const vimeoIdToUse = nextPlaylistVideo.vimeo_id || nextPlaylistVideo.id;
+    const nextVideo = {
+      id: vimeoIdToUse,
+      name: nextPlaylistVideo.title,
+      description: '',
+      duration: nextPlaylistVideo.duration,
+      embed: {
+        html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+      },
+      pictures: {
+        sizes: [{ link: nextPlaylistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+      }
+    };
+    
+    console.log('🎵 Playing next video from playlist:', nextVideo.name, 'at playlist index:', nextIndex);
     setCurrentVideo(nextVideo);
     setCurrentVideoIndex(nextIndex);
-    setIsPaused(false); // Yeni şarkı başladığında pause durumunu sıfırla
-    debugLog.main('Playing next video:', `${nextVideo.title} at index: ${nextIndex}`);
+    setIsPaused(false);
+    debugLog.main('Playing next video:', `${nextVideo.name} at index: ${nextIndex}`);
   };
 
   const playPreviousVideo = () => {
-    if (videos.length === 0) return;
+    console.log('🎵 PLAY PREVIOUS VIDEO CALLED - videos.length:', videos.length, 'currentIndex:', currentVideoIndex);
     
-    const prevIndex = currentVideoIndex <= 0 ? videos.length - 1 : currentVideoIndex - 1;
-    const prevVideo = videos[prevIndex];
+    // Find current video in playlists
+    let currentPlaylist = null;
+    let currentVideoIndexInPlaylist = -1;
     
+    for (const playlist of userPlaylists) {
+      if (playlist.videos && playlist.videos.length > 0) {
+        const videoIndex = playlist.videos.findIndex((v: any) => 
+          v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id
+        );
+        if (videoIndex !== -1) {
+          currentPlaylist = playlist;
+          currentVideoIndexInPlaylist = videoIndex;
+          break;
+        }
+      }
+    }
+    
+    if (!currentPlaylist || !currentPlaylist.videos || currentPlaylist.videos.length === 0) {
+      console.log('🎵 No playlist found or playlist empty');
+      return;
+    }
+    
+    const prevIndex = currentVideoIndexInPlaylist <= 0 ? currentPlaylist.videos.length - 1 : currentVideoIndexInPlaylist - 1;
+    const prevPlaylistVideo = currentPlaylist.videos[prevIndex];
+    
+    // Convert playlist video to Vimeo format
+    const vimeoIdToUse = prevPlaylistVideo.vimeo_id || prevPlaylistVideo.id;
+    const prevVideo = {
+      id: vimeoIdToUse,
+      name: prevPlaylistVideo.title,
+      description: '',
+      duration: prevPlaylistVideo.duration,
+      embed: {
+        html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+      },
+      pictures: {
+        sizes: [{ link: prevPlaylistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+      }
+    };
+    
+    console.log('🎵 Playing previous video from playlist:', prevVideo.name, 'at playlist index:', prevIndex);
     setCurrentVideo(prevVideo);
     setCurrentVideoIndex(prevIndex);
-    setIsPaused(false); // Yeni şarkı başladığında pause durumunu sıfırla
-    debugLog.main('Playing previous video:', `${prevVideo.title} at index: ${prevIndex}`);
+    setIsPaused(false);
+    debugLog.main('Playing previous video:', `${prevVideo.name} at index: ${prevIndex}`);
   };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -411,19 +484,19 @@ export default function HomeScreen() {
 
   const handleAddToPlaylist = async (video: SimplifiedVimeoVideo) => {
     try {
-      const playlists = await playlistService.getPlaylists();
+      const playlists = await hybridPlaylistService.getPlaylists();
       
       if (playlists.length === 0) {
         // Hiç playlist yoksa yeni oluştur
         router.push({
           pathname: '/create-playlist',
-          params: { videoId: video.id, videoTitle: video.title }
+          params: { videoId: video.id, videoTitle: video.name || video.title || 'Untitled Video' }
         });
       } else {
         // Mevcut playlist'leri göster
         router.push({
           pathname: '/select-playlist',
-          params: { videoId: video.id, videoTitle: video.title }
+          params: { videoId: video.id, videoTitle: video.name || video.title || 'Untitled Video' }
         });
       }
     } catch (error) {
@@ -519,10 +592,22 @@ export default function HomeScreen() {
             )}
           </>
         ) : (
-          <ThemedView style={styles.noVideoContainer}>
-            <IconSymbol name="music.note" size={48} color="#e0af92" />
-            <ThemedText style={styles.noVideoText}>Select a video</ThemedText>
-          </ThemedView>
+          <View style={styles.noVideoContainer}>
+            {/* Background Video when no video selected */}
+            <Video
+              source={require('@/assets/videos/select.mp4')}
+              style={styles.selectVideo}
+              shouldPlay
+              isLooping
+              isMuted
+              resizeMode="cover"
+            />
+            {/* Dark Overlay */}
+            <LinearGradient
+              colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']}
+              style={styles.selectVideoOverlay}
+            />
+          </View>
         )}
       </ThemedView>
 
@@ -532,7 +617,7 @@ export default function HomeScreen() {
           <ThemedView style={styles.titleContainer}>
             <ThemedView style={styles.titleTextContainer}>
               <ThemedText style={styles.currentVideoTitle} numberOfLines={2}>
-                {currentVideo.title}
+                {currentVideo.name || currentVideo.title || 'Untitled Video'}
               </ThemedText>
             </ThemedView>
             <View style={styles.headerActions}>
@@ -551,73 +636,13 @@ export default function HomeScreen() {
 
       {/* Playlist Area */}
       {!isFullscreen && (
-        <View style={styles.playlistArea}>
-          <TouchableOpacity 
-            style={styles.playlistHeader}
-            onPress={() => setIsPlaylistExpanded(!isPlaylistExpanded)}
-            activeOpacity={0.7}
-          >
-            <ThemedView style={styles.playlistTitleContainer}>
-              <ExpoImage 
-                source={require('@/assets/images/playlist.svg')}
-                style={styles.playlistHeaderIcon}
-                contentFit="contain"
-              />
-              <ThemedText style={styles.playlistTitle}>All Videos ({videos.length})</ThemedText>
-            </ThemedView>
-            <IconSymbol 
-              name={isPlaylistExpanded ? "chevron.down" : "chevron.right"} 
-              size={16} 
-              color="#e0af92" 
-            />
-          </TouchableOpacity>
-          
-          {isPlaylistExpanded && (
-            <ScrollView 
-              ref={playlistScrollRef}
-              style={styles.playlistScroll}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={true}
-              nestedScrollEnabled={true}
-            >
-              {videos.map((video, index) => (
-                <TouchableOpacity
-                  key={video.id}
-                  style={[
-                    styles.playlistItem,
-                    currentVideo?.id === video.id && styles.currentPlaylistItem
-                  ]}
-                  onPress={() => playVideo(video)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.playlistItemInfo}>
-                    <Text 
-                      style={[
-                        styles.playlistItemTitle,
-                        currentVideo?.id === video.id && styles.currentPlaylistItemTitle
-                      ]} 
-                      numberOfLines={1}
-                    >
-                      {video.title}
-                    </Text>
-                    <Text 
-                      style={[
-                        styles.playlistItemDuration,
-                        currentVideo?.id === video.id && styles.currentPlaylistItemDuration
-                      ]}
-                    >
-                      {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
-                    </Text>
-                  </View>
-                  <View style={styles.playlistItemActions}>
-                    {currentVideo?.id === video.id && (
-                      <IconSymbol name="speaker.wave.2.fill" size={16} color="#e0af92" />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
+        <ScrollView 
+          style={styles.playlistArea}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={true}
+          nestedScrollEnabled={true}
+        >
+          {/* All Videos section hidden - cleaner UI */}
 
           {/* Admin Panel Playlists */}
           {userPlaylists.map((playlist) => {
@@ -645,7 +670,10 @@ export default function HomeScreen() {
               
               {expandedPlaylists.has(playlist.id) && (
                 <ScrollView 
-                  style={styles.userPlaylistScroll}
+                  style={[
+                    styles.userPlaylistScroll,
+                    expandedPlaylists.size === 1 && styles.userPlaylistScrollExpanded
+                  ]}
                   showsVerticalScrollIndicator={false}
                   scrollEnabled={true}
                   nestedScrollEnabled={true}
@@ -685,7 +713,7 @@ export default function HomeScreen() {
                             ]} 
                             numberOfLines={1}
                           >
-                            {playlistVideo.title}
+                            {playlistVideo.title || playlistVideo.name || 'Untitled Video'}
                           </Text>
                           <Text 
                             style={[
@@ -713,7 +741,7 @@ export default function HomeScreen() {
             </View>
             );
           })}
-        </View>
+        </ScrollView>
       )}
 
       {/* Toast Notification */}
@@ -738,7 +766,10 @@ export default function HomeScreen() {
           onAddToPlaylist={() => {
             router.push({
               pathname: '/select-playlist',
-              params: { videoId: currentVideo.id }
+              params: { 
+                videoId: currentVideo.id, 
+                videoTitle: currentVideo.name || currentVideo.title || 'Untitled Video' 
+              }
             });
           }}
           testState={testState}
@@ -834,6 +865,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#000000', // Tutarlı siyah
+    position: 'relative',
+  },
+  selectVideo: {
+    position: 'absolute',
+    top: 0,
+    left: -20, // Video'yu çok az sağa al
+    right: 0,
+    bottom: 0,
+    width: '105%', // Genişliği hafif artır
+    height: '100%',
+  },
+  selectVideoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  selectTextContainer: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+    zIndex: 10,
   },
   noVideoText: {
     color: 'white', // Siyah yerine beyaz
@@ -897,6 +953,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     position: 'relative',
+    paddingBottom: 250, // Extra large padding to ensure playlists stay above music bar
   },
   userPlaylistContainer: {
     marginTop: 0,
@@ -947,7 +1004,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000', // Tam siyah background
   },
   userPlaylistScroll: {
-    maxHeight: 200, // Fixed height instead of flex
+    maxHeight: 500, // Large height for expanded playlist videos
+    backgroundColor: '#000000',
+  },
+  userPlaylistScrollExpanded: {
+    maxHeight: 600, // Even larger height when playlist is the only one expanded
     backgroundColor: '#000000',
   },
   playlistItem: {

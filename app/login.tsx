@@ -5,14 +5,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Video } from 'expo-av';
 import { router } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
-import { useAuth } from '@/contexts/AuthContext';
 import { useVimeo } from '@/contexts/VimeoContext';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
 const { width } = Dimensions.get('window');
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
   const { isLoading, videos } = useVimeo();
   const [progressAnim] = useState(new Animated.Value(0));
   const [showLoading, setShowLoading] = useState(false);
@@ -33,13 +31,17 @@ export default function LoginScreen() {
   const ripple1Scale = useRef(new Animated.Value(1)).current;
   const ripple1Opacity = useRef(new Animated.Value(0)).current;
   
-  // Button entrance animation
-  const buttonOpacity = useRef(new Animated.Value(0)).current;
-  const buttonY = useRef(new Animated.Value(30)).current; // Start 30px below
+  // Button entrance animation - Start visible for better UX
+  const buttonOpacity = useRef(new Animated.Value(1)).current; // Always visible
+  const buttonY = useRef(new Animated.Value(0)).current; // Start in position
 
   // Start logo animation on component mount
   useEffect(() => {
     startLogoAnimation();
+    // Start ripple animation immediately since button is always visible
+    setTimeout(() => {
+      startRippleAnimation();
+    }, 2000); // Start after logo animation
   }, []);
 
   // Force hide home indicator for development
@@ -149,9 +151,9 @@ export default function LoginScreen() {
 
   const startRippleAnimation = () => {
     const singleRipple = () => {
-      // Reset to button size and invisible
+      // Reset to button size and more visible
       ripple1Scale.setValue(1);
-      ripple1Opacity.setValue(0.5);
+      ripple1Opacity.setValue(0.8); // More visible start
       
       // Animate outward
       Animated.parallel([
@@ -173,8 +175,8 @@ export default function LoginScreen() {
       });
     };
     
-    // Start first ripple after delay
-    setTimeout(singleRipple, 1000);
+    // Start first ripple immediately
+    singleRipple();
   };
 
   const startSubtleHeartbeat = () => {
@@ -260,15 +262,8 @@ export default function LoginScreen() {
   };
 
   const handleEnter = () => {
-    if (isLoading) return; // Prevent action while loading
-    
-    // Sign in user and navigate directly
-    signIn();
-    
-    // Navigate to main app
-    setTimeout(() => {
-      router.replace('/(tabs)');
-    }, 100);
+    // Navigate directly to main app (no auth needed)
+    router.replace('/(tabs)');
   };
 
   const isReady = !isLoading && videos.length > 0;
@@ -549,6 +544,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 100, // En üstte olsun
   },
   rippleCircle: {
     position: 'absolute',
@@ -574,7 +570,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    zIndex: 10, // Above ripples
+    zIndex: 200, // Above ripples
   },
   arrowIcon: {
     justifyContent: 'center',

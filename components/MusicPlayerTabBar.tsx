@@ -227,7 +227,10 @@ export default function MusicPlayerTabBar({
 
       {/* Music Controls - Centered */}
       <View style={styles.controls}>
-        <TouchableOpacity style={styles.controlButton} onPress={onPrevious}>
+        <TouchableOpacity style={styles.controlButton} onPress={() => {
+          console.log('🎵 FOOTER: Previous button pressed');
+          onPrevious();
+        }}>
           <IconSymbol name="backward.fill" size={20} color="#ffffff" />
         </TouchableOpacity>
 
@@ -239,15 +242,21 @@ export default function MusicPlayerTabBar({
           />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.controlButton} onPress={onNext}>
+        <TouchableOpacity style={styles.controlButton} onPress={() => {
+          console.log('🎵 FOOTER: Next button pressed');
+          onNext();
+        }}>
           <IconSymbol name="forward.fill" size={20} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
       {/* Right Actions */}
       <View style={styles.rightActions}>
-        <TouchableOpacity style={styles.actionButton} onPress={onPlaylistPress}>
-          <IconSymbol name="list.bullet" size={22} color="#e0af92" />
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={onPlaylistPress}
+        >
+          <IconSymbol name="list.bullet" size={24} color="#e0af92" />
         </TouchableOpacity>
       </View>
       </View>
@@ -276,7 +285,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingBottom: 30, // İconları çok az daha yukarı
     height: 100, // Daha küçük container
-    zIndex: 10, // Blur'un üstünde
+    zIndex: 100, // Daha yüksek z-index
   },
   leftLogo: {
     width: 100, // Sabit genişlik

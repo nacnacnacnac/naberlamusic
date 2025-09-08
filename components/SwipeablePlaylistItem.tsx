@@ -13,7 +13,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { Playlist } from '@/types/playlist';
-import { playlistService } from '@/services/playlistService';
+import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 
 interface SwipeablePlaylistItemProps {
   playlist: Playlist;
@@ -46,7 +46,7 @@ export default function SwipeablePlaylistItem({
           style: 'destructive',
           onPress: async () => {
             try {
-              await playlistService.deletePlaylist(playlist.id);
+              await hybridPlaylistService.deletePlaylist(playlist.id);
               onDelete(); // Refresh the list
             } catch (error) {
               console.error('Error deleting playlist:', error);
