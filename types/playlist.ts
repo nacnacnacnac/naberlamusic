@@ -4,6 +4,7 @@ export interface PlaylistVideo {
   duration: number;
   thumbnail: string;
   addedAt: string;
+  vimeo_id?: string; // Add vimeo_id field for cross-account video playback
 }
 
 export interface Playlist {

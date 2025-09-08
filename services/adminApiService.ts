@@ -14,6 +14,7 @@ export interface AdminPlaylist {
     duration: number;
     thumbnail: string;
     addedAt: string;
+    vimeo_id?: string; // Add vimeo_id field
   }>;
   createdAt: string;
   updatedAt: string;
@@ -58,6 +59,7 @@ class AdminApiService {
           duration: video.duration,
           thumbnail: video.thumbnail,
           addedAt: video.addedAt,
+          vimeo_id: video.vimeo_id, // Include vimeo_id
         })),
         createdAt: adminPlaylist.createdAt,
         updatedAt: adminPlaylist.updatedAt,
