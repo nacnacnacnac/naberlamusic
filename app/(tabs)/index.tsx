@@ -566,10 +566,15 @@ export default function HomeScreen() {
                   failedCommands: prev.failedCommands + 1
                 }));
                 
-                // If video has 401 error, skip to next video automatically
-                if (error.includes('401') && videos.length > 1) {
-                  console.log('🔄 Auto-skipping private video, playing next...');
-                  showToast('Private video skipped', 'info');
+                // If video has 401 error, add to private list and skip to next video
+                if (error.includes('401') && currentVideo) {
+                  console.log(`🔄 Video ${currentVideo.id} has domain restrictions, adding to private list and skipping...`);
+                  // Add to private video list for future filtering
+                  import('@/services/vimeoService').then(({ vimeoService }) => {
+                    vimeoService.addToPrivateList(currentVideo.id);
+                  });
+                  
+                  showToast('Video has domain restrictions, skipped', 'info');
                   setTimeout(() => {
                     playNextVideo();
                   }, 1000);
