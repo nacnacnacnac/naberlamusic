@@ -957,7 +957,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     position: 'relative',
-    paddingBottom: 350, // Increased padding to ensure last songs are accessible above music bar
+    paddingBottom: 450, // Much larger padding to ensure last songs are fully accessible above music bar
   },
   userPlaylistContainer: {
     marginTop: 0,
