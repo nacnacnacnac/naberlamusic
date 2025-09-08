@@ -44,16 +44,21 @@ class AdminApiService {
 
       const result = await response.json();
       
+      console.log('🔍 Admin API response:', JSON.stringify(result, null, 2));
+      
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch playlists');
       }
 
+      const playlistsData = result.playlists || result.data || [];
+      console.log('📋 Playlists data:', playlistsData);
+
       // Convert admin format to mobile app format
-      const playlists: Playlist[] = (result.playlists || result.data || []).map((adminPlaylist: AdminPlaylist) => ({
+      const playlists: Playlist[] = playlistsData.map((adminPlaylist: AdminPlaylist) => ({
         id: adminPlaylist.id,
         name: adminPlaylist.name,
         description: adminPlaylist.description,
-        videos: adminPlaylist.videos.map(video => ({
+        videos: (adminPlaylist.videos || []).map(video => ({
           id: video.id,
           title: video.title,
           duration: video.duration,
@@ -108,7 +113,7 @@ class AdminApiService {
         id: adminPlaylist.id,
         name: adminPlaylist.name,
         description: adminPlaylist.description,
-        videos: adminPlaylist.videos.map(video => ({
+        videos: (adminPlaylist.videos || []).map(video => ({
           id: video.id,
           title: video.title,
           duration: video.duration,
