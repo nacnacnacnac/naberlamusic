@@ -718,10 +718,7 @@ export default function HomeScreen() {
                             {playlistVideo.title || playlistVideo.name || 'Untitled Video'}
                           </Text>
                           <Text 
-                            style={[
-                              styles.playlistItemDuration,
-                              (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentPlaylistItemDuration
-                            ]}
+                            style={styles.playlistItemDuration}
                           >
                             {Math.floor(playlistVideo.duration / 60)}:{(playlistVideo.duration % 60).toString().padStart(2, '0')}
                           </Text>
