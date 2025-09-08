@@ -12,6 +12,7 @@ import { vimeoService } from '@/services/vimeoService';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
 import VimeoPlayer from '@/components/VimeoPlayer';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
+import { autoSyncService } from '@/services/autoSyncService';
 import Toast from '@/components/Toast';
 import MusicPlayerTabBar from '@/components/MusicPlayerTabBar';
 
@@ -102,7 +103,7 @@ export default function HomeScreen() {
     }
   }, [videos]);
 
-  // Load user playlists
+  // Load user playlists and initialize auto sync
   useEffect(() => {
     const loadPlaylists = async () => {
       try {
@@ -113,7 +114,16 @@ export default function HomeScreen() {
       }
     };
     
+    const initializeAutoSync = async () => {
+      try {
+        await autoSyncService.initialize();
+      } catch (error) {
+        console.error('Error initializing auto sync:', error);
+      }
+    };
+    
     loadPlaylists();
+    initializeAutoSync();
   }, []);
 
   // Refresh playlists when screen comes into focus
@@ -611,8 +621,6 @@ export default function HomeScreen() {
 
           {/* Admin Panel Playlists */}
           {userPlaylists.map((playlist) => {
-            console.log('Rendering playlist:', playlist.name, 'Videos:', playlist.videos?.length || 0, 'Video titles:', playlist.videos?.map(v => v.title) || []);
-            console.log('Full playlist object:', JSON.stringify(playlist, null, 2));
             return (
             <View key={playlist.id} style={styles.userPlaylistContainer}>
               <TouchableOpacity 
@@ -651,17 +659,8 @@ export default function HomeScreen() {
                           currentVideo?.id === playlistVideo.id && styles.currentPlaylistItem
                         ]}
                         onPress={() => {
-                          console.log('🎵 Playlist video tapped:', playlistVideo.title);
-                          console.log('🎵 Playlist video UUID:', playlistVideo.id);
-                          console.log('🎵 Playlist video Vimeo ID:', playlistVideo.vimeo_id);
-                          console.log('🎵 Full playlist video object:', JSON.stringify(playlistVideo, null, 2));
-                          
                           // Use vimeo_id if available, otherwise try to find by UUID
                           const vimeoIdToUse = playlistVideo.vimeo_id || playlistVideo.id;
-                          console.log('🎵 Final Vimeo ID to use:', vimeoIdToUse);
-                          
-                          // Always create synthetic video from playlist data with correct Vimeo ID
-                          console.log('🎵 Creating synthetic video from playlist data');
                           const syntheticVideo = {
                             id: vimeoIdToUse,
                             name: playlistVideo.title,
@@ -673,8 +672,7 @@ export default function HomeScreen() {
                             pictures: {
                               sizes: [{ link: playlistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
                             }
-                          };
-                          console.log('🎵 Playing synthetic video:', syntheticVideo.name, 'with Vimeo ID:', vimeoIdToUse);
+                            };
                           playVideo(syntheticVideo);
                         }}
                         activeOpacity={0.7}
