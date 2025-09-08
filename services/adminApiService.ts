@@ -2,7 +2,7 @@ import { Playlist, PlaylistVideo } from '@/types/playlist';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
 
 // Admin API Base URL
-const ADMIN_API_BASE_URL = 'https://igami-worker.ugurcan-b84.workers.dev';
+const ADMIN_API_BASE_URL = 'https://naberla.org';
 
 export interface AdminPlaylist {
   id: string;
