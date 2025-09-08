@@ -49,7 +49,7 @@ class AdminApiService {
       }
 
       // Convert admin format to mobile app format
-      const playlists: Playlist[] = result.data.map((adminPlaylist: AdminPlaylist) => ({
+      const playlists: Playlist[] = (result.playlists || result.data || []).map((adminPlaylist: AdminPlaylist) => ({
         id: adminPlaylist.id,
         name: adminPlaylist.name,
         description: adminPlaylist.description,
@@ -101,7 +101,7 @@ class AdminApiService {
         throw new Error(result.error || 'Failed to fetch playlist');
       }
 
-      const adminPlaylist: AdminPlaylist = result.data;
+      const adminPlaylist: AdminPlaylist = result.playlist || result.data;
       
       // Convert admin format to mobile app format
       const playlist: Playlist = {
@@ -156,7 +156,7 @@ class AdminApiService {
         throw new Error(result.error || 'Failed to create playlist');
       }
 
-      const adminPlaylist: AdminPlaylist = result.data;
+      const adminPlaylist: AdminPlaylist = result.playlist || result.data;
       
       // Convert admin format to mobile app format
       const playlist: Playlist = {
