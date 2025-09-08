@@ -190,11 +190,10 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
         throw new Error('Wrapper not ready');
       }
       
-      // Queue command if app is in background
+      // Allow play commands in background for auto-next functionality
       if (isAppInBackground) {
-        playerDebugLog.command('App in background, queueing play command');
-        queuedCommandsRef.current.push(() => playVideo());
-        return;
+        playerDebugLog.command('App in background, but allowing play for auto-next');
+        // Don't queue, execute immediately for background audio continuity
       }
       
       playerDebugLog.command('Calling wrapper play method');
@@ -974,10 +973,15 @@ const VimeoPlayer = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
           if (progress >= 0.95 && duration > 10 && !hasTriggeredEndRef.current) { // Only for videos longer than 10 seconds
             console.log('🎬 VIDEO NEAR END (95%) - Auto-playing next video');
             console.log(`🎬 Progress: ${Math.round(progress * 100)}%, Duration: ${duration}s, Current: ${currentTime}s`);
-            playerDebugLog.state('Video near end, triggering onVideoEnd');
+            playerDebugLog.state('Video near end, triggering onVideoEnd (background-safe)');
             hasTriggeredEndRef.current = true; // Prevent multiple triggers
             savePosition(0); // Reset position
-            onVideoEnd?.();
+            
+            // Trigger onVideoEnd even in background for continuous playback
+            if (onVideoEnd) {
+              console.log('🎬 ✅ Calling onVideoEnd callback (background-safe)');
+              onVideoEnd();
+            }
             return; // Don't process further timeupdate events
           }
           

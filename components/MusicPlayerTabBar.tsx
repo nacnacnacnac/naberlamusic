@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 120, // Reduced gradient height to not block playlist items
+    height: 190, // Çok daha yukarı çıkar
     zIndex: 1,
   },
   container: {

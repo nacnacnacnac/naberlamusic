@@ -15,6 +15,7 @@ import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { autoSyncService } from '@/services/autoSyncService';
 import Toast from '@/components/Toast';
 import MusicPlayerTabBar from '@/components/MusicPlayerTabBar';
+import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
 
 // Integration Testing Infrastructure
 interface IntegrationTestState {
@@ -61,6 +62,7 @@ const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { videos, isConfigured, isLoading, refreshVideos } = useVimeo();
+  const { isConfigured: isBackgroundAudioConfigured } = useBackgroundAudio();
   const [currentVideo, setCurrentVideo] = useState<SimplifiedVimeoVideo | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = useState<number>(-1);
@@ -102,12 +104,24 @@ export default function HomeScreen() {
     }
   }, [videos]);
 
+  // Log background audio configuration status
+  useEffect(() => {
+    debugLog.main(`Background audio configured: ${isBackgroundAudioConfigured}`);
+  }, [isBackgroundAudioConfigured]);
+
   // Load user playlists and initialize auto sync
   useEffect(() => {
     const loadPlaylists = async () => {
       try {
         const playlists = await hybridPlaylistService.getPlaylists();
-        setUserPlaylists(playlists);
+        
+        // Remove duplicates by ID
+        const uniquePlaylists = playlists.filter((playlist, index, self) => 
+          index === self.findIndex(p => p.id === playlist.id)
+        );
+        
+        setUserPlaylists(uniquePlaylists);
+        console.log('Initial playlists loaded:', uniquePlaylists.length, 'unique playlists');
       } catch (error) {
         console.error('Error loading playlists:', error);
       }
@@ -115,6 +129,12 @@ export default function HomeScreen() {
     
     const initializeAutoSync = async () => {
       try {
+        // Set callback for automatic refresh when sync notifications are received
+        autoSyncService.setOnSyncCallback(() => {
+          console.log('🔄 Auto-refreshing playlists due to admin sync notification');
+          refreshPlaylists();
+        });
+        
         await autoSyncService.initialize();
       } catch (error) {
         console.error('Error initializing auto sync:', error);
@@ -125,31 +145,34 @@ export default function HomeScreen() {
     initializeAutoSync();
   }, []);
 
-  // Refresh playlists when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      const loadPlaylists = async () => {
-        try {
-          const playlists = await hybridPlaylistService.getPlaylists();
-          setUserPlaylists(playlists);
-          console.log('Playlists refreshed:', playlists.length);
-          
-          // Auto-expand playlists that have videos
-          const newExpanded = new Set<string>();
-          playlists.forEach(playlist => {
-            if (playlist.videos && playlist.videos.length > 0) {
-              newExpanded.add(playlist.id);
-            }
-          });
-          setExpandedPlaylists(newExpanded);
-          
-        } catch (error) {
-          console.error('Error refreshing playlists:', error);
+  // Manual refresh function for pull-to-refresh and admin sync
+  const refreshPlaylists = async () => {
+    try {
+      console.log('🔄 Refreshing playlists...');
+      
+      const playlists = await hybridPlaylistService.getPlaylists();
+      
+      // Remove duplicates by ID
+      const uniquePlaylists = playlists.filter((playlist, index, self) => 
+        index === self.findIndex(p => p.id === playlist.id)
+      );
+      
+      setUserPlaylists(uniquePlaylists);
+      console.log('Playlists refreshed:', uniquePlaylists.length, 'unique playlists');
+      
+      // Auto-expand playlists that have videos
+      const newExpanded = new Set<string>();
+      uniquePlaylists.forEach(playlist => {
+        if (playlist.videos && playlist.videos.length > 0) {
+          newExpanded.add(playlist.id);
         }
-      };
-      loadPlaylists();
-    }, [])
-  );
+      });
+      setExpandedPlaylists(newExpanded);
+      
+    } catch (error) {
+      console.error('Error refreshing playlists:', error);
+    }
+  };
 
   // Toggle user playlist expansion
   const togglePlaylistExpansion = (playlistId: string) => {
@@ -169,15 +192,6 @@ export default function HomeScreen() {
     setExpandedPlaylists(newExpanded);
   };
 
-  // Refresh playlists when returning from other screens
-  const refreshPlaylists = async () => {
-    try {
-      const playlists = await hybridPlaylistService.getPlaylists();
-      setUserPlaylists(playlists);
-    } catch (error) {
-      console.error('Error refreshing playlists:', error);
-    }
-  };
 
   // Sign out functionality removed - no auth system
 
@@ -484,25 +498,31 @@ export default function HomeScreen() {
     }
   }, []);
 
-  const handleAddToPlaylist = async (video: SimplifiedVimeoVideo) => {
-    try {
-      const playlists = await hybridPlaylistService.getPlaylists();
-      
-      if (playlists.length === 0) {
-        // Hiç playlist yoksa yeni oluştur
-        router.push({
-          pathname: '/create-playlist',
-          params: { videoId: video.id, videoTitle: video.name || video.title || 'Untitled Video' }
-        });
-      } else {
-        // Mevcut playlist'leri göster
-        router.push({
-          pathname: '/select-playlist',
-          params: { videoId: video.id, videoTitle: video.name || video.title || 'Untitled Video' }
-        });
+  // Refresh playlists when returning from playlist creation/selection pages
+  useFocusEffect(
+    React.useCallback(() => {
+      // Only refresh if we have playlists loaded (not on initial load)
+      if (userPlaylists.length > 0) {
+        console.log('🔄 Refreshing playlists after navigation');
+        refreshPlaylists();
       }
-    } catch (error) {
-      debugLog.error('Error handling add to playlist:', error);
+    }, [userPlaylists.length])
+  );
+
+  const handleAddToPlaylist = (video: SimplifiedVimeoVideo) => {
+    // Use cached playlists instead of API call for instant response
+    if (userPlaylists.length === 0) {
+      // Hiç playlist yoksa yeni oluştur
+      router.push({
+        pathname: '/create-playlist',
+        params: { videoId: video.id, videoTitle: video.name || video.title || 'Untitled Video' }
+      });
+    } else {
+      // Mevcut playlist'leri göster
+      router.push({
+        pathname: '/select-playlist',
+        params: { videoId: video.id, videoTitle: video.name || video.title || 'Untitled Video' }
+      });
     }
   };
 
@@ -652,7 +672,8 @@ export default function HomeScreen() {
           {/* All Videos section hidden - cleaner UI */}
 
           {/* Admin Panel Playlists */}
-          {userPlaylists.map((playlist) => {
+          {userPlaylists.map((playlist, playlistIndex) => {
+            const isLastPlaylist = playlistIndex === userPlaylists.length - 1;
             return (
             <View key={playlist.id} style={styles.userPlaylistContainer}>
               <TouchableOpacity 
@@ -686,55 +707,66 @@ export default function HomeScreen() {
                   nestedScrollEnabled={true}
                 >
                   {playlist.videos && playlist.videos.length > 0 ? (
-                    playlist.videos.map((playlistVideo: any, index: number) => (
-                      <TouchableOpacity
-                        key={`${playlist.id}-${playlistVideo.id}`}
-                        style={[
-                          styles.playlistItem,
-                          (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentPlaylistItem
-                        ]}
-                        onPress={() => {
-                          // Use vimeo_id if available, otherwise try to find by UUID
-                          const vimeoIdToUse = playlistVideo.vimeo_id || playlistVideo.id;
-                          const syntheticVideo = {
-                            id: vimeoIdToUse,
-                            name: playlistVideo.title,
-                            description: '',
-                            duration: playlistVideo.duration,
-                            embed: {
-                              html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
-                            },
-                            pictures: {
-                              sizes: [{ link: playlistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
-                            }
-                            };
-                          playVideo(syntheticVideo);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.playlistItemInfo}>
-                          <Text 
-                            style={[
-                              styles.playlistItemTitle,
-                              (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentPlaylistItemTitle
-                            ]} 
-                            numberOfLines={1}
-                          >
-                            {playlistVideo.title || playlistVideo.name || 'Untitled Video'}
-                          </Text>
-                          <Text 
-                            style={styles.playlistItemDuration}
-                          >
-                            {Math.floor(playlistVideo.duration / 60)}:{(playlistVideo.duration % 60).toString().padStart(2, '0')}
-                          </Text>
-                        </View>
-                        <View style={styles.playlistItemActions}>
-                          {(currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && (
-                            <IconSymbol name="speaker.wave.2.fill" size={16} color="#e0af92" />
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    ))
+                    <>
+                      {playlist.videos.map((playlistVideo: any, index: number) => (
+                        <TouchableOpacity
+                          key={`${playlist.id}-${playlistVideo.id}`}
+                          style={[
+                            styles.playlistItem,
+                            (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentPlaylistItem
+                          ]}
+                          onPress={() => {
+                            // Use vimeo_id if available, otherwise try to find by UUID
+                            const vimeoIdToUse = playlistVideo.vimeo_id || playlistVideo.id;
+                            const syntheticVideo = {
+                              id: vimeoIdToUse,
+                              name: playlistVideo.title,
+                              description: '',
+                              duration: playlistVideo.duration,
+                              embed: {
+                                html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
+                              },
+                              pictures: {
+                                sizes: [{ link: playlistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+                              }
+                              };
+                            playVideo(syntheticVideo);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.playlistItemInfo}>
+                            <Text 
+                              style={[
+                                styles.playlistItemTitle,
+                                (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentPlaylistItemTitle
+                              ]} 
+                              numberOfLines={1}
+                            >
+                              {playlistVideo.title || playlistVideo.name || 'Untitled Video'}
+                            </Text>
+                            <Text 
+                              style={styles.playlistItemDuration}
+                            >
+                              {Math.floor(playlistVideo.duration / 60)}:{(playlistVideo.duration % 60).toString().padStart(2, '0')}
+                            </Text>
+                          </View>
+                          <View style={styles.playlistItemActions}>
+                            {(currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && (
+                              <IconSymbol name="speaker.wave.2.fill" size={16} color="#e0af92" />
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                      
+                      {/* Add spacer items only after the last playlist's last song */}
+                      {isLastPlaylist && (
+                        <>
+                          {[1, 2, 3, 4].map((spacer) => (
+                            <View key={`spacer-${spacer}`} style={styles.spacerItem} />
+                          ))}
+                        </>
+                      )}
+                    </>
                   ) : (
                     <View style={styles.emptyPlaylistContainer}>
                       <ThemedText style={styles.emptyPlaylistText}>No videos in this playlist</ThemedText>
@@ -957,7 +989,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     position: 'relative',
-    paddingBottom: 180, // Optimized padding based on reduced music player height (120px gradient + 100px container + buffer)
+    paddingBottom: 100, // Reduced padding since we now use spacer items for proper spacing
   },
   userPlaylistContainer: {
     marginTop: 0,
@@ -1051,6 +1083,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  spacerItem: {
+    height: 60, // Same height as playlist item to create proper spacing
+    backgroundColor: 'transparent',
   },
   
   // Debug Overlay Styles

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hybridPlaylistService } from './hybridPlaylistService';
 
-const ADMIN_API_BASE_URL = 'https://igami-worker.ugurcan-b84.workers.dev';
+const ADMIN_API_BASE_URL = 'https://naberla.org';
 const DEVICE_ID_KEY = 'naber_la_device_id';
 const LAST_SYNC_KEY = 'naber_la_last_sync';
 
@@ -9,6 +9,14 @@ class AutoSyncService {
   private deviceId: string | null = null;
   private syncInterval: NodeJS.Timeout | null = null;
   private isRunning = false;
+  private onSyncCallback: (() => void) | null = null;
+
+  /**
+   * Set callback for when sync notification is received
+   */
+  setOnSyncCallback(callback: () => void): void {
+    this.onSyncCallback = callback;
+  }
 
   /**
    * Initialize auto sync service
@@ -115,22 +123,33 @@ class AutoSyncService {
    * Process sync events
    */
   private async processSyncEvents(events: any[]): Promise<void> {
+    let shouldRefresh = false;
+    
     for (const event of events) {
       try {
         switch (event.type) {
           case 'playlist_sync':
             await this.handlePlaylistSync(event);
+            shouldRefresh = true;
             break;
           case 'video_added':
             await this.handleVideoAdded(event);
+            shouldRefresh = true;
             break;
           case 'general_sync':
             await this.handleGeneralSync(event);
+            shouldRefresh = true;
             break;
         }
       } catch (error) {
         // Silently fail
       }
+    }
+    
+    // Trigger UI refresh if any sync events were processed
+    if (shouldRefresh && this.onSyncCallback) {
+      console.log('🔄 Triggering automatic playlist refresh');
+      this.onSyncCallback();
     }
   }
 
