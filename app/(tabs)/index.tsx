@@ -201,17 +201,26 @@ export default function HomeScreen() {
     debugLog.main('PLAYING NEW VIDEO:', `${video.title} at index: ${videoIndex}`);
     
     // Direct video switching with proper state management
-    // Remove complex timeout-based approach for immediate responsiveness
     setCurrentVideo(video);
     setCurrentVideoIndex(videoIndex);
     setIsPaused(false); // Set to play immediately
+    
+    // Send play command to player after video loads
+    setTimeout(() => {
+      if (vimeoPlayerRef.current) {
+        debugLog.main('🎬 Auto-playing new video');
+        vimeoPlayerRef.current.play().catch(error => {
+          debugLog.error('❌ Auto-play failed:', error);
+        });
+      }
+    }, 1000); // Wait for video to load
   };
 
-  const handlePlayStateChange = (isPlaying: boolean) => {
+  const handlePlayStateChange = (isPausedFromPlayer: boolean) => {
     const responseTime = Date.now() - commandStartTimeRef.current;
-    const newPausedState = !isPlaying;
+    const newPausedState = isPausedFromPlayer;
     
-    debugLog.player(`Play state change callback - isPlaying: ${isPlaying}, newPaused: ${newPausedState}`);
+    debugLog.player(`Play state change callback - isPausedFromPlayer: ${isPausedFromPlayer}, newPaused: ${newPausedState}`);
     debugLog.performance(`End-to-end response time: ${responseTime}ms`);
     
     // Track response times for performance analysis
@@ -232,18 +241,9 @@ export default function HomeScreen() {
       debugLog.performance(`Average response time: ${Math.round(avgTime)}ms (${responseTimes.current.length} samples)`);
     }
     
-    // Validate state synchronization
-    if (isPaused === newPausedState) {
-      debugLog.sync(`State synchronization successful - Main: ${isPaused}, Player: ${newPausedState}`);
-    } else {
-      debugLog.error(`State desynchronization detected - Main: ${isPaused}, Player callback: ${newPausedState}`);
-      setTestState(prev => ({
-        ...prev,
-        stateDesyncCount: prev.stateDesyncCount + 1
-      }));
-    }
-    
+    // Update state 
     setIsPaused(newPausedState);
+    debugLog.sync(`State updated from player callback - isPaused: ${newPausedState}`);
     
     // Create state snapshot for player response
     const snapshot: StateSnapshot = {
@@ -295,8 +295,9 @@ export default function HomeScreen() {
     // Update main state
     setIsPaused(newPausedState);
     
-    // Send command to video player
+    // Send command to video player - DEBUG ENHANCED
     if (vimeoPlayerRef.current) {
+      debugLog.main(`🎬 DEBUG: newPausedState=${newPausedState}, should send ${newPausedState ? 'PAUSE' : 'PLAY'}`);
       if (newPausedState) {
         debugLog.main('🎬 Sending PAUSE command to player');
         vimeoPlayerRef.current.pause().catch(error => {
