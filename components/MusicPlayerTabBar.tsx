@@ -25,11 +25,9 @@ interface ButtonPressEvent {
 const isDev = __DEV__;
 const log = (prefix: string) => (msg: string, data?: any) => {
   if (!isDev) return;
-  console.log(prefix + msg, data ?? '');
 };
 const logError = (prefix: string) => (msg: string, data?: any) => {
   if (!isDev) return;
-  console.error(prefix + msg, data ?? '');
 };
 
 // Debug logging for footer component
@@ -285,7 +283,6 @@ export default function MusicPlayerTabBar({
       {/* Music Controls - Centered */}
       <View style={styles.controls}>
         <TouchableOpacity style={styles.controlButton} onPress={() => {
-          console.log('🎵 FOOTER: Previous button pressed');
           onPrevious();
         }}>
           <IconSymbol name="backward.fill" size={20} color="#ffffff" />
@@ -300,7 +297,6 @@ export default function MusicPlayerTabBar({
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.controlButton} onPress={() => {
-          console.log('🎵 FOOTER: Next button pressed');
           onNext();
         }}>
           <IconSymbol name="forward.fill" size={20} color="#ffffff" />

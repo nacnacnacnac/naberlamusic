@@ -49,7 +49,6 @@ export default function SwipeablePlaylistItem({
               await hybridPlaylistService.deletePlaylist(playlist.id);
               onDelete(); // Refresh the list
             } catch (error) {
-              console.error('Error deleting playlist:', error);
               Alert.alert('Error', 'Failed to delete playlist');
             }
           },

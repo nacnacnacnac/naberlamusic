@@ -10,7 +10,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useVimeo } from '@/contexts/VimeoContext';
 import { vimeoService } from '@/services/vimeoService';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
-import VimeoPlayer from '@/components/VimeoPlayer';
+import { VimeoPlayerNative } from '@/components/VimeoPlayerNative';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { autoSyncService } from '@/services/autoSyncService';
 import Toast from '@/components/Toast';
@@ -295,6 +295,23 @@ export default function HomeScreen() {
     // Update main state
     setIsPaused(newPausedState);
     
+    // Send command to video player
+    if (vimeoPlayerRef.current) {
+      if (newPausedState) {
+        debugLog.main('🎬 Sending PAUSE command to player');
+        vimeoPlayerRef.current.pause().catch(error => {
+          debugLog.error('❌ Player pause failed:', error);
+        });
+      } else {
+        debugLog.main('🎬 Sending PLAY command to player');
+        vimeoPlayerRef.current.play().catch(error => {
+          debugLog.error('❌ Player play failed:', error);
+        });
+      }
+    } else {
+      debugLog.error('❌ Player ref not available');
+    }
+    
     // Create state snapshot after change
     const afterSnapshot: StateSnapshot = {
       timestamp: Date.now(),
@@ -573,7 +590,7 @@ export default function HomeScreen() {
       <ThemedView style={[styles.playerArea, isFullscreen && styles.fullscreenPlayer]}>
         {currentVideo ? (
           <>
-            <VimeoPlayer
+            <VimeoPlayerNative
               ref={vimeoPlayerRef}
               video={currentVideo}
               isFullscreen={isFullscreen}

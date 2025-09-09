@@ -7,7 +7,9 @@
     "icon": "./assets/images/icon-1024x1024.png",
     "scheme": "naberla",
     "linking": {
-      "prefixes": ["naberla://"],
+      "prefixes": [
+        "naberla://"
+      ],
       "config": {
         "screens": {
           "oauth-callback": "oauth/callback"
@@ -19,17 +21,17 @@
     "ios": {
       "supportsTablet": true,
       "icon": {
-        "120": "./assets/images/icon-120x120.png",
-        "152": "./assets/images/icon-152x152.png",
-        "167": "./assets/images/icon-167x167.png",
-        "180": "./assets/images/icon-180x180.png",
         "20": "./assets/images/icon-20x20.png",
         "29": "./assets/images/icon-29x29.png",
         "40": "./assets/images/icon-40x40.png",
         "58": "./assets/images/icon-58x58.png",
         "76": "./assets/images/icon-76x76.png",
         "80": "./assets/images/icon-80x80.png",
-        "87": "./assets/images/icon-87x87.png"
+        "87": "./assets/images/icon-87x87.png",
+        "120": "./assets/images/icon-120x120.png",
+        "152": "./assets/images/icon-152x152.png",
+        "167": "./assets/images/icon-167x167.png",
+        "180": "./assets/images/icon-180x180.png"
       },
       "infoPlist": {
         "NSCameraUsageDescription": "Bu uygulama video çekmek için kameraya erişim gerektirir.",
@@ -108,7 +110,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.852958067531-6b47ucgkstt9g1g2ok71corb7qrmhics"
         }
-      ]
+      ],
+      "react-native-video"
     ],
     "experiments": {
       "typedRoutes": true
