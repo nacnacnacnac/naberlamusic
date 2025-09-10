@@ -83,6 +83,35 @@
             display: none !important;
         }
         
+        /* Additional video control hiding */
+        video::-webkit-media-controls {
+            display: none !important;
+            -webkit-appearance: none !important;
+        }
+        
+        video::-webkit-media-controls-enclosure {
+            display: none !important;
+        }
+        
+        video::-webkit-media-controls-panel {
+            display: none !important;
+        }
+        
+        video::-moz-media-controls {
+            display: none !important;
+        }
+        
+        video::--webkit-media-controls-overlay-enclosure {
+            display: none !important;
+        }
+        
+        /* Force hide all possible video controls */
+        .video-background[controls] {
+            -webkit-appearance: none !important;
+            -moz-appearance: none !important;
+            appearance: none !important;
+        }
+        
         .container {
             text-align: center;
             display: flex;
@@ -433,9 +462,9 @@
         x5-video-player-type="h5"
         x5-video-player-fullscreen="true"
         x5-video-orientation="portraint"
-        controls="false"
         disablepictureinpicture
         poster=""
+        style="pointer-events: none !important;"
     >
         <source src="assets/backweb.mp4" type="video/mp4">
     </video>
@@ -605,11 +634,31 @@
             }
         });
         
-        // Force video autoplay on mobile
+        // Force video autoplay on mobile and hide all controls
         document.addEventListener('DOMContentLoaded', function() {
             const video = document.querySelector('.video-background');
             
             if (video) {
+                // Force remove all controls
+                video.removeAttribute('controls');
+                video.controls = false;
+                video.setAttribute('controlsList', 'nodownload nofullscreen noremoteplayback');
+                video.setAttribute('disablepictureinpicture', 'true');
+                
+                // Additional mobile-specific settings
+                video.setAttribute('webkit-playsinline', 'true');
+                video.setAttribute('playsinline', 'true');
+                video.muted = true;
+                video.defaultMuted = true;
+                video.volume = 0;
+                
+                // Hide controls with JavaScript
+                video.style.pointerEvents = 'none';
+                video.style.webkitUserSelect = 'none';
+                video.style.mozUserSelect = 'none';
+                video.style.msUserSelect = 'none';
+                video.style.userSelect = 'none';
+                
                 // Try to play video immediately
                 const playPromise = video.play();
                 
@@ -617,6 +666,8 @@
                     playPromise.then(() => {
                         // Video started successfully
                         console.log('Video autoplay started');
+                        // Force hide controls after play starts
+                        video.controls = false;
                     }).catch(error => {
                         // Autoplay failed, try on user interaction
                         console.log('Video autoplay failed, waiting for user interaction');
@@ -624,6 +675,9 @@
                         const startVideo = () => {
                             video.play().then(() => {
                                 console.log('Video started after user interaction');
+                                // Force hide controls after manual start
+                                video.controls = false;
+                                video.removeAttribute('controls');
                                 // Remove event listeners after successful play
                                 document.removeEventListener('touchstart', startVideo);
                                 document.removeEventListener('click', startVideo);
@@ -638,11 +692,13 @@
                     });
                 }
                 
-                // Additional mobile-specific settings
-                video.setAttribute('webkit-playsinline', 'true');
-                video.setAttribute('playsinline', 'true');
-                video.muted = true;
-                video.defaultMuted = true;
+                // Continuously ensure controls are hidden
+                setInterval(() => {
+                    if (video.controls) {
+                        video.controls = false;
+                        video.removeAttribute('controls');
+                    }
+                }, 100);
             }
         });
     </script>
