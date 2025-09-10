@@ -117,7 +117,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 1rem;
+            gap: 0.5rem;
             z-index: 1;
         }
         
@@ -147,12 +147,14 @@
             width: 40vw;
             height: auto;
             object-fit: contain;
-            transition: transform 0.3s ease;
+            opacity: 0.6;
+            transition: all 0.3s ease;
             cursor: pointer;
         }
         
         .app-logo:hover {
-            transform: scale(1.1);
+            opacity: 1;
+            transform: scale(1.05);
         }
         
         @media (max-width: 768px) {
@@ -317,7 +319,7 @@
         <div class="main-logo-container">
             <img src="assets/nla.png" alt="Naber LA Logo" class="main-logo">
         </div>
-        <img src="assets/appstore.png" alt="App Store" class="app-logo">
+        <img src="assets/appstore2.png" alt="App Store" class="app-logo">
     </div>
     <a href="#" class="privacy-link" onclick="openModal()">Privacy Policy</a>
     
