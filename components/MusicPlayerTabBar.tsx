@@ -266,18 +266,25 @@ export default function MusicPlayerTabBar({
       <View style={styles.container}>
       {/* Left Logo */}
       <View style={styles.leftLogo}>
-        <Animated.View
-          style={{
-            transform: [{ scale: logoScale }],
-            opacity: logoOpacity,
+        <TouchableOpacity 
+          onPress={() => {
+            const { router } = require('expo-router');
+            router.push('/profile');
           }}
         >
-          <Image
-            source={require('@/assets/images/naberla.svg')}
-            style={styles.logoImage}
-            contentFit="contain"
-          />
-        </Animated.View>
+          <Animated.View
+            style={{
+              transform: [{ scale: logoScale }],
+              opacity: logoOpacity,
+            }}
+          >
+            <Image
+              source={require('@/assets/images/naberla.svg')}
+              style={styles.logoImage}
+              contentFit="contain"
+            />
+          </Animated.View>
+        </TouchableOpacity>
       </View>
 
       {/* Music Controls - Centered */}

@@ -2,8 +2,9 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -18,6 +19,33 @@ export default function RootLayout() {
 
   // Initialize background audio session (native platforms only)
   const { isConfigured, error } = useBackgroundAudio();
+
+  // Maintain audio session on app state changes
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+
+    const handleAppStateChange = async (nextAppState: string) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        // Reinforce background audio when app goes to background
+        try {
+          const { Audio } = require('expo-av');
+          await Audio.setAudioModeAsync({
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: true,
+            interruptionModeIOS: 2, // DoNotMix
+            shouldDuckAndroid: false,
+            allowsRecordingIOS: false,
+          });
+          console.log('🔊 [LAYOUT] Background audio reinforced on app state change:', nextAppState);
+        } catch (error) {
+          console.warn('⚠️ [LAYOUT] Failed to reinforce background audio:', error);
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, []);
 
   if (__DEV__ && Platform.OS !== 'web') {
     if (error) {
@@ -47,6 +75,14 @@ export default function RootLayout() {
                 headerShown: false,
                 presentation: 'modal',
                 animation: 'slide_from_right'
+              }} 
+            />
+            <Stack.Screen 
+              name="profile" 
+              options={{ 
+                headerShown: false,
+                presentation: 'modal',
+                animation: 'slide_from_bottom'
               }} 
             />
             <Stack.Screen name="+not-found" />

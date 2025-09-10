@@ -5,34 +5,17 @@
     "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon-1024x1024.png",
-    "scheme": "naberla",
-    "linking": {
-      "prefixes": [
-        "naberla://"
-      ],
-      "config": {
-        "screens": {
-          "oauth-callback": "oauth/callback"
-        }
-      }
-    },
+    "scheme": [
+      "naberla",
+      "com.googleusercontent.apps.127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb"
+    ],
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "jsEngine": "hermes",
     "ios": {
+      "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
-      "icon": {
-        "20": "./assets/images/icon-20x20.png",
-        "29": "./assets/images/icon-29x29.png",
-        "40": "./assets/images/icon-40x40.png",
-        "58": "./assets/images/icon-58x58.png",
-        "76": "./assets/images/icon-76x76.png",
-        "80": "./assets/images/icon-80x80.png",
-        "87": "./assets/images/icon-87x87.png",
-        "120": "./assets/images/icon-120x120.png",
-        "152": "./assets/images/icon-152x152.png",
-        "167": "./assets/images/icon-167x167.png",
-        "180": "./assets/images/icon-180x180.png"
-      },
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Bu uygulama video çekmek için kameraya erişim gerektirir.",
         "NSMicrophoneUsageDescription": "Bu uygulama ses kaydetmek için mikrofona erişim gerektirir.",
@@ -49,7 +32,7 @@
         "UIStatusBarStyle": "UIStatusBarStyleLightContent",
         "UILaunchStoryboardName": "SplashScreen"
       },
-      "bundleIdentifier": "com.naber.la"
+      "bundleIdentifier": "com.nacnac.naberla"
     },
     "android": {
       "adaptiveIcon": {
@@ -108,10 +91,19 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.852958067531-6b47ucgkstt9g1g2ok71corb7qrmhics"
+          "iosUrlScheme": "com.googleusercontent.apps.127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb"
         }
       ],
-      "react-native-video"
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "react-native-video",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true
@@ -127,7 +119,9 @@
       "EXPO_PUBLIC_VIMEO_ACCESS_TOKEN": "f0e1fe38a2b99765df33777ff57e3aaa",
       "EXPO_PUBLIC_USE_BACKEND_TOKENS": "true",
       "EXPO_PUBLIC_BACKEND_URL": "https://api.naberla.org",
-      "EXPO_PUBLIC_APP_ID": "naber-la-mobile"
+      "EXPO_PUBLIC_APP_ID": "naber-la-mobile",
+      "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "naber-la",
+      "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "127637606270-bn9m33t2gqfrhrqa7r9t4prrgdievflf.apps.googleusercontent.com"
     },
     "owner": "nacnac"
   }

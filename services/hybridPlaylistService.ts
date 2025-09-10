@@ -38,8 +38,33 @@ class HybridPlaylistService {
    * Get all playlists (admin playlists + user playlists combined)
    * Uses cache-first approach for better performance
    */
-  async getPlaylists(): Promise<Playlist[]> {
+  async getPlaylists(forceRefresh: boolean = false): Promise<Playlist[]> {
     try {
+      // Check cache freshness (5 minutes)
+      if (!forceRefresh) {
+        const lastRefresh = await AsyncStorage.getItem('playlists_last_refresh');
+        if (lastRefresh) {
+          const timeSinceRefresh = Date.now() - parseInt(lastRefresh);
+          const fiveMinutes = 5 * 60 * 1000;
+          
+          if (timeSinceRefresh < fiveMinutes) {
+            // Return cached data only
+            const cachedAdminPlaylists = await this.getCachedAdminPlaylists();
+            const userPlaylists = await this.getUserPlaylists();
+            
+            if (cachedAdminPlaylists.length > 0 || userPlaylists.length > 0) {
+              console.log('⚡ Using fresh cached playlists - no API call needed');
+              const prefixedCachedPlaylists = cachedAdminPlaylists.map(playlist => ({
+                ...playlist,
+                id: `admin_${playlist.id}`,
+                isAdminPlaylist: true
+              }));
+              return [...prefixedCachedPlaylists, ...userPlaylists];
+            }
+          }
+        }
+      }
+      
       // First, get cached admin playlists for immediate display
       const cachedAdminPlaylists = await this.getCachedAdminPlaylists();
       const userPlaylists = await this.getUserPlaylists();
@@ -89,6 +114,9 @@ class HybridPlaylistService {
         id: playlist.id.startsWith('user_') ? playlist.id : `user_${playlist.id}`,
         isAdminPlaylist: false
       }));
+      
+      // Save refresh timestamp
+      await AsyncStorage.setItem('playlists_last_refresh', Date.now().toString());
       
       return [...prefixedAdminPlaylists, ...prefixedUserPlaylists];
       

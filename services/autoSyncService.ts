@@ -49,10 +49,10 @@ class AutoSyncService {
     // Initial sync
     this.performSync();
 
-    // Set up periodic sync (every 15 seconds)
+    // Set up periodic sync (every 10 minutes - ultra-safe for 3000+ users)
     this.syncInterval = setInterval(() => {
       this.performSync();
-    }, 15000);
+    }, 600000); // 10 minutes for maximum API safety
   }
 
   /**

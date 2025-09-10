@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { StyleSheet, View, TouchableOpacity, Image, ActivityIndicator, Animated } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Image, ActivityIndicator, Animated, DeviceEventEmitter } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -26,6 +26,7 @@ interface VimeoPlayerProps {
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onError?: (error: string) => void;
   onReady?: () => void;
+  onNext?: () => void;
 }
 
 export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
@@ -36,6 +37,7 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   onTimeUpdate,
   onError,
   onReady,
+  onNext,
 }, ref) => {
   const videoRef = useRef<Video>(null);
   const [videoUri, setVideoUri] = useState<string | null>(null);
@@ -142,16 +144,35 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     }
   }, [isLoading]);
 
+  // Listen for global stop music events
+  useEffect(() => {
+    const stopMusicListener = DeviceEventEmitter.addListener('STOP_ALL_MUSIC', () => {
+      console.log('🎵 [VIMEO-NATIVE] Received STOP_ALL_MUSIC event - stopping video...');
+      if (videoRef.current) {
+        videoRef.current.pauseAsync().then(() => {
+          console.log('✅ [VIMEO-NATIVE] Video paused successfully');
+        }).catch(error => {
+          console.error('❌ [VIMEO-NATIVE] Error pausing video:', error);
+        });
+      }
+      setShouldPlay(false);
+    });
+
+    return () => {
+      stopMusicListener.remove();
+    };
+  }, []);
+
   // Set audio mode for playback
   useEffect(() => {
     const setAudioMode = async () => {
       try {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
-          staysActiveInBackground: false,
+          staysActiveInBackground: true,
           interruptionModeIOS: InterruptionModeIOS.DoNotMix,
           playsInSilentModeIOS: true,
-          shouldDuckAndroid: true,
+          shouldDuckAndroid: false,
           interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
           playThroughEarpieceAndroid: false
         });
@@ -293,6 +314,13 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       setCurrentTime(newCurrentTime);
       if (newDuration > 0) {
         setDuration(newDuration);
+      }
+      
+      // Check if video finished
+      if (status.didJustFinish) {
+        console.log('🏁 [VIMEO-NATIVE] Video finished - calling onNext');
+        onNext?.();
+        return;
       }
       
       // Only update local state, don't notify main app automatically

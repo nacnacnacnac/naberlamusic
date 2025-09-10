@@ -14,11 +14,50 @@ import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { adminApiService } from '@/services/adminApiService';
 import { hybridVimeoService } from '@/services/hybridVimeoService';
 import Toast from '@/components/Toast';
+import { authService } from '@/services/authService';
 
 export default function DebugApiScreen() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState('');
+  
+  // Admin check - only allow uurcan@gmail.com
+  const user = authService.getCurrentUser();
+  const isAdmin = user?.email === 'uurcan@gmail.com';
+  
+  // Redirect if not admin
+  if (!isAdmin) {
+    return (
+      <>
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        <ThemedView style={styles.container}>
+          <ThemedView style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <IconSymbol name="chevron.left" size={24} color="#e0af92" />
+            </TouchableOpacity>
+            <ThemedText style={styles.title}>Access Denied</ThemedText>
+          </ThemedView>
+          
+          <ThemedView style={styles.centerContent}>
+            <IconSymbol name="exclamationmark.triangle" size={64} color="#ff6b6b" />
+            <ThemedText style={styles.errorTitle}>Access Denied</ThemedText>
+            <ThemedText style={styles.errorText}>
+              This page is only accessible to administrators.
+            </ThemedText>
+            <TouchableOpacity
+              style={styles.backToProfileButton}
+              onPress={() => router.back()}
+            >
+              <ThemedText style={styles.backToProfileButtonText}>Go Back</ThemedText>
+            </TouchableOpacity>
+          </ThemedView>
+        </ThemedView>
+      </>
+    );
+  }
 
   const addResult = (message: string) => {
     console.log('🔍 DEBUG:', message);
@@ -712,5 +751,37 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     marginBottom: 4,
     lineHeight: 16,
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#CCCCCC',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 24,
+  },
+  backToProfileButton: {
+    backgroundColor: '#e0af92',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  backToProfileButtonText: {
+    color: '#000000',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -43,18 +43,41 @@ export const useBackgroundAudio = (): BackgroundAudioState => {
           return;
         }
 
-        // Configure audio session for background playback
+        // Configure audio session for background playback with aggressive settings
         await Audio.setAudioModeAsync({
           playsInSilentModeIOS: true,
           staysActiveInBackground: true,
-          interruptionModeIOS: Audio.InterruptionModeIOS?.MixWithOthers || 1,
+          interruptionModeIOS: Audio.InterruptionModeIOS?.DoNotMix || 2,
           shouldDuckAndroid: false,
           allowsRecordingIOS: false,
           interruptionModeAndroid: Audio.InterruptionModeAndroid?.DoNotMix || 1,
         });
 
+        // Additional iOS-specific background audio configuration
+        if (Platform.OS === 'ios') {
+          try {
+            // Set audio category to playback for background audio
+            if (Audio.setAudioModeAsync) {
+              await Audio.setAudioModeAsync({
+                playsInSilentModeIOS: true,
+                staysActiveInBackground: true,
+                interruptionModeIOS: 2, // DoNotMix
+                shouldDuckAndroid: false,
+                allowsRecordingIOS: false,
+              });
+            }
+          } catch (iosError) {
+            console.warn('[BackgroundAudio] iOS-specific configuration failed:', iosError);
+          }
+        }
+
         if (__DEV__) {
           console.log('[BackgroundAudio] Audio session configured successfully');
+        }
+
+        // Enable background audio playback for iOS
+        if (Platform.OS === 'ios' && Audio.setIsEnabledAsync) {
+          await Audio.setIsEnabledAsync(true);
         }
 
         if (isMounted) {

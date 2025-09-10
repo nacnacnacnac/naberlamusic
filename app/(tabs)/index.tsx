@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image, DeviceEventEmitter } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Video } from 'expo-av';
@@ -94,6 +94,7 @@ export default function HomeScreen() {
   const commandStartTimeRef = useRef<number>(0);
   const responseTimes = useRef<number[]>([]);
 
+
   useEffect(() => {
     // Auto-select first video when videos load and start playing
     if (videos.length > 0 && !currentVideo) {
@@ -108,6 +109,18 @@ export default function HomeScreen() {
   useEffect(() => {
     debugLog.main(`Background audio configured: ${isBackgroundAudioConfigured}`);
   }, [isBackgroundAudioConfigured]);
+
+  // Listen for global stop music events
+  useEffect(() => {
+    const stopMusicListener = DeviceEventEmitter.addListener('STOP_ALL_MUSIC', () => {
+      console.log('🎵 Received STOP_ALL_MUSIC event - stopping music...');
+      stopAllMusic();
+    });
+
+    return () => {
+      stopMusicListener.remove();
+    };
+  }, []);
 
   // Load user playlists and initialize auto sync
   useEffect(() => {
@@ -150,7 +163,7 @@ export default function HomeScreen() {
     try {
       console.log('🔄 Refreshing playlists...');
       
-      const playlists = await hybridPlaylistService.getPlaylists();
+      const playlists = await hybridPlaylistService.getPlaylists(true); // Force refresh
       
       // Remove duplicates by ID
       const uniquePlaylists = playlists.filter((playlist, index, self) => 
@@ -509,10 +522,37 @@ export default function HomeScreen() {
     debugLog.test('Stress test completed');
   };
 
-  // Expose test helpers in dev builds
+  // Global music stop function for sign out
+  const stopAllMusic = () => {
+    console.log('🎵 Stopping all music for sign out...');
+    
+    // Pause current video
+    setIsPaused(true);
+    
+    // Stop video player
+    if (vimeoPlayerRef.current) {
+      vimeoPlayerRef.current.pause().catch(error => {
+        console.error('❌ Error pausing video player:', error);
+      });
+    }
+    
+    // Clear current video
+    setCurrentVideo(null);
+    setCurrentVideoIndex(-1);
+    
+    console.log('✅ All music stopped successfully');
+  };
+
+  // Expose test helpers and music control in dev builds
   useEffect(() => {
     if (__DEV__ && typeof window !== 'undefined') {
-      (window as any).homeTestHelpers = { simulateFooterButtonPress, validateStateSync, measureResponseTime, stressTestPlayPause };
+      (window as any).homeTestHelpers = { 
+        simulateFooterButtonPress, 
+        validateStateSync, 
+        measureResponseTime, 
+        stressTestPlayPause,
+        stopAllMusic 
+      };
     }
   }, []);
 
@@ -543,6 +583,8 @@ export default function HomeScreen() {
       });
     }
   };
+
+  // Show loading screen while checking configuration
 
   // Loading durumu
   if (isLoading && videos.length === 0) {
@@ -597,6 +639,7 @@ export default function HomeScreen() {
               isFullscreen={isFullscreen}
               playerHeight={300}
               onFullscreenToggle={toggleFullscreen}
+              onNext={playNextVideo}
               onError={(error) => {
                 debugLog.error('Video player error:', error);
                 setTestState(prev => ({
@@ -666,21 +709,6 @@ export default function HomeScreen() {
               </ThemedText>
             </ThemedView>
             <View style={styles.headerActions}>
-              {/* Debug Icon */}
-              <TouchableOpacity 
-                style={styles.debugButton}
-                onPress={() => router.push('/debug-api')}
-              >
-                <IconSymbol name="wrench.and.screwdriver" size={16} color="#8B5CF6" />
-              </TouchableOpacity>
-              
-              {/* Admin Icon */}
-              <TouchableOpacity 
-                style={styles.adminButton}
-                onPress={() => router.push('/admin-settings')}
-              >
-                <IconSymbol name="gear" size={16} color="#EF4444" />
-              </TouchableOpacity>
               
               {/* Add to Playlist Icon */}
               <TouchableOpacity 
@@ -815,6 +843,7 @@ export default function HomeScreen() {
         </ScrollView>
       )}
 
+
       {/* Toast Notification */}
       <Toast
         message={toastMessage}
@@ -835,13 +864,10 @@ export default function HomeScreen() {
             router.push('/videos');
           }}
           onAddToPlaylist={() => {
-            router.push({
-              pathname: '/select-playlist',
-              params: { 
-                videoId: currentVideo.id, 
-                videoTitle: currentVideo.name || currentVideo.title || 'Untitled Video' 
-              }
-            });
+            handleAddToPlaylist(currentVideo);
+          }}
+          onProfilePress={() => {
+            router.push('/profile');
           }}
           testState={testState}
           onTestStateChange={setTestState}

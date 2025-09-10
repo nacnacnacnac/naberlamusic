@@ -1,4 +1,4 @@
-package com.nacnac.naberla
+package com.naber.la
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Alert } from 'react-native';
+import { Alert, DeviceEventEmitter } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hybridVimeoService } from '@/services/hybridVimeoService';
 import { VimeoConfig, SimplifiedVimeoVideo, VimeoError } from '@/types/vimeo';
 import { remoteConfigService, RemoteConfig } from '@/services/remoteConfigService';
@@ -19,6 +20,7 @@ interface VimeoContextType {
   loadVideos: () => Promise<void>;
   refreshVideos: () => Promise<void>;
   clearVimeoData: () => Promise<void>;
+  resetAll: () => void;
   
   // Video operations
   getVideo: (videoId: string) => SimplifiedVimeoVideo | undefined;
@@ -156,10 +158,25 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
     }
   };
 
-  const loadVideosFromAPI = async (): Promise<void> => {
+  const loadVideosFromAPI = async (forceRefresh: boolean = false): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Check if we have fresh cache (less than 5 minutes old)
+      if (!forceRefresh) {
+        const lastRefresh = await AsyncStorage.getItem('videos_last_refresh');
+        if (lastRefresh) {
+          const timeSinceRefresh = Date.now() - parseInt(lastRefresh);
+          const fiveMinutes = 5 * 60 * 1000;
+          
+          if (timeSinceRefresh < fiveMinutes && videos.length > 0) {
+            console.log('⚡ Using cached videos - no API call needed (fresh cache)');
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
       
       // First get all videos
       console.log('🔍 DEBUG: About to call hybridVimeoService.getAllUserVideos()');
@@ -185,6 +202,9 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       console.log(`✅ Found ${filteredVideos.length} playable videos after filtering`);
       
       setVideos(filteredVideos);
+      
+      // Save refresh timestamp for cache management
+      await AsyncStorage.setItem('videos_last_refresh', Date.now().toString());
       
     } catch (err: any) {
       console.error('Error loading videos:', err);
@@ -216,9 +236,9 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       setIsLoading(true);
       setError(null);
       
-      // Clear cache and reload
+      // Clear cache and force reload (ignore cache)
       await vimeoService.clearCache();
-      await loadVideosFromAPI();
+      await loadVideosFromAPI(true); // Force refresh
       
     } catch (err: any) {
       console.error('Error refreshing videos:', err);
@@ -282,6 +302,35 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
     }
   };
 
+  const resetAll = () => {
+    console.log('🔄 Resetting all Vimeo state...');
+    
+    // Emit global stop music event for all players
+    try {
+      console.log('🎵 Emitting STOP_ALL_MUSIC event...');
+      DeviceEventEmitter.emit('STOP_ALL_MUSIC');
+    } catch (error) {
+      console.error('❌ Error emitting stop music event:', error);
+    }
+    
+    // Stop any playing audio/video by clearing the hybrid service
+    try {
+      hybridVimeoService.clearCache();
+      console.log('🎵 Hybrid service cache cleared - audio should stop');
+    } catch (error) {
+      console.error('❌ Error clearing hybrid service cache:', error);
+    }
+    
+    setIsConfigured(false);
+    setConfig(null);
+    setVideos([]);
+    setIsLoading(false);
+    setError(null);
+    setRemoteConfig(null);
+    
+    console.log('✅ All Vimeo state reset completed');
+  };
+
   const contextValue: VimeoContextType = {
     // Configuration
     isConfigured,
@@ -297,6 +346,7 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
     loadVideos,
     refreshVideos,
     clearVimeoData,
+    resetAll,
     
     // Video operations
     getVideo,

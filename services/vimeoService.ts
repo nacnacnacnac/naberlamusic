@@ -12,6 +12,9 @@ class VimeoService {
   private api: AxiosInstance;
   private config: VimeoConfig | null = null;
   private baseURL = 'https://api.vimeo.com';
+  private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
+  private lastApiCall: number = 0;
+  private minApiInterval: number = 1000; // Minimum 1 second between API calls
 
   constructor() {
     this.api = axios.create({
@@ -26,25 +29,11 @@ class VimeoService {
     // Request interceptor to add auth token
     this.api.interceptors.request.use(
       (config) => {
-        console.log('🔍 INTERCEPTOR: this.config exists?', !!this.config);
-        console.log('🔍 INTERCEPTOR: accessToken exists?', !!this.config?.accessToken);
-        
+        // Reduced logging for performance (Vimeo Premium optimization)
         if (this.config?.accessToken) {
           const token = this.config.accessToken;
-          console.log('🔍 INTERCEPTOR: Adding token:', token.substring(0, 15) + '...');
-          console.log('🔍 INTERCEPTOR: Token length:', token.length);
-          console.log('🔍 INTERCEPTOR: Token starts with:', token.substring(0, 3));
-          
-          // Ensure proper Bearer format
           config.headers.Authorization = `Bearer ${token}`;
-          console.log('🔍 INTERCEPTOR: Authorization header set:', config.headers.Authorization.substring(0, 20) + '...');
-        } else {
-          console.log('🔍 INTERCEPTOR: ❌ NO TOKEN AVAILABLE');
-          console.log('🔍 INTERCEPTOR: this.config:', this.config);
         }
-        
-        // Log all headers for debugging
-        console.log('🔍 INTERCEPTOR: All headers:', Object.keys(config.headers));
         
         return config;
       },
@@ -545,6 +534,41 @@ class VimeoService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Debounce API calls to prevent spam (Vimeo Premium optimization)
+   */
+  private async debounceApiCall<T>(key: string, apiCall: () => Promise<T>, delayMs: number = 500): Promise<T> {
+    return new Promise((resolve, reject) => {
+      // Clear existing timer for this key
+      const existingTimer = this.debounceTimers.get(key);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
+
+      // Set new timer
+      const timer = setTimeout(async () => {
+        try {
+          // Check minimum interval between API calls
+          const now = Date.now();
+          const timeSinceLastCall = now - this.lastApiCall;
+          if (timeSinceLastCall < this.minApiInterval) {
+            await this.delay(this.minApiInterval - timeSinceLastCall);
+          }
+          
+          this.lastApiCall = Date.now();
+          const result = await apiCall();
+          this.debounceTimers.delete(key);
+          resolve(result);
+        } catch (error) {
+          this.debounceTimers.delete(key);
+          reject(error);
+        }
+      }, delayMs);
+
+      this.debounceTimers.set(key, timer);
+    });
   }
 
   /**

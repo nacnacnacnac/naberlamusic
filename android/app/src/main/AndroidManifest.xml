@@ -32,6 +32,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="naberla"/>
+        <data android:scheme="com.googleusercontent.apps.127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb"/>
         <data android:scheme="exp+naber-la"/>
       </intent-filter>
     </activity>

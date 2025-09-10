@@ -87,13 +87,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.nacnac.naberla'
+    namespace 'com.naber.la'
     defaultConfig {
-        applicationId 'com.nacnac.naberla'
+        applicationId 'com.naber.la'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0.0"
+        versionName "1.5.0"
     }
     signingConfigs {
         debug {

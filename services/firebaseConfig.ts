@@ -1,0 +1,32 @@
+import { initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDv3rEVz9UYSsVWhOR87hWBIzpesJz-7FA",
+  authDomain: "naber-la-471413.firebaseapp.com",
+  projectId: "naber-la-471413",
+  storageBucket: "naber-la-471413.firebasestorage.app",
+  messagingSenderId: "127637606270",
+  appId: "1:127637606270:web:efa3f9a0b640b2d6b7ed2f"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+// Configure Google Sign-In
+GoogleSignin.configure({
+  webClientId: '127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb.apps.googleusercontent.com',
+  iosClientId: '127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb.apps.googleusercontent.com',
+  offlineAccess: true, // Enable offline access
+  hostedDomain: '', // Specify the G Suite domain (if any)
+  forceCodeForRefreshToken: true, // Force code for refresh token
+  accountName: '', // Specify account name
+  googleServicePlistPath: '', // Path to GoogleService-Info.plist
+  openIdNonce: '', // OpenID nonce
+  profileImageSize: 120, // Profile image size
+});
+
+export { auth, GoogleAuthProvider, GoogleSignin };

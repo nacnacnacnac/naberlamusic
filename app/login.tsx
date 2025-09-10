@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, TouchableOpacity, StatusBar, Platform, Animated, Dimensions, Easing } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, StatusBar, Platform, Animated, Dimensions, Easing, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Video } from 'expo-av';
 import { router } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { useVimeo } from '@/contexts/VimeoContext';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { authService, User } from '@/services/authService';
 import * as ScreenOrientation from 'expo-screen-orientation';
 
 const { width } = Dimensions.get('window');
@@ -14,6 +16,10 @@ export default function LoginScreen() {
   const { isLoading, videos } = useVimeo();
   const [progressAnim] = useState(new Animated.Value(0));
   const [showLoading, setShowLoading] = useState(false);
+  
+  // Auth state
+  const [authLoading, setAuthLoading] = useState(false);
+  const [showAuthButtons, setShowAuthButtons] = useState(false);
 
   // Logo Animation Values
   const heartScale = useRef(new Animated.Value(0)).current;
@@ -34,6 +40,11 @@ export default function LoginScreen() {
   // Button entrance animation - Start visible for better UX
   const buttonOpacity = useRef(new Animated.Value(1)).current; // Always visible
   const buttonY = useRef(new Animated.Value(0)).current; // Start in position
+  
+  // Auth animation values
+  const authSlideAnim = useRef(new Animated.Value(0)).current;
+  const authFadeAnim = useRef(new Animated.Value(0)).current;
+  const authScaleAnim = useRef(new Animated.Value(1)).current;
 
   // Start logo animation on component mount
   useEffect(() => {
@@ -261,9 +272,83 @@ export default function LoginScreen() {
     });
   };
 
-  const handleEnter = () => {
-    // Navigate directly to main app (no auth needed)
-    router.replace('/(tabs)');
+  const handleMainButtonPress = () => {
+    if (showAuthButtons) {
+      // Hide auth buttons
+      Animated.parallel([
+        Animated.timing(authSlideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(authFadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(authScaleAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShowAuthButtons(false);
+      });
+    } else {
+      // Show auth buttons
+      setShowAuthButtons(true);
+      Animated.parallel([
+        Animated.timing(authSlideAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(authFadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(authScaleAnim, {
+          toValue: 0.8,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthLoading(true);
+    try {
+      const user = await authService.signInWithGoogle();
+      // Navigate to main app after successful auth
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert(
+        'Sign In Failed',
+        error.message || 'Failed to sign in with Google'
+      );
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setAuthLoading(true);
+    try {
+      const user = await authService.signInWithApple();
+      console.log('🍎 Apple Sign-In successful:', user);
+      // Navigate to main app after successful auth
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      console.error('❌ Apple Sign-In Error:', error);
+      Alert.alert(
+        'Apple Sign In Failed',
+        error.message || 'Failed to sign in with Apple'
+      );
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   const isReady = !isLoading && videos.length > 0;
@@ -362,7 +447,7 @@ export default function LoginScreen() {
           </View>
         </Animated.View>
         
-        {/* Enter Icon Button with Ripples - Animated entrance */}
+        {/* Auth Buttons Container - Animated entrance */}
         <Animated.View style={[
           styles.buttonContainer,
           {
@@ -379,16 +464,86 @@ export default function LoginScreen() {
             }
           ]} />
           
-          {/* Main button */}
-          <TouchableOpacity
-            style={styles.enterIconButton}
-            onPress={handleEnter}
-            activeOpacity={0.7}
-          >
-            <View style={styles.arrowIcon}>
-              <ThemedText style={styles.arrowText}>›</ThemedText>
-            </View>
-          </TouchableOpacity>
+          {/* Main Action Button */}
+          <Animated.View style={[styles.mainButtonContainer, { transform: [{ scale: authScaleAnim }] }]}>
+            <TouchableOpacity
+              style={styles.enterIconButton}
+              onPress={handleMainButtonPress}
+              activeOpacity={0.7}
+              disabled={authLoading}
+            >
+              <View style={styles.arrowIcon}>
+                <ThemedText style={styles.arrowText}>›</ThemedText>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Auth Options */}
+          {showAuthButtons && (
+            <>
+              {/* Google Button */}
+              <Animated.View 
+                style={[
+                  styles.authButton,
+                  styles.googleButton,
+                  {
+                    opacity: authFadeAnim,
+                    transform: [
+                      {
+                        translateX: authSlideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, -70],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.authButtonInner}
+                  onPress={handleGoogleSignIn}
+                  disabled={authLoading}
+                >
+                  <Image
+                    source={require('@/assets/images/google.svg')}
+                    style={styles.googleIcon}
+                    contentFit="contain"
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Apple Button */}
+              <Animated.View 
+                style={[
+                  styles.authButton,
+                  styles.appleButton,
+                  {
+                    opacity: authFadeAnim,
+                    transform: [
+                      {
+                        translateX: authSlideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, 70],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.authButtonInner}
+                  onPress={handleAppleSignIn}
+                  disabled={authLoading}
+                >
+                  <IconSymbol 
+                    name="apple.logo" 
+                    size={24} 
+                    color="#fff"
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            </>
+          )}
         </Animated.View>
 
       </View>
@@ -616,5 +771,40 @@ const styles = StyleSheet.create({
   progressBar: {
     height: '100%',
     backgroundColor: '#e0af92',
+  },
+  
+  // Auth Button Styles
+  mainButtonContainer: {
+    position: 'absolute',
+    zIndex: 3,
+  },
+  authButton: {
+    position: 'absolute',
+    width: 70, // Ana tuş ile aynı büyüklük
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'transparent', // İçi boş
+    borderWidth: 2,
+    borderColor: '#444', // Koyu gri border
+    zIndex: 2,
+  },
+  authButtonInner: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 33,
+    backgroundColor: 'transparent', // İçi boş, beyaz değil
+  },
+  googleButton: {
+    left: -70, // 70px aralık
+  },
+  appleButton: {
+    right: -70, // 70px aralık
+  },
+  googleIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#fff', // SVG'yi beyaz yapar
   },
 });
