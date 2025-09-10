@@ -38,7 +38,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 2rem;
+            gap: 1rem;
             z-index: 1;
         }
         
@@ -56,10 +56,16 @@
         }
         
         .app-logo {
-            max-width: 120px;
-            width: 30vw;
+            max-width: 180px;
+            width: 40vw;
             height: auto;
             object-fit: contain;
+            transition: transform 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .app-logo:hover {
+            transform: scale(1.1);
         }
         
         @media (max-width: 768px) {
@@ -68,7 +74,7 @@
             }
             
             .app-logo {
-                max-width: 100px;
+                max-width: 140px;
             }
         }
         
@@ -78,7 +84,7 @@
             }
             
             .app-logo {
-                max-width: 80px;
+                max-width: 120px;
             }
         }
     </style>
