@@ -114,6 +114,9 @@
         
         .heart-container {
             position: absolute;
+            left: 50%;
+            margin-left: -16px;
+            top: 17px;
             z-index: 3;
             animation: heartbeat 2s infinite ease-in-out;
         }
@@ -127,7 +130,8 @@
         .naber-container {
             position: absolute;
             left: 50%;
-            transform: translateX(-50%);
+            margin-left: -50px;
+            top: 1px;
             z-index: 1;
             overflow: hidden;
             width: 120px;
@@ -138,14 +142,15 @@
         .naber-image {
             width: 100px;
             height: 60px;
-            transform: translateX(-72px);
-            animation: naberSlide 1.5s ease-out 0.5s both;
+            position: relative;
+            left: -72px;
         }
         
         .la-container {
             position: absolute;
             left: 50%;
-            transform: translateX(-50%);
+            margin-left: -18px;
+            top: 14px;
             z-index: 2;
             overflow: hidden;
             width: 50px;
@@ -156,8 +161,8 @@
         .la-image {
             width: 36px;
             height: 36px;
-            transform: translateX(40px);
-            animation: laSlide 1.5s ease-out 0.5s both;
+            position: relative;
+            left: 40px;
         }
         
         @keyframes logoEntrance {
@@ -200,10 +205,10 @@
         
         @keyframes naberSlide {
             0% {
-                transform: translateX(28px);
+                transform: translateX(0);
             }
             100% {
-                transform: translateX(-72px);
+                transform: translateX(0);
             }
         }
         
@@ -218,10 +223,10 @@
         
         @keyframes laSlide {
             0% {
-                transform: translateX(8px);
+                transform: translateX(0);
             }
             100% {
-                transform: translateX(40px);
+                transform: translateX(0);
             }
         }
         
