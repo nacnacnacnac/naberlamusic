@@ -32,6 +32,55 @@
             height: 100%;
             z-index: -1;
             object-fit: cover;
+            pointer-events: none;
+        }
+        
+        .video-background::-webkit-media-controls {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-panel {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-play-button {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-start-playback-button {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-timeline {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-current-time-display {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-time-remaining-display {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-mute-button {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-toggle-closed-captions-button {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-volume-slider {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-fullscreen-button {
+            display: none !important;
+        }
+        
+        .video-background::-webkit-media-controls-overlay-play-button {
+            display: none !important;
         }
         
         .container {
@@ -381,7 +430,22 @@
     </style>
 </head>
 <body>
-    <video class="video-background" autoplay muted loop>
+    <video 
+        class="video-background" 
+        autoplay 
+        muted 
+        loop 
+        playsinline 
+        preload="auto"
+        webkit-playsinline="true"
+        x5-playsinline="true"
+        x5-video-player-type="h5"
+        x5-video-player-fullscreen="true"
+        x5-video-orientation="portraint"
+        controls="false"
+        disablepictureinpicture
+        poster=""
+    >
         <source src="assets/backweb.mp4" type="video/mp4">
     </video>
     <div class="container">
@@ -547,6 +611,47 @@
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 closeModal();
+            }
+        });
+        
+        // Force video autoplay on mobile
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.querySelector('.video-background');
+            
+            if (video) {
+                // Try to play video immediately
+                const playPromise = video.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        // Video started successfully
+                        console.log('Video autoplay started');
+                    }).catch(error => {
+                        // Autoplay failed, try on user interaction
+                        console.log('Video autoplay failed, waiting for user interaction');
+                        
+                        const startVideo = () => {
+                            video.play().then(() => {
+                                console.log('Video started after user interaction');
+                                // Remove event listeners after successful play
+                                document.removeEventListener('touchstart', startVideo);
+                                document.removeEventListener('click', startVideo);
+                                document.removeEventListener('scroll', startVideo);
+                            }).catch(e => console.log('Video play failed:', e));
+                        };
+                        
+                        // Try to start video on any user interaction
+                        document.addEventListener('touchstart', startVideo, { once: true });
+                        document.addEventListener('click', startVideo, { once: true });
+                        document.addEventListener('scroll', startVideo, { once: true });
+                    });
+                }
+                
+                // Additional mobile-specific settings
+                video.setAttribute('webkit-playsinline', 'true');
+                video.setAttribute('playsinline', 'true');
+                video.muted = true;
+                video.defaultMuted = true;
             }
         });
     </script>
