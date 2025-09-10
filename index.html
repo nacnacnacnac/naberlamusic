@@ -87,6 +87,29 @@
                 max-width: 120px;
             }
         }
+        
+        .privacy-link {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            color: #666666;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+            z-index: 10;
+        }
+        
+        .privacy-link:hover {
+            color: #999999;
+        }
+        
+        @media (max-width: 480px) {
+            .privacy-link {
+                font-size: 0.8rem;
+                bottom: 15px;
+                right: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -97,5 +120,6 @@
         <img src="assets/nla.png" alt="Naber LA Logo" class="main-logo">
         <img src="assets/appstore.png" alt="App Store" class="app-logo">
     </div>
+    <a href="privacy.html" class="privacy-link">Privacy Policy</a>
 </body>
 </html>
