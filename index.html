@@ -43,17 +43,137 @@
             z-index: 1;
         }
         
-        .main-logo {
-            max-width: 400px;
-            width: 80vw;
-            height: auto;
-            object-fit: contain;
-            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
-            transition: transform 0.3s ease;
+        .logo-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            width: 300px;
+            height: 80px;
+            margin: 0 auto;
+            animation: logoEntrance 2s ease-out;
         }
         
-        .main-logo:hover {
-            transform: scale(1.05);
+        .logo-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .heart-container {
+            position: absolute;
+            z-index: 3;
+            animation: heartbeat 2s infinite ease-in-out;
+        }
+        
+        .heart-image {
+            width: 32px;
+            height: 29px;
+            filter: drop-shadow(0 0 10px rgba(224, 175, 146, 0.5));
+        }
+        
+        .naber-container {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1;
+            overflow: hidden;
+            width: 120px;
+            height: 60px;
+            animation: slideFromRight 1.5s ease-out 0.5s both;
+        }
+        
+        .naber-image {
+            width: 100px;
+            height: 60px;
+            transform: translateX(-72px);
+            animation: naberSlide 1.5s ease-out 0.5s both;
+        }
+        
+        .la-container {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2;
+            overflow: hidden;
+            width: 50px;
+            height: 36px;
+            animation: slideFromLeft 1.5s ease-out 0.5s both;
+        }
+        
+        .la-image {
+            width: 36px;
+            height: 36px;
+            transform: translateX(40px);
+            animation: laSlide 1.5s ease-out 0.5s both;
+        }
+        
+        @keyframes logoEntrance {
+            0% {
+                opacity: 0;
+                transform: scale(0.8) translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        
+        @keyframes heartbeat {
+            0%, 100% {
+                transform: scale(1);
+            }
+            14% {
+                transform: scale(1.15);
+            }
+            28% {
+                transform: scale(0.95);
+            }
+            42% {
+                transform: scale(1.12);
+            }
+            70% {
+                transform: scale(1);
+            }
+        }
+        
+        @keyframes slideFromRight {
+            0% {
+                width: 0;
+            }
+            100% {
+                width: 120px;
+            }
+        }
+        
+        @keyframes naberSlide {
+            0% {
+                transform: translateX(28px);
+            }
+            100% {
+                transform: translateX(-72px);
+            }
+        }
+        
+        @keyframes slideFromLeft {
+            0% {
+                width: 0;
+            }
+            100% {
+                width: 50px;
+            }
+        }
+        
+        @keyframes laSlide {
+            0% {
+                transform: translateX(8px);
+            }
+            100% {
+                transform: translateX(40px);
+            }
         }
         
         .app-logo {
@@ -70,8 +190,34 @@
         }
         
         @media (max-width: 768px) {
-            .main-logo {
-                max-width: 300px;
+            .logo-wrapper {
+                width: 250px;
+                height: 70px;
+            }
+            
+            .heart-image {
+                width: 28px;
+                height: 25px;
+            }
+            
+            .naber-container {
+                width: 100px;
+                height: 50px;
+            }
+            
+            .naber-image {
+                width: 85px;
+                height: 50px;
+            }
+            
+            .la-container {
+                width: 42px;
+                height: 30px;
+            }
+            
+            .la-image {
+                width: 30px;
+                height: 30px;
             }
             
             .app-logo {
@@ -80,8 +226,34 @@
         }
         
         @media (max-width: 480px) {
-            .main-logo {
-                max-width: 250px;
+            .logo-wrapper {
+                width: 200px;
+                height: 60px;
+            }
+            
+            .heart-image {
+                width: 24px;
+                height: 22px;
+            }
+            
+            .naber-container {
+                width: 80px;
+                height: 40px;
+            }
+            
+            .naber-image {
+                width: 70px;
+                height: 40px;
+            }
+            
+            .la-container {
+                width: 35px;
+                height: 25px;
+            }
+            
+            .la-image {
+                width: 25px;
+                height: 25px;
             }
             
             .app-logo {
@@ -213,7 +385,24 @@
         <source src="assets/backweb.mp4" type="video/mp4">
     </video>
     <div class="container">
-        <img src="assets/nla.png" alt="Naber LA Logo" class="main-logo">
+        <div class="logo-wrapper">
+            <div class="logo-container">
+                <!-- Naber text with mask animation -->
+                <div class="naber-container">
+                    <img src="assets/naber.png" alt="Naber" class="naber-image">
+                </div>
+                
+                <!-- Heart in center with heartbeat -->
+                <div class="heart-container">
+                    <img src="assets/heart.png" alt="Heart" class="heart-image">
+                </div>
+                
+                <!-- LA text with mask animation -->
+                <div class="la-container">
+                    <img src="assets/la.png" alt="LA" class="la-image">
+                </div>
+            </div>
+        </div>
         <img src="assets/appstore.png" alt="App Store" class="app-logo">
     </div>
     <a href="#" class="privacy-link" onclick="openModal()">Privacy Policy</a>
