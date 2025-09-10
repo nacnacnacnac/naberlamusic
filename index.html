@@ -115,8 +115,8 @@
         .heart-container {
             position: absolute;
             left: 50%;
-            margin-left: -16px;
-            top: 17px;
+            top: 50%;
+            transform: translate(-50%, -50%);
             z-index: 3;
             animation: heartbeat 2s infinite ease-in-out;
         }
@@ -129,40 +129,26 @@
         
         .naber-container {
             position: absolute;
-            left: 50%;
-            margin-left: -50px;
-            top: 1px;
+            left: 0;
+            top: 10px;
             z-index: 1;
-            overflow: hidden;
-            width: 120px;
-            height: 60px;
-            animation: slideFromRight 1.5s ease-out 0.5s both;
         }
         
         .naber-image {
             width: 100px;
             height: 60px;
-            position: relative;
-            left: -72px;
         }
         
         .la-container {
             position: absolute;
-            left: 50%;
-            margin-left: -18px;
-            top: 14px;
+            right: 0;
+            top: 20px;
             z-index: 2;
-            overflow: hidden;
-            width: 50px;
-            height: 36px;
-            animation: slideFromLeft 1.5s ease-out 0.5s both;
         }
         
         .la-image {
             width: 36px;
             height: 36px;
-            position: relative;
-            left: 40px;
         }
         
         @keyframes logoEntrance {
