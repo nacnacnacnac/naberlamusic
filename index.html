@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naber LA Awesome Music</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #000000;
+            font-family: 'Arial', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .container {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2rem;
+        }
+        
+        .main-logo {
+            max-width: 400px;
+            width: 80vw;
+            height: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.3));
+            transition: transform 0.3s ease;
+        }
+        
+        .main-logo:hover {
+            transform: scale(1.05);
+        }
+        
+        .title {
+            color: #ffffff;
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            margin-bottom: 1rem;
+            letter-spacing: 2px;
+        }
+        
+        .app-logo {
+            max-width: 150px;
+            width: 40vw;
+            height: auto;
+            object-fit: contain;
+            border-radius: 20px;
+            filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.2));
+            transition: transform 0.3s ease;
+        }
+        
+        .app-logo:hover {
+            transform: scale(1.1);
+        }
+        
+        @media (max-width: 768px) {
+            .title {
+                font-size: 1.8rem;
+                letter-spacing: 1px;
+            }
+            
+            .main-logo {
+                max-width: 300px;
+            }
+            
+            .app-logo {
+                max-width: 120px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .title {
+                font-size: 1.4rem;
+            }
+            
+            .main-logo {
+                max-width: 250px;
+            }
+            
+            .app-logo {
+                max-width: 100px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="assets/nla.png" alt="Naber LA Logo" class="main-logo">
+        <h1 class="title">Naber LA Awesome Music</h1>
+        <img src="assets/app.jpg" alt="App Logo" class="app-logo">
+    </div>
+</body>
+</html>
