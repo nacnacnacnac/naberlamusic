@@ -190,15 +190,22 @@
             }
         }
         
-        .privacy-link {
+        .bottom-links {
             position: fixed;
             bottom: 20px;
             right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10;
+        }
+        
+        .privacy-link {
             color: #666666;
             text-decoration: none;
             font-size: 0.9rem;
             transition: color 0.3s ease;
-            z-index: 10;
+            text-align: right;
         }
         
         .privacy-link:hover {
@@ -206,10 +213,13 @@
         }
         
         @media (max-width: 480px) {
-            .privacy-link {
-                font-size: 0.8rem;
+            .bottom-links {
                 bottom: 15px;
                 right: 15px;
+            }
+            
+            .privacy-link {
+                font-size: 0.8rem;
             }
         }
         
@@ -334,7 +344,10 @@
         </div>
     </div>
     <img src="assets/appstore2.png" alt="App Store" class="app-logo app-logo-bottom-left">
-    <a href="#" class="privacy-link" onclick="openModal()">Privacy Policy</a>
+    <div class="bottom-links">
+        <a href="support.html" class="privacy-link">Support</a>
+        <a href="#" class="privacy-link" onclick="openModal()">Privacy Policy</a>
+    </div>
     
     <!-- Privacy Policy Modal -->
     <div id="privacyModal" class="modal">
