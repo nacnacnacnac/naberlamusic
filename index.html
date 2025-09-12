@@ -166,6 +166,15 @@
             z-index: 10;
         }
         
+        .app-logo-bottom-left-android {
+            position: fixed;
+            bottom: 20px;
+            left: 150px; /* App Store'un yanında */
+            max-width: 120px;
+            width: auto;
+            z-index: 10;
+        }
+        
         @media (max-width: 768px) {
             .main-logo {
                 max-width: 300px;
@@ -175,6 +184,12 @@
                 max-width: 100px;
                 bottom: 15px;
                 left: 15px;
+            }
+            
+            .app-logo-bottom-left-android {
+                max-width: 100px;
+                bottom: 15px;
+                left: 125px; /* Tablet için ayarlandı */
             }
         }
         
@@ -187,6 +202,12 @@
                 max-width: 80px;
                 bottom: 10px;
                 left: 10px;
+            }
+            
+            .app-logo-bottom-left-android {
+                max-width: 80px;
+                bottom: 10px;
+                left: 100px; /* Mobil için ayarlandı */
             }
         }
         
@@ -344,6 +365,7 @@
         </div>
     </div>
     <img src="assets/appstore2.png" alt="App Store" class="app-logo app-logo-bottom-left">
+    <img src="assets/android_store.png" alt="Google Play Store" class="app-logo app-logo-bottom-left-android">
     <div class="bottom-links">
         <a href="support.html" class="privacy-link">Support</a>
         <a href="#" class="privacy-link" onclick="openModal()">Privacy Policy</a>
