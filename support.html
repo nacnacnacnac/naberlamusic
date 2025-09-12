@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support - Naber LA Music Streaming App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #000000;
+            font-family: 'Inter', sans-serif;
+            color: #ffffff;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .logo {
+            max-width: 200px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 20px rgba(224, 175, 146, 0.3));
+        }
+        
+        h1 {
+            color: #e0af92;
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            letter-spacing: -0.02em;
+        }
+        
+        .subtitle {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            color: #e0af92;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 30px 0 15px 0;
+            border-bottom: 2px solid rgba(224, 175, 146, 0.3);
+            padding-bottom: 8px;
+        }
+        
+        h3 {
+            color: #e0af92;
+            font-size: 1.2rem;
+            font-weight: 500;
+            margin: 20px 0 10px 0;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+        
+        .contact-info {
+            background: rgba(224, 175, 146, 0.1);
+            border: 1px solid rgba(224, 175, 146, 0.2);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 25px 0;
+            backdrop-filter: blur(10px);
+        }
+        
+        .contact-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px 0;
+        }
+        
+        .contact-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .contact-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 15px;
+            color: #e0af92;
+        }
+        
+        .contact-link {
+            color: #e0af92;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+        
+        .contact-link:hover {
+            color: #ffffff;
+        }
+        
+        .faq-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .faq-question {
+            color: #e0af92;
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        
+        .faq-answer {
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.7;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            background: rgba(224, 175, 146, 0.1);
+            margin-bottom: 8px;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 3px solid #e0af92;
+        }
+        
+        .feature-list li strong {
+            color: #e0af92;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 30px;
+            padding: 12px 24px;
+            background: rgba(224, 175, 146, 0.2);
+            color: #e0af92;
+            text-decoration: none;
+            border-radius: 25px;
+            border: 1px solid rgba(224, 175, 146, 0.3);
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        
+        .back-link:hover {
+            background: rgba(224, 175, 146, 0.3);
+            color: #ffffff;
+            transform: translateY(-2px);
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 15px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            h2 {
+                font-size: 1.3rem;
+            }
+            
+            .contact-info {
+                padding: 20px;
+            }
+            
+            .faq-item {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="assets/nla.png" alt="Naber LA Logo" class="logo">
+            <h1>Support Center</h1>
+            <p class="subtitle">Get help with Naber LA Music Streaming App</p>
+        </div>
+
+        <h2>📞 Contact Information</h2>
+        <div class="contact-info">
+            <div class="contact-item">
+                <span class="contact-icon">📧</span>
+                <div>
+                    <strong>Email Support:</strong> 
+                    <a href="mailto:support@naberla.music" class="contact-link">support@naberla.music</a>
+                </div>
+            </div>
+            <div class="contact-item">
+                <span class="contact-icon">💬</span>
+                <div>
+                    <strong>General Inquiries:</strong> 
+                    <a href="mailto:info@naberla.music" class="contact-link">info@naberla.music</a>
+                </div>
+            </div>
+            <div class="contact-item">
+                <span class="contact-icon">⏱️</span>
+                <div>
+                    <strong>Response Time:</strong> We typically respond within 24-48 hours
+                </div>
+            </div>
+        </div>
+
+        <h2>❓ Frequently Asked Questions</h2>
+        
+        <div class="faq-item">
+            <div class="faq-question">How do I sign in to the app?</div>
+            <div class="faq-answer">You can sign in using your Google account or Apple ID. Simply tap the respective sign-in button on the login screen or in your profile.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">Can I use the app without signing in?</div>
+            <div class="faq-answer">Yes! You can browse and listen to music as a guest. However, some features like creating playlists require signing in.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">How do I create and manage playlists?</div>
+            <div class="faq-answer">After signing in, tap the "+" button next to any song to add it to a playlist. You can create new playlists or add to existing ones. Access your playlists from the bottom navigation bar.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">How do I delete my account?</div>
+            <div class="faq-answer">Go to your Profile page and tap "Delete Account". This will permanently remove all your data and cannot be undone.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">The app is not working properly. What should I do?</div>
+            <div class="faq-answer">Try restarting the app first. If the problem persists, please contact us at support@naberla.music with details about the issue and your device information.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="faq-question">How do I report a bug or suggest a feature?</div>
+            <div class="faq-answer">We love hearing from our users! Please email us at support@naberla.music with your feedback, bug reports, or feature suggestions.</div>
+        </div>
+
+        <h2>🛠️ Technical Support</h2>
+        <p>If you're experiencing technical issues, please include the following information when contacting us:</p>
+        <ul class="feature-list">
+            <li><strong>Device:</strong> iPhone/Android model and operating system version</li>
+            <li><strong>App Version:</strong> Current version of Naber LA app</li>
+            <li><strong>Issue Description:</strong> Detailed description of the problem</li>
+            <li><strong>Steps to Reproduce:</strong> What you were doing when the issue occurred</li>
+            <li><strong>Screenshots:</strong> If applicable, screenshots help us understand the issue better</li>
+        </ul>
+
+        <h2>🔒 Privacy & Data</h2>
+        <p>For questions about privacy and data handling, please review our <a href="index.html" class="contact-link">Privacy Policy</a> or contact us directly at <a href="mailto:privacy@naberla.music" class="contact-link">privacy@naberla.music</a>.</p>
+
+        <h2>📱 App Features</h2>
+        <ul class="feature-list">
+            <li><strong>Music Streaming:</strong> High-quality audio streaming</li>
+            <li><strong>Playlist Management:</strong> Create and organize your music collections</li>
+            <li><strong>Guest Mode:</strong> Browse music without creating an account</li>
+            <li><strong>Cross-Platform:</strong> Available on iOS and Android</li>
+            <li><strong>Offline Support:</strong> Some features work without internet connection</li>
+        </ul>
+
+        <h2>💌 Get in Touch</h2>
+        <p>We value your feedback and are committed to providing the best music streaming experience. Don't hesitate to reach out with any questions, suggestions, or concerns.</p>
+
+        <a href="index.html" class="back-link">← Back to Home</a>
+
+        <div class="footer">
+            <p><strong>Naber LA Music Streaming App</strong></p>
+            <p>Last updated: December 2024</p>
+            <p>© 2024 Naber LA. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
