@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, initializeAuth, getReactNativePersistence } from 'firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -16,8 +16,19 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Auth
-const auth = getAuth(app);
+// Initialize Auth with persistence
+let auth;
+try {
+  // Try to initialize auth with React Native persistence
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+  console.log('🔥 Firebase Auth initialized with AsyncStorage persistence');
+} catch (error) {
+  // If already initialized, get existing auth instance
+  auth = getAuth(app);
+  console.log('🔥 Firebase Auth already initialized, using existing instance');
+}
 
 // Configure Google Sign-In
 GoogleSignin.configure({

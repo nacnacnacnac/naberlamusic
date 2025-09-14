@@ -7,6 +7,7 @@ import { SimplifiedVimeoVideo } from '@/types/vimeo';
 import { Video, Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import { hybridVimeoService } from '@/services/hybridVimeoService';
 import { vimeoService } from '@/services/vimeoService';
+import { useMediaSession } from '@/hooks/useMediaSession';
 
 export interface VimeoPlayerRef {
   play(): Promise<void>;
@@ -50,6 +51,16 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   const [isReady, setIsReady] = useState(false);
   const heartbeatAnim = useRef(new Animated.Value(1)).current;
 
+  // Media session for background controls
+  const { updatePlaybackState } = useMediaSession(
+    video ? {
+      title: video.name || 'Naber-la Video',
+      artist: 'Naber-la',
+      duration: duration,
+      currentTime: currentTime,
+    } : null
+  );
+
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     async play() {
@@ -58,6 +69,8 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
         setShouldPlay(true);
         if (videoRef.current) {
           await videoRef.current.playAsync();
+          // Update media session for background controls
+          await updatePlaybackState(true);
           // Notify main app after successful play with delay
           setTimeout(() => {
             console.log('🎵 [VIMEO-NATIVE] Notifying main app - isPaused: false');
@@ -76,6 +89,8 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
         setShouldPlay(false);
         if (videoRef.current) {
           await videoRef.current.pauseAsync();
+          // Update media session for background controls
+          await updatePlaybackState(false);
           // Notify main app after successful pause with delay
           setTimeout(() => {
             console.log('⏸️ [VIMEO-NATIVE] Notifying main app - isPaused: true');
@@ -334,6 +349,8 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       if (newIsPlaying !== isPlaying) {
         console.log('🎬 [VIMEO-NATIVE] Play state changed from status:', isPlaying, '→', newIsPlaying);
         setIsPlaying(newIsPlaying);
+        // Update media session for background controls
+        updatePlaybackState(newIsPlaying);
         // DON'T call onPlayStateChange here - only call it from user actions
       }
       

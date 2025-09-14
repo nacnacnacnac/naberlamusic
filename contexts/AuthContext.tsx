@@ -37,14 +37,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     console.log('🔥 Setting up Firebase auth listener...');
     const unsubscribe = authService.onAuthStateChanged((firebaseUser) => {
       console.log('🔥 Firebase auth state changed:', firebaseUser?.email || 'null');
+      console.log('🔍 [DEBUG] Current context user:', user?.email || 'null');
+      console.log('🔍 [DEBUG] Comparison - Firebase:', firebaseUser?.email, 'vs Context:', user?.email);
       
       // Only update if there's a real change
       if (firebaseUser && firebaseUser.email !== user?.email) {
         console.log('✅ Firebase user authenticated, updating context');
         setUser(firebaseUser);
       } else if (!firebaseUser && user) {
-        console.log('❌ Firebase user signed out, clearing context');
-        setUser(null);
+        // Check if user was loaded from AsyncStorage (warning sign)
+        console.log('🔍 Checking if this is a real logout or Firebase not ready...');
+        console.log('🔍 [DEBUG] User exists in context but Firebase is null');
+        console.log('🔍 [DEBUG] This could be: 1) Real logout 2) Firebase not ready 3) Development reload');
+        
+        // Don't clear user immediately - this might be Firebase not being ready yet
+        // In development mode, Firebase auth state can be delayed
+        console.log('⏳ Keeping user from AsyncStorage, Firebase auth may restore later');
+        console.log('💡 If this is a real logout, user will be cleared by explicit signOut call');
+      } else {
+        console.log('🔍 [DEBUG] No action needed - states match or both null');
       }
     });
 
@@ -64,21 +75,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const initializeAuth = async () => {
     try {
       console.log('🔐 Initializing auth state...');
+      console.log('🔐 [DEBUG] App startup - checking auth state');
       
-      // Step 1: Try to load user from AsyncStorage first (immediate restore)
-      const storedUser = await authService.loadUserFromStorage();
-      if (storedUser) {
-        console.log('📦 Loaded user from storage:', storedUser.email);
-        setUser(storedUser);
+      // Step 1: Check Firebase auth state first (more reliable)
+      const firebaseUser = authService.getCurrentUser();
+      console.log('🔥 [DEBUG] Firebase getCurrentUser result:', firebaseUser?.email || 'null');
+      
+      let storedUser = null;
+      
+      if (firebaseUser) {
+        console.log('🔥 Firebase user already authenticated:', firebaseUser.email);
+        setUser(firebaseUser);
       } else {
-        console.log('📦 No stored user found');
+        // Step 2: Try to load user from AsyncStorage as fallback
+        console.log('📦 [DEBUG] Checking AsyncStorage...');
+        storedUser = await authService.loadUserFromStorage();
+        console.log('📦 [DEBUG] AsyncStorage result:', storedUser?.email || 'null');
+        
+        if (storedUser) {
+          console.log('📦 Loaded user from storage:', storedUser.email);
+          console.log('⚠️ [WARNING] User loaded from storage but Firebase auth not ready');
+          console.log('⚠️ [WARNING] API calls may fail until Firebase auth restores');
+          setUser(storedUser);
+        } else {
+          console.log('📦 No stored user found');
+        }
       }
       
-      // Step 2: Mark as initialized and stop loading
+      // Step 3: Mark as initialized and stop loading
       setIsInitialized(true);
       setIsLoading(false);
       
-      console.log('✅ Auth initialization complete');
+      const finalUser = firebaseUser || storedUser;
+      console.log('✅ Auth initialization complete - final user:', finalUser?.email || 'null');
+      console.log('🔍 [DEBUG] Final state - Firebase:', firebaseUser?.email || 'null', 'Storage:', storedUser?.email || 'null');
       
     } catch (error) {
       console.error('❌ Auth initialization failed:', error);
@@ -128,10 +158,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       
+      console.log('🚪 Explicit sign out - clearing all auth state');
       await authService.signOut();
       setUser(null);
       
-      console.log('✅ Sign-out successful');
+      console.log('✅ Sign-out successful - user cleared from context and storage');
       
       // No automatic navigation - user stays on current page
       

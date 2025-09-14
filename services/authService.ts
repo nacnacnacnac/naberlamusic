@@ -193,9 +193,27 @@ class AuthService {
   }
 
   /**
-   * Get current user
+   * Get current user (check Firebase auth first)
    */
   getCurrentUser(): User | null {
+    // Check Firebase auth state first
+    const firebaseUser = auth.currentUser;
+    console.log('🔍 [DEBUG] Firebase auth.currentUser:', firebaseUser?.email || 'null');
+    
+    if (firebaseUser) {
+      const user: User = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
+        photoURL: firebaseUser.photoURL,
+      };
+      this.currentUser = user;
+      console.log('✅ [DEBUG] Firebase user found, returning:', user.email);
+      return user;
+    }
+    
+    // Fallback to cached user
+    console.log('🔍 [DEBUG] No Firebase user, checking cached user:', this.currentUser?.email || 'null');
     return this.currentUser;
   }
 
@@ -211,11 +229,16 @@ class AuthService {
    */
   async loadUserFromStorage(): Promise<User | null> {
     try {
+      console.log('📖 [DEBUG] Loading user from AsyncStorage...');
       const userData = await AsyncStorage.getItem('user');
+      console.log('📖 [DEBUG] Raw AsyncStorage data:', userData ? 'exists' : 'null');
+      
       if (userData) {
         this.currentUser = JSON.parse(userData);
+        console.log('✅ [DEBUG] User loaded from AsyncStorage:', this.currentUser.email);
         return this.currentUser;
       }
+      console.log('📖 [DEBUG] No user data in AsyncStorage');
       return null;
     } catch (error) {
       console.error('❌ Failed to load user from storage:', error);
@@ -228,7 +251,9 @@ class AuthService {
    */
   private async saveUserToStorage(user: User): Promise<void> {
     try {
+      console.log('💾 [DEBUG] Saving user to AsyncStorage:', user.email);
       await AsyncStorage.setItem('user', JSON.stringify(user));
+      console.log('✅ [DEBUG] User saved to AsyncStorage successfully');
     } catch (error) {
       console.error('❌ Failed to save user to storage:', error);
     }
