@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -17,6 +17,7 @@ import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { useVimeo } from '@/contexts/VimeoContext';
 import { Playlist } from '@/types/playlist';
 import Toast from '@/components/Toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function SelectPlaylistScreen() {
   const { videoId, videoTitle } = useLocalSearchParams<{
@@ -25,6 +26,7 @@ export default function SelectPlaylistScreen() {
   }>();
   
   const { getVideo } = useVimeo();
+  const { user, isAuthenticated } = useAuth();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addingToPlaylist, setAddingToPlaylist] = useState<string | null>(null);
@@ -33,8 +35,21 @@ export default function SelectPlaylistScreen() {
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
 
   useEffect(() => {
+    // Check authentication before loading playlists
+    if (!isAuthenticated || !user) {
+      router.replace({
+        pathname: '/guest-signin',
+        params: { 
+          videoId: videoId || '', 
+          videoTitle: videoTitle || 'Untitled Video',
+          action: 'playlist'
+        }
+      });
+      return;
+    }
+    
     loadPlaylists();
-  }, []);
+  }, [isAuthenticated, user]);
 
   const loadPlaylists = async () => {
     try {
@@ -167,6 +182,7 @@ export default function SelectPlaylistScreen() {
 
   return (
     <ThemedView style={[styles.container, styles.darkContainer]}>
+      <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       {/* Header */}

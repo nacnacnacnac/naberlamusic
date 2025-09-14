@@ -1,24 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, TouchableOpacity, StatusBar, Platform, Animated, Dimensions, Easing, Alert } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, StatusBar, Platform, Animated, Dimensions, Easing, Alert, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Video } from 'expo-av';
 import { router } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { useVimeo } from '@/contexts/VimeoContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { authService, User } from '@/services/authService';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as NavigationBar from 'expo-navigation-bar';
 
 const { width } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const { isLoading, videos } = useVimeo();
+  const { signIn, isLoading: authLoading, isAuthenticated } = useAuth();
   const [progressAnim] = useState(new Animated.Value(0));
   const [showLoading, setShowLoading] = useState(false);
   
-  // Auth state
-  const [authLoading, setAuthLoading] = useState(false);
+  // UI state
   const [showAuthButtons, setShowAuthButtons] = useState(false);
 
   // Logo Animation Values
@@ -45,6 +46,15 @@ export default function LoginScreen() {
   const authSlideAnim = useRef(new Animated.Value(0)).current;
   const authFadeAnim = useRef(new Animated.Value(0)).current;
   const authScaleAnim = useRef(new Animated.Value(1)).current;
+
+
+  // Check if already authenticated - NO AUTO REDIRECT
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('🔄 Already authenticated, but staying on login page');
+      // User can manually navigate using buttons
+    }
+  }, [isAuthenticated]);
 
   // Start logo animation on component mount
   useEffect(() => {
@@ -318,36 +328,44 @@ export default function LoginScreen() {
   };
 
   const handleGoogleSignIn = async () => {
-    setAuthLoading(true);
     try {
-      const user = await authService.signInWithGoogle();
-      // Navigate to main app after successful auth
+      await signIn('google');
+      // Navigate to main app after successful sign in
       router.replace('/(tabs)');
     } catch (error: any) {
       Alert.alert(
         'Sign In Failed',
         error.message || 'Failed to sign in with Google'
       );
-    } finally {
-      setAuthLoading(false);
     }
   };
 
   const handleAppleSignIn = async () => {
-    setAuthLoading(true);
     try {
-      const user = await authService.signInWithApple();
-      console.log('🍎 Apple Sign-In successful:', user);
-      // Navigate to main app after successful auth
+      await signIn('apple');
+      // Navigate to main app after successful sign in
       router.replace('/(tabs)');
     } catch (error: any) {
-      console.error('❌ Apple Sign-In Error:', error);
       Alert.alert(
         'Apple Sign In Failed',
         error.message || 'Failed to sign in with Apple'
       );
-    } finally {
-      setAuthLoading(false);
+    }
+  };
+
+
+  const handleGuestSignIn = async () => {
+    try {
+      console.log('👤 Guest button clicked, starting guest mode...');
+      // For guest mode, just navigate to main app without authentication
+      console.log('🚀 Navigating to main app as guest...');
+      router.push('/(tabs)');
+    } catch (error: any) {
+      console.error('❌ Guest mode error:', error);
+      Alert.alert(
+        'Guest Mode Failed',
+        error.message || 'Failed to enter guest mode'
+      );
     }
   };
 
@@ -359,12 +377,12 @@ export default function LoginScreen() {
       
       {/* Background Video */}
       <Video
-        source={require('@/assets/videos/background.mp4')}
+        source={{ uri: 'https://naberla.org/videos/background2.mp4' }}
         style={styles.backgroundVideo}
         shouldPlay
         isLooping
         isMuted
-        resizeMode="cover"
+        resizeMode="stretch"
       />
       
       {/* Dark Overlay */}
@@ -492,7 +510,13 @@ export default function LoginScreen() {
                       {
                         translateX: authSlideAnim.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [0, -70],
+                          outputRange: [0, Platform.OS === 'android' ? -80 : -80], // Android'de daha fazla sola
+                        }),
+                      },
+                      {
+                        translateY: authSlideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, Platform.OS === 'android' ? 0 : 0], // Android'de vurgu butonu ile aynı seviye
                         }),
                       },
                     ],
@@ -505,25 +529,64 @@ export default function LoginScreen() {
                   disabled={authLoading}
                 >
                   <Image
-                    source={require('@/assets/images/google.svg')}
+                    source={require('@/assets/images/google_new.svg')}
                     style={styles.googleIcon}
                     contentFit="contain"
                   />
                 </TouchableOpacity>
               </Animated.View>
 
-              {/* Apple Button */}
+              {/* Apple Button - Only on iOS */}
+              {Platform.OS === 'ios' && (
+                <Animated.View 
+                  style={[
+                    styles.authButton,
+                    styles.appleButton,
+                    {
+                      opacity: authFadeAnim,
+                      transform: [
+                        {
+                          translateX: authSlideAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0, 50], // Daha az sağa kaymış
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.authButtonInner}
+                    onPress={handleAppleSignIn}
+                    disabled={authLoading}
+                  >
+                    <IconSymbol 
+                      name="apple.logo" 
+                      size={24} 
+                      color="#fff"
+                    />
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+
+              {/* Guest Mode Button - Always visible for iOS compliance */}
               <Animated.View 
                 style={[
                   styles.authButton,
-                  styles.appleButton,
+                  styles.guestButton,
                   {
                     opacity: authFadeAnim,
                     transform: [
                       {
                         translateX: authSlideAnim.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [0, 70],
+                          outputRange: [0, Platform.OS === 'android' ? 80 : 0], // Ortadan başlayıp sağa kayıyor
+                        }),
+                      },
+                      {
+                        translateY: authSlideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0, -120], // Başlangıçta vurgu butonun arkasında (0), sonra 40px daha yukarı çıkıyor (-120)
                         }),
                       },
                     ],
@@ -532,16 +595,17 @@ export default function LoginScreen() {
               >
                 <TouchableOpacity
                   style={styles.authButtonInner}
-                  onPress={handleAppleSignIn}
-                  disabled={authLoading}
+                  onPress={handleGuestSignIn}
+                  disabled={false}
                 >
-                  <IconSymbol 
-                    name="apple.logo" 
-                    size={24} 
-                    color="#fff"
+                  <Image
+                    source={require('@/assets/images/play.svg')}
+                    style={styles.guestIcon}
+                    contentFit="contain"
                   />
                 </TouchableOpacity>
               </Animated.View>
+
             </>
           )}
         </Animated.View>
@@ -797,14 +861,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent', // İçi boş, beyaz değil
   },
   googleButton: {
-    left: -70, // 70px aralık
+    // Platform-specific positioning handled by transform animations
   },
   appleButton: {
     right: -70, // 70px aralık
+  },
+  guestButton: {
+    top: 0, // Vurgu butonun arkasında başlıyor (aynı konumda)
+    borderColor: '#e0af92', // Vurgu rengi border
   },
   googleIcon: {
     width: 24,
     height: 24,
     tintColor: '#fff', // SVG'yi beyaz yapar
+  },
+  guestIcon: {
+    width: 32,
+    height: 32,
+    tintColor: '#fff', // Beyaz renk
+    marginLeft: 2, // Play ikonu için sağa kaydırma
   },
 });

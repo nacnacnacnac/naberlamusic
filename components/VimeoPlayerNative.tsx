@@ -272,17 +272,24 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
 
   // Handle shouldPlay changes
   useEffect(() => {
-    if (videoRef.current && videoUri) {
-      if (shouldPlay) {
-        videoRef.current.playAsync().catch(error => {
-          console.error('❌ [VIMEO-NATIVE] Auto-play failed:', error);
-        });
-      } else {
-        videoRef.current.pauseAsync().catch(error => {
-          console.error('❌ [VIMEO-NATIVE] Auto-pause failed:', error);
-        });
+    if (!videoRef.current || !videoUri) return;
+    
+    // Add small delay for Android compatibility
+    const timer = setTimeout(() => {
+      if (videoRef.current && videoUri) {
+        if (shouldPlay) {
+          videoRef.current.playAsync().catch(error => {
+            console.error('❌ [VIMEO-NATIVE] Auto-play failed:', error);
+          });
+        } else {
+          videoRef.current.pauseAsync().catch(error => {
+            console.error('❌ [VIMEO-NATIVE] Auto-pause failed:', error);
+          });
+        }
       }
-    }
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [shouldPlay, videoUri]);
 
   // Handle video ready
@@ -373,6 +380,7 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
         {videoUri && (
           <View style={{ overflow: 'hidden', flex: 1 }}>
             <Video
+              key={`video-${video?.id}-${videoUri}`}
               ref={videoRef}
               source={{ uri: videoUri }}
               style={styles.video}

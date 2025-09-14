@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   section: {
-    backgroundColor: 'white',
+    backgroundColor: '#1a1a1a',
     padding: 15,
     marginBottom: 15,
     borderRadius: 10,

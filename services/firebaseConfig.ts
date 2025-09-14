@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -14,11 +15,13 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Auth
 const auth = getAuth(app);
 
 // Configure Google Sign-In
 GoogleSignin.configure({
-  webClientId: '127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb.apps.googleusercontent.com',
+  webClientId: '127637606270-bn9m33t2gqfrhrqa7r9t4prrgdievflf.apps.googleusercontent.com',
   iosClientId: '127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb.apps.googleusercontent.com',
   offlineAccess: true, // Enable offline access
   hostedDomain: '', // Specify the G Suite domain (if any)

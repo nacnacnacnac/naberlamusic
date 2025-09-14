@@ -1,4 +1,4 @@
-import { auth, GoogleAuthProvider, appleProvider, GoogleSignin } from './firebaseConfig';
+import { auth, GoogleAuthProvider, GoogleSignin } from './firebaseConfig';
 import { signInWithCredential, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
@@ -13,6 +13,24 @@ export interface User {
 
 class AuthService {
   private currentUser: User | null = null;
+  
+  /**
+   * Development bypass - creates a fake user for simulator testing
+   */
+  async signInAsDeveloper(): Promise<User> {
+    console.log('🧑‍💻 Development bypass - signing in as fake user');
+    const fakeUser: User = {
+      uid: 'dev-user-123',
+      email: 'developer@naberla.com',
+      displayName: 'Developer User',
+      photoURL: null,
+    };
+    
+    this.currentUser = fakeUser;
+    await this.saveUserToStorage(fakeUser);
+    console.log('✅ Development sign-in successful');
+    return fakeUser;
+  }
 
   /**
    * Google Sign-In with Firebase

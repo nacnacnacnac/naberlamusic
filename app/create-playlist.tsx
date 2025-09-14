@@ -10,12 +10,13 @@ import {
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { useVimeo } from '@/contexts/VimeoContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function CreatePlaylistScreen() {
   const { videoId, videoTitle } = useLocalSearchParams<{
@@ -24,11 +25,24 @@ export default function CreatePlaylistScreen() {
   }>();
   
   const { getVideo } = useVimeo();
+  const { user, isAuthenticated } = useAuth();
   const [playlistName, setPlaylistName] = useState('');
   const [playlistDescription, setPlaylistDescription] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreatePlaylist = async () => {
+    // Check if user is authenticated
+    if (!isAuthenticated || !user) {
+      router.replace({
+        pathname: '/guest-signin',
+        params: { 
+          videoId: videoId || '', 
+          videoTitle: videoTitle || 'Untitled Video',
+          action: 'playlist'
+        }
+      });
+      return;
+    }
     if (!playlistName.trim()) {
       Alert.alert('Error', 'Please enter a playlist name.');
       return;
@@ -128,6 +142,7 @@ export default function CreatePlaylistScreen() {
       style={[styles.container, styles.darkContainer]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       {/* Header */}

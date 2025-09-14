@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, FlatList, ScrollView, TouchableOpacity, RefreshControl, StatusBar, Alert } from 'react-native';
+import { StyleSheet, FlatList, ScrollView, TouchableOpacity, RefreshControl, StatusBar, Alert, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
@@ -8,8 +8,10 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { Playlist } from '@/types/playlist';
 import SwipeablePlaylistItem from '@/components/SwipeablePlaylistItem';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function PlaylistsScreen() {
+  const { user, isAuthenticated, signIn } = useAuth();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -24,6 +26,38 @@ export default function PlaylistsScreen() {
       loadPlaylists();
     }, [])
   );
+
+  const handleGoogleSignIn = async () => {
+    try {
+      console.log('🔍 Google Sign-In from playlists...');
+      const user = await signIn('google');
+      console.log('✅ Google sign-in completed:', user);
+      // Reload playlists after sign-in
+      loadPlaylists();
+    } catch (error: any) {
+      console.error('❌ Google sign-in error:', error);
+      Alert.alert(
+        'Google Sign In Failed',
+        error.message || 'Failed to sign in with Google'
+      );
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      console.log('🍎 Apple Sign-In from playlists...');
+      const user = await signIn('apple');
+      console.log('✅ Apple sign-in completed:', user);
+      // Reload playlists after sign-in
+      loadPlaylists();
+    } catch (error: any) {
+      console.error('❌ Apple sign-in error:', error);
+      Alert.alert(
+        'Apple Sign In Failed',
+        error.message || 'Failed to sign in with Apple'
+      );
+    }
+  };
 
   const loadPlaylists = async () => {
     try {
@@ -119,7 +153,45 @@ export default function PlaylistsScreen() {
         </ThemedView>
       </ThemedView>
       
-      {playlists.length === 0 ? (
+      {!isAuthenticated ? (
+        <ThemedView style={styles.centerContent}>
+          <Image 
+            source={require('@/assets/images/playlist.svg')}
+            style={styles.playlistIcon}
+            contentFit="contain"
+          />
+          <ThemedText style={styles.emptyTitle}>My Playlists</ThemedText>
+          <ThemedText style={styles.emptyText}>
+            Sign in to create and manage your personal playlists
+          </ThemedText>
+          
+          {/* Google Sign-In Button */}
+          <TouchableOpacity
+            style={[styles.createPlaylistButton, styles.googleSignInButton]}
+            onPress={handleGoogleSignIn}
+          >
+            <Image
+              source={require('@/assets/images/google.svg')}
+              style={styles.signInIcon}
+              contentFit="contain"
+            />
+            <ThemedText style={styles.createPlaylistButtonText}>Sign in with Google</ThemedText>
+          </TouchableOpacity>
+
+          {/* Apple Sign-In Button - Only on iOS */}
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[styles.createPlaylistButton, styles.appleSignInButton]}
+              onPress={handleAppleSignIn}
+            >
+              <IconSymbol name="apple.logo" size={20} color="#ffffff" />
+              <ThemedText style={[styles.createPlaylistButtonText, { color: '#ffffff' }]}>
+                Sign in with Apple
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+        </ThemedView>
+      ) : playlists.length === 0 ? (
         <ThemedView style={styles.centerContent}>
           <Image 
             source={require('@/assets/images/playlist.svg')}
@@ -261,6 +333,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  signInIcon: {
+    width: 20,
+    height: 20,
+  },
+  googleSignInButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e0af92',
+    marginBottom: 15,
+  },
+  appleSignInButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: '#333333',
+    marginBottom: 15,
   },
   playlistList: {
     padding: 20,

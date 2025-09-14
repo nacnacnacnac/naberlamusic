@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image, DeviceEventEmitter } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image, DeviceEventEmitter, Alert } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Video } from 'expo-av';
@@ -16,6 +16,7 @@ import { autoSyncService } from '@/services/autoSyncService';
 import Toast from '@/components/Toast';
 import MusicPlayerTabBar from '@/components/MusicPlayerTabBar';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Integration Testing Infrastructure
 interface IntegrationTestState {
@@ -63,6 +64,7 @@ const { width } = Dimensions.get('window');
 export default function HomeScreen() {
   const { videos, isConfigured, isLoading, refreshVideos } = useVimeo();
   const { isConfigured: isBackgroundAudioConfigured } = useBackgroundAudio();
+  const { isAuthenticated } = useAuth();
   const [currentVideo, setCurrentVideo] = useState<SimplifiedVimeoVideo | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = useState<number>(-1);
@@ -95,15 +97,16 @@ export default function HomeScreen() {
   const responseTimes = useRef<number[]>([]);
 
 
-  useEffect(() => {
-    // Auto-select first video when videos load and start playing
-    if (videos.length > 0 && !currentVideo) {
-      setCurrentVideo(videos[0]);
-      setCurrentVideoIndex(0);
-      setIsPaused(false); // Start playing automatically
-      debugLog.main('Auto-selected first video and started playbook:', videos[0].title);
-    }
-  }, [videos]);
+  // Auth check disabled for debugging
+  // useEffect(() => {
+  //   if (!isAuthenticated) {
+  //     router.replace('/login');
+  //   }
+  // }, [isAuthenticated]);
+
+  // Removed auto-play: Let user choose which video to play
+  // Videos will be available in playlist, but no auto-selection
+  // This way select.mp4 will show until user clicks a video
 
   // Log background audio configuration status
   useEffect(() => {
@@ -117,8 +120,14 @@ export default function HomeScreen() {
       stopAllMusic();
     });
 
+    const stopMusicAfterSignInListener = DeviceEventEmitter.addListener('stopMusic', () => {
+      console.log('🎵 Received stopMusic event after sign-in - stopping guest music...');
+      stopAllMusic();
+    });
+
     return () => {
       stopMusicListener.remove();
+      stopMusicAfterSignInListener.remove();
     };
   }, []);
 
@@ -568,6 +577,20 @@ export default function HomeScreen() {
   );
 
   const handleAddToPlaylist = (video: SimplifiedVimeoVideo) => {
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      // Navigate to guest sign-in page instead of modal
+      router.push({
+        pathname: '/guest-signin',
+        params: { 
+          videoId: video.id, 
+          videoTitle: video.name || video.title || 'Untitled Video',
+          action: 'playlist'
+        }
+      });
+      return;
+    }
+
     // Use cached playlists instead of API call for instant response
     if (userPlaylists.length === 0) {
       // Hiç playlist yoksa yeni oluştur
@@ -683,7 +706,7 @@ export default function HomeScreen() {
           <View style={styles.noVideoContainer}>
             {/* Background Video when no video selected */}
             <Video
-              source={require('@/assets/videos/select.mp4')}
+              source={{ uri: 'https://naberla.org/videos/select.mp4' }}
               style={styles.selectVideo}
               shouldPlay
               isLooping
@@ -947,10 +970,10 @@ const styles = StyleSheet.create({
   },
   topGradientOverlay: {
     position: 'absolute',
-    top: 0, // playerArea'nın en üstünden başla
+    top: -10, // Gradient'i aşağı indir (was -30, now -10)
     left: 0,
     right: 0,
-    height: 150, // playerArea'nın yarısı kadar
+    height: 150, // Gradient'i 150'ye çıkar (was 120, now 150)
     zIndex: 20, // Daha yüksek z-index
     pointerEvents: 'none', // Touch event'leri geçsin
   },
