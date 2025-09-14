@@ -20,11 +20,13 @@ export default function PlaylistsScreen() {
     loadPlaylists();
   }, []);
 
-  // Sayfa focus olduğunda playlist'leri yenile
+  // Only reload playlists if they're empty (cache-first approach)
   useFocusEffect(
     React.useCallback(() => {
-      loadPlaylists();
-    }, [])
+      if (playlists.length === 0) {
+        loadPlaylists();
+      }
+    }, [playlists.length])
   );
 
   const handleGoogleSignIn = async () => {
@@ -32,8 +34,7 @@ export default function PlaylistsScreen() {
       console.log('🔍 Google Sign-In from playlists...');
       const user = await signIn('google');
       console.log('✅ Google sign-in completed:', user);
-      // Reload playlists after sign-in
-      loadPlaylists();
+      // Note: Playlists will auto-refresh via cache mechanism
     } catch (error: any) {
       console.error('❌ Google sign-in error:', error);
       Alert.alert(
@@ -48,8 +49,7 @@ export default function PlaylistsScreen() {
       console.log('🍎 Apple Sign-In from playlists...');
       const user = await signIn('apple');
       console.log('✅ Apple sign-in completed:', user);
-      // Reload playlists after sign-in
-      loadPlaylists();
+      // Note: Playlists will auto-refresh via cache mechanism
     } catch (error: any) {
       console.error('❌ Apple sign-in error:', error);
       Alert.alert(

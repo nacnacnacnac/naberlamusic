@@ -24,15 +24,18 @@ export const useMediaSession = (mediaInfo: MediaSessionInfo | null) => {
 
     const setupMediaSession = async () => {
       try {
-        // Set up media session for iOS Control Center
-        if (Audio.setAudioModeAsync) {
+        // Set up audio mode for background playback with enhanced settings
+        if (Audio?.setAudioModeAsync) {
           await Audio.setAudioModeAsync({
             playsInSilentModeIOS: true,
             staysActiveInBackground: true,
-            interruptionModeIOS: 2, // DoNotMix
-            shouldDuckAndroid: false,
+            interruptionModeIOS: 0, // DoNotMix - for better Control Center integration
+            interruptionModeAndroid: 1, // DuckOthers
+            shouldDuckAndroid: true,
             allowsRecordingIOS: false,
           });
+          
+          console.log('🎵 [MEDIA-SESSION] Enhanced audio mode configured for background playback');
         }
 
         console.log('🎵 [MEDIA-SESSION] Media session configured for:', mediaInfo.title);
@@ -51,14 +54,17 @@ export const useMediaSession = (mediaInfo: MediaSessionInfo | null) => {
     }
 
     try {
-      // Reinforce audio session on playback state change
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        interruptionModeIOS: 2, // DoNotMix
-        shouldDuckAndroid: false,
-        allowsRecordingIOS: false,
-      });
+      // Reinforce audio session on playback state change with enhanced settings
+      if (Audio?.setAudioModeAsync) {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          interruptionModeIOS: 0, // DoNotMix - for Control Center
+          interruptionModeAndroid: 1, // DuckOthers
+          shouldDuckAndroid: true,
+          allowsRecordingIOS: false,
+        });
+      }
 
       console.log('🎵 [MEDIA-SESSION] Playback state updated:', isPlaying ? 'playing' : 'paused');
     } catch (error) {

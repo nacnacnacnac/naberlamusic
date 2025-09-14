@@ -180,7 +180,7 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       
       // First get all videos
       console.log('🔍 DEBUG: About to call hybridVimeoService.getAllUserVideos()');
-      const allVideos = await hybridVimeoService.getAllUserVideos();
+      const allVideos = await hybridVimeoService.getAllUserVideos(forceRefresh);
       console.log(`📥 Loaded ${allVideos.length} total videos from Vimeo`);
       
       // Apply remote config filtering directly to all videos (no need for separate public filter)

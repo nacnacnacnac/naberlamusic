@@ -4,7 +4,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
-import { Video, Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+import { Video, Audio } from 'expo-av';
 import { hybridVimeoService } from '@/services/hybridVimeoService';
 import { vimeoService } from '@/services/vimeoService';
 import { useMediaSession } from '@/hooks/useMediaSession';
@@ -51,54 +51,45 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   const [isReady, setIsReady] = useState(false);
   const heartbeatAnim = useRef(new Animated.Value(1)).current;
 
-  // Media session for background controls
+  // Media session for background controls - always active when video exists
   const { updatePlaybackState } = useMediaSession(
     video ? {
       title: video.name || 'Naber-la Video',
       artist: 'Naber-la',
-      duration: duration,
-      currentTime: currentTime,
+      duration: duration || 0,
+      currentTime: currentTime || 0,
     } : null
   );
+
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     async play() {
       try {
-        console.log('🎵 [VIMEO-NATIVE] Play command received');
         setShouldPlay(true);
         if (videoRef.current) {
           await videoRef.current.playAsync();
-          // Update media session for background controls
           await updatePlaybackState(true);
-          // Notify main app after successful play with delay
           setTimeout(() => {
-            console.log('🎵 [VIMEO-NATIVE] Notifying main app - isPaused: false');
             onPlayStateChange?.(false);
           }, 100);
         }
       } catch (error: any) {
-        console.error('❌ [VIMEO-NATIVE] Play error:', error);
         onError?.(error.message);
       }
     },
 
     async pause() {
       try {
-        console.log('⏸️ [VIMEO-NATIVE] Pause command received');
         setShouldPlay(false);
         if (videoRef.current) {
           await videoRef.current.pauseAsync();
-          // Update media session for background controls
           await updatePlaybackState(false);
-          // Notify main app after successful pause with delay
           setTimeout(() => {
-            console.log('⏸️ [VIMEO-NATIVE] Notifying main app - isPaused: true');
             onPlayStateChange?.(true);
           }, 100);
         }
       } catch (error: any) {
-        console.error('❌ [VIMEO-NATIVE] Pause error:', error);
         onError?.(error.message);
       }
     },
@@ -162,13 +153,8 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   // Listen for global stop music events
   useEffect(() => {
     const stopMusicListener = DeviceEventEmitter.addListener('STOP_ALL_MUSIC', () => {
-      console.log('🎵 [VIMEO-NATIVE] Received STOP_ALL_MUSIC event - stopping video...');
       if (videoRef.current) {
-        videoRef.current.pauseAsync().then(() => {
-          console.log('✅ [VIMEO-NATIVE] Video paused successfully');
-        }).catch(error => {
-          console.error('❌ [VIMEO-NATIVE] Error pausing video:', error);
-        });
+        videoRef.current.pauseAsync();
       }
       setShouldPlay(false);
     });
@@ -178,34 +164,12 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     };
   }, []);
 
-  // Set audio mode for playback
-  useEffect(() => {
-    const setAudioMode = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          staysActiveInBackground: true,
-          interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: false,
-          interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-          playThroughEarpieceAndroid: false
-        });
-        console.log('🔊 [VIMEO-NATIVE] Audio mode set for video playback');
-      } catch (error) {
-        console.error('❌ [VIMEO-NATIVE] Failed to set audio mode:', error);
-      }
-    };
-    
-    setAudioMode();
-  }, []);
 
   // Fetch video URL from Vimeo API
   useEffect(() => {
     const fetchVideoUrl = async () => {
       if (!video?.id) return;
       
-      console.log('🚀 [VIMEO-NATIVE] Starting fetch for video:', video.id);
       setIsLoading(true);
       setError(null);
       
@@ -223,10 +187,6 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
         }
         
         const videoData = await response.json();
-        console.log('📊 [VIMEO-NATIVE] Video data received:', {
-          hasFiles: !!videoData.files,
-          fileCount: videoData.files?.length || 0
-        });
         
         if (videoData?.files && videoData.files.length > 0) {
           // Find MP4 files
@@ -234,14 +194,6 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
             file.type === 'video/mp4' && file.link
           );
           
-          console.log('🎬 [VIMEO-NATIVE] MP4 files found:', mp4Files.length);
-          mp4Files.forEach((file: any, index: number) => {
-            console.log(`📹 [VIMEO-NATIVE] File ${index + 1}:`, {
-              quality: file.quality,
-              rendition: file.rendition,
-              hasLink: !!file.link
-            });
-          });
           
           // Prefer HD quality, fallback to first available
           const bestFile = mp4Files.find((file: any) => 
@@ -249,24 +201,16 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
           ) || mp4Files[0];
           
           if (bestFile?.link) {
-            console.log('✅ [VIMEO-NATIVE] Selected video:', {
-              quality: bestFile.quality,
-              rendition: bestFile.rendition,
-              url: bestFile.link.substring(0, 50) + '...'
-            });
             setVideoUri(bestFile.link);
             // Reset video position for new video
             setCurrentTime(0);
-            console.log('🔄 [VIMEO-NATIVE] Video position reset to 0');
             
             // Reset video position in player after a short delay
             setTimeout(async () => {
               if (videoRef.current) {
                 try {
                   await videoRef.current.setPositionAsync(0);
-                  console.log('🔄 [VIMEO-NATIVE] Player position reset to 0ms');
                 } catch (error) {
-                  console.error('❌ [VIMEO-NATIVE] Failed to reset position:', error);
                 }
               }
             }, 500);
@@ -294,11 +238,9 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       if (videoRef.current && videoUri) {
         if (shouldPlay) {
           videoRef.current.playAsync().catch(error => {
-            console.error('❌ [VIMEO-NATIVE] Auto-play failed:', error);
           });
         } else {
           videoRef.current.pauseAsync().catch(error => {
-            console.error('❌ [VIMEO-NATIVE] Auto-pause failed:', error);
           });
         }
       }
@@ -309,11 +251,9 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
 
   // Handle video ready
   const handleVideoReady = () => {
-    console.log('✅ [VIMEO-NATIVE] Video ready:', video.title);
     setIsLoading(false);
     setError(null);
     // DON'T trigger play state change on ready - video should start paused
-    console.log('🎬 [VIMEO-NATIVE] Video ready but staying paused (isPlaying: false)');
     onReady?.();
   };
 
@@ -340,14 +280,12 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       
       // Check if video finished
       if (status.didJustFinish) {
-        console.log('🏁 [VIMEO-NATIVE] Video finished - calling onNext');
         onNext?.();
         return;
       }
       
       // Only update local state, don't notify main app automatically
       if (newIsPlaying !== isPlaying) {
-        console.log('🎬 [VIMEO-NATIVE] Play state changed from status:', isPlaying, '→', newIsPlaying);
         setIsPlaying(newIsPlaying);
         // Update media session for background controls
         updatePlaybackState(newIsPlaying);
@@ -366,9 +304,7 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
           if (videoRef.current) {
             try {
               await videoRef.current.setPositionAsync(0);
-              console.log('🔄 [VIMEO-NATIVE] Video ready - position reset to 0ms');
             } catch (error) {
-              console.error('❌ [VIMEO-NATIVE] Failed to reset ready position:', error);
             }
           }
         }, 100);
@@ -381,7 +317,6 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
 
   // Handle video tap - disable for now to avoid state conflicts
   const handleVideoTap = async () => {
-    console.log('🎬 [VIMEO-NATIVE] Video tap disabled - use footer controls');
     // Disabled to prevent state sync issues
     // Users should use footer play/pause buttons
   };
@@ -409,11 +344,6 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
               showsTimecodes={false}
               onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
               onLoad={() => {
-                console.log('🔊 [VIMEO-NATIVE] Video loaded - Audio settings:', {
-                  isMuted: false,
-                  volume: 1.0,
-                  playsInSilentMode: true
-                });
               }}
               resizeMode="contain"
             />

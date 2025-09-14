@@ -139,8 +139,17 @@ class HybridVimeoService {
   /**
    * Get all user videos
    */
-  async getAllUserVideos() {
-    console.log('🔍 DEBUG: hybridVimeoService.getAllUserVideos() called');
+  async getAllUserVideos(forceRefresh: boolean = false) {
+    // Try cache first unless force refresh
+    if (!forceRefresh) {
+      const cachedVideos = await vimeoService.getCachedVideos();
+      if (cachedVideos.length > 0) {
+        console.log(`⚡ Using cached videos: ${cachedVideos.length} videos`);
+        return cachedVideos;
+      }
+    }
+
+    console.log('🔍 DEBUG: hybridVimeoService.getAllUserVideos() - fetching from API');
     console.log('🔍 DEBUG: isInitialized?', this.isInitialized);
     console.log('🔍 DEBUG: useBackendTokens?', this.useBackendTokens);
     

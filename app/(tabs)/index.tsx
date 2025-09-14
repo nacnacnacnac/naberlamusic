@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image, DeviceEventEmitter, Alert } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image, DeviceEventEmitter, Alert, RefreshControl } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Video } from 'expo-av';
@@ -78,6 +78,7 @@ export default function HomeScreen() {
   const [isPlaylistExpanded, setIsPlaylistExpanded] = useState(true);
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
   const [expandedPlaylists, setExpandedPlaylists] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
   const playlistScrollRef = useRef<ScrollView>(null);
 
   // Integration Testing State
@@ -194,6 +195,13 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error refreshing playlists:', error);
     }
+  };
+
+  // Pull-to-refresh handler
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshPlaylists();
+    setRefreshing(false);
   };
 
   // Toggle user playlist expansion
@@ -565,12 +573,12 @@ export default function HomeScreen() {
     }
   }, []);
 
-  // Refresh playlists when returning from playlist creation/selection pages
+  // Refresh playlists when screen becomes focused (but with smart caching)
   useFocusEffect(
     React.useCallback(() => {
-      // Only refresh if we have playlists loaded (not on initial load)
-      if (userPlaylists.length > 0) {
-        console.log('🔄 Refreshing playlists after navigation');
+      // Only refresh if no playlists are loaded (empty state)
+      if (userPlaylists.length === 0) {
+        console.log('🔄 No playlists loaded, refreshing...');
         refreshPlaylists();
       }
     }, [userPlaylists.length])
@@ -754,6 +762,14 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           scrollEnabled={true}
           nestedScrollEnabled={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#e0af92"
+              colors={['#e0af92']}
+            />
+          }
         >
           {/* All Videos section hidden - cleaner UI */}
 

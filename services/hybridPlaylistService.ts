@@ -8,6 +8,7 @@ class HybridPlaylistService {
   private readonly ADMIN_CACHE_KEY = 'naber_la_admin_cache'; // Admin playlists cache
   private readonly SYNC_KEY = 'naber_la_last_sync';
   private readonly USE_ADMIN_API_KEY = 'naber_la_use_admin_api';
+  private isBackgroundRefreshing = false; // Prevent duplicate background refreshes
 
   /**
    * Check if admin API should be used
@@ -88,8 +89,17 @@ class HybridPlaylistService {
         
         const cachedResult = [...prefixedCachedPlaylists, ...prefixedUserPlaylists];
         
-        // Fetch fresh data in background (don't await)
-        this.refreshAdminPlaylistsInBackground();
+        // Only refresh in background if cache is older than 2 minutes
+        const lastRefresh = await AsyncStorage.getItem('playlists_last_refresh');
+        if (lastRefresh) {
+          const timeSinceRefresh = Date.now() - parseInt(lastRefresh);
+          const twoMinutes = 2 * 60 * 1000;
+          
+          if (timeSinceRefresh > twoMinutes && !this.isBackgroundRefreshing) {
+            // Fetch fresh data in background (don't await)
+            this.refreshAdminPlaylistsInBackground();
+          }
+        }
         
         return cachedResult;
       }
@@ -179,6 +189,11 @@ class HybridPlaylistService {
    * Refresh admin playlists in background
    */
   private async refreshAdminPlaylistsInBackground(): Promise<void> {
+    if (this.isBackgroundRefreshing) {
+      return; // Already refreshing, skip
+    }
+
+    this.isBackgroundRefreshing = true;
     try {
       console.log('🔄 Refreshing admin playlists in background...');
       const freshPlaylists = await adminApiService.getPlaylists();
@@ -186,6 +201,8 @@ class HybridPlaylistService {
       console.log('✅ Background refresh completed:', freshPlaylists.length);
     } catch (error) {
       console.warn('⚠️ Background refresh failed:', error);
+    } finally {
+      this.isBackgroundRefreshing = false;
     }
   }
 
