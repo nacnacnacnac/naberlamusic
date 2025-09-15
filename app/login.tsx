@@ -840,7 +840,7 @@ export default function LoginScreen() {
                 height: 'auto',
                 opacity: 0.6,
                 transition: 'all 0.3s ease',
-                cursor: 'pointer',
+                cursor: 'default', // Changed from 'pointer' - temporarily disabled
                 fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 filter: 'drop-shadow(0 0 10px rgba(224, 175, 146, 0.2))',
                 objectFit: 'contain',
@@ -857,7 +857,7 @@ export default function LoginScreen() {
                 console.log('App Store image failed to load:', e);
                 e.target.style.display = 'none';
               }}
-              onClick={() => window.open('https://apps.apple.com/app/naber-la/id6670140659', '_blank')}
+              // onClick={() => window.open('https://apps.apple.com/app/naber-la/id6670140659', '_blank')} // Temporarily disabled
             />
             <img 
               src={androidStoreImage}
@@ -867,7 +867,7 @@ export default function LoginScreen() {
                 height: 'auto',
                 opacity: 0.6,
                 transition: 'all 0.3s ease',
-                cursor: 'pointer',
+                cursor: 'default', // Changed from 'pointer' - temporarily disabled
                 fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 filter: 'drop-shadow(0 0 10px rgba(224, 175, 146, 0.2))',
                 objectFit: 'contain',
@@ -884,7 +884,7 @@ export default function LoginScreen() {
                 console.log('Android Store image failed to load:', e);
                 e.target.style.display = 'none';
               }}
-              onClick={() => window.open('https://play.google.com/store/apps/details?id=com.nacnac.naberla', '_blank')}
+              // onClick={() => window.open('https://play.google.com/store/apps/details?id=com.nacnac.naberla', '_blank')} // Temporarily disabled
             />
           </div>
 
@@ -917,7 +917,7 @@ export default function LoginScreen() {
                 fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: '300',
                 letterSpacing: '0.02em',
-                cursor: 'pointer',
+                cursor: 'default', // Changed from 'pointer' - temporarily disabled
               }}
               onMouseEnter={(e) => {
                 e.target.style.color = '#999999';
@@ -945,7 +945,7 @@ export default function LoginScreen() {
                 fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 fontWeight: '300',
                 letterSpacing: '0.02em',
-                cursor: 'pointer',
+                cursor: 'default', // Changed from 'pointer' - temporarily disabled
               }}
               onMouseEnter={(e) => {
                 e.target.style.color = '#999999';
@@ -1002,7 +1002,7 @@ export default function LoginScreen() {
                 float: 'right',
                 fontSize: '2rem',
                 fontWeight: 'bold',
-                cursor: 'pointer',
+                cursor: 'default', // Changed from 'pointer' - temporarily disabled
                 position: 'absolute',
                 top: '1rem',
                 right: '1.5rem',
@@ -1382,7 +1382,7 @@ export default function LoginScreen() {
                 float: 'right',
                 fontSize: '2rem',
                 fontWeight: 'bold',
-                cursor: 'pointer',
+                cursor: 'default', // Changed from 'pointer' - temporarily disabled
                 position: 'absolute',
                 top: '1rem',
                 right: '1.5rem',
