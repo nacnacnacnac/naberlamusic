@@ -13,7 +13,7 @@ const iconMapping = {
   'play': 'icons8-play-60.png',
   'pause': 'icons8-pause-50.png',
   'skip-next': 'icons8-end-30.png',
-  'skip-previous': 'icons8-rewind-50.png',
+  'skip-previous': 'icons8-end-30.png',
   'volume-up': 'icons8-volume-up-50.png',
   'playlist': 'icons8-list-60.png',
   'chevron-up': 'icons8-chevron-up-30.png',
@@ -98,6 +98,7 @@ export function CustomIcon({ name, size = 24, color = '#e0af92', style }: Custom
       if (name === 'chevron-left') rotation = '0deg'; // Sol tarafa baksın
       if (name === 'chevron-right') rotation = '180deg'; // Sağa baksın
       if (name === 'keyboard-arrow-down') rotation = '180deg';
+      if (name === 'skip-previous') rotation = '180deg'; // Sol tarafa baksın (ters çevir)
       
       return (
         <View style={[{ width: size, height: size }, style]}>
