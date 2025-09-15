@@ -943,8 +943,10 @@ export default function HomeScreen() {
                   src="/ten.png" 
                   alt="Overlay"
                   style={{
-                    maxWidth: '80%',
-                    maxHeight: '80%',
+                    maxWidth: typeof window !== 'undefined' && window.innerWidth <= 768 ? '95%' : '80%',
+                    maxHeight: typeof window !== 'undefined' && window.innerWidth <= 768 ? '95%' : '80%',
+                    width: typeof window !== 'undefined' && window.innerWidth <= 768 ? '300px' : 'auto',
+                    height: typeof window !== 'undefined' && window.innerWidth <= 768 ? '300px' : 'auto',
                     objectFit: 'contain'
                   }}
                 />
@@ -952,7 +954,13 @@ export default function HomeScreen() {
             ) : (
               <Image
                 source={overlayImage}
-                style={styles.overlayImageStyle}
+                style={[
+                  styles.overlayImageStyle,
+                  Platform.OS !== 'web' && {
+                    width: 300,
+                    height: 300,
+                  }
+                ]}
                 resizeMode="contain"
               />
             )}
@@ -1378,9 +1386,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -50 }, { translateY: -50 }],
-    maxWidth: '80%',
-    maxHeight: '80%',
+    transform: [{ translateX: -150 }, { translateY: -150 }], // 300px/2 = 150px offset
     zIndex: 10,
   },
   selectVideo: {
