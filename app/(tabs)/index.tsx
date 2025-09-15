@@ -27,6 +27,7 @@ import MainPlaylistModal from '@/components/MainPlaylistModal';
 
 // Background video import
 const backgroundVideo = require('@/assets/videos/NLA2.mp4');
+const overlayImage = require('@/assets/images/ten.png');
 
 // Integration Testing Infrastructure
 interface IntegrationTestState {
@@ -886,7 +887,7 @@ export default function HomeScreen() {
           </>
         ) : (
           <View style={styles.noVideoContainer}>
-            {/* Background Video - NLA.mp4 */}
+            {/* Background Video - NLA2.mp4 */}
             {Platform.OS === 'web' ? (
               <div style={{
                 position: 'absolute',
@@ -925,6 +926,34 @@ export default function HomeScreen() {
                 isLooping
                 isMuted
                 resizeMode="cover"
+              />
+            )}
+            
+            {/* ten.png Overlay - Görünür video başlamadan önce, video oynadığında kaybolur */}
+            {Platform.OS === 'web' ? (
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 10,
+                pointerEvents: 'none'
+              }}>
+                <img 
+                  src={overlayImage} 
+                  alt="Overlay"
+                  style={{
+                    maxWidth: '80%',
+                    maxHeight: '80%',
+                    objectFit: 'contain'
+                  }}
+                />
+              </div>
+            ) : (
+              <Image
+                source={overlayImage}
+                style={styles.overlayImageStyle}
+                resizeMode="contain"
               />
             )}
             
@@ -1344,6 +1373,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  overlayImageStyle: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -50 }, { translateY: -50 }],
+    maxWidth: '80%',
+    maxHeight: '80%',
+    zIndex: 10,
   },
   selectVideo: {
     position: 'absolute',
