@@ -940,7 +940,7 @@ export default function HomeScreen() {
                 pointerEvents: 'none'
               }}>
                 <img 
-                  src={overlayImage} 
+                  src="/ten.png" 
                   alt="Overlay"
                   style={{
                     maxWidth: '80%',

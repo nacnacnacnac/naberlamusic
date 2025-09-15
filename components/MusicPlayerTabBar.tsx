@@ -83,8 +83,162 @@ export default function MusicPlayerTabBar({
   // Logo animation values
   const logoScale = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(1)).current;
+  
+  // Slap animation values
+  const handPosition = useRef(new Animated.Value(-50)).current;
+  const handOpacity = useRef(new Animated.Value(0)).current;
+  const handRotation = useRef(new Animated.Value(20)).current;
+  const handScale = useRef(new Animated.Value(1)).current;
+  const textScale = useRef(new Animated.Value(0)).current; // Başlangıçta görünmez
+  const textRotation = useRef(new Animated.Value(0)).current;
 
-  // Logo heartbeat animation
+  // Slap animation
+  const startSlapAnimation = () => {
+    // Reset values
+    handPosition.setValue(-50);
+    handOpacity.setValue(0);
+    handRotation.setValue(20);
+    handScale.setValue(1);
+    textScale.setValue(0); // Yazıyı da reset et
+    textRotation.setValue(0);
+
+    Animated.parallel([
+      // Hand animation
+      Animated.sequence([
+        // Hand appears and moves to slap position
+        Animated.timing(handOpacity, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(handPosition, {
+          toValue: 55, // Biraz daha sağa
+          duration: 275,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        // Slap impact - vurma anı
+        Animated.timing(handRotation, {
+          toValue: -5,
+          duration: 50,
+          useNativeDriver: true,
+        }),
+        Animated.timing(handScale, {
+          toValue: 1.4, // Büyük el
+          duration: 50,
+          useNativeDriver: true,
+        }),
+        // Geri sekme
+        Animated.timing(handPosition, {
+          toValue: 50, // Geri sekme de biraz daha sağa
+          duration: 75,
+          useNativeDriver: true,
+        }),
+        Animated.timing(handRotation, {
+          toValue: 5,
+          duration: 75,
+          useNativeDriver: true,
+        }),
+        Animated.timing(handScale, {
+          toValue: 1,
+          duration: 75,
+          useNativeDriver: true,
+        }),
+        // Hand exits - başladığı yere geri dön (opacity olmadan)
+        Animated.parallel([
+          Animated.timing(handPosition, {
+            toValue: -50, // Başladığı yere geri dön
+            duration: 400,
+            easing: Easing.in(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(handRotation, {
+            toValue: 0, // Normal pozisyona dön
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+      // Text animation - opacity ile gelsin, el vurduktan sonra gitsin
+      Animated.sequence([
+        // Yazı gidiş animasyonunun tersi - güzel geliş
+        Animated.timing(textScale, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.back(1.7)), // Gidiş animasyonunun tersi
+          useNativeDriver: true,
+        }),
+        // Wait for slap impact (375ms'de vurma oluyor)
+        Animated.delay(75), // Toplam 375ms olacak şekilde ayarlandı (300+75=375)
+        // Text wobble on impact
+        Animated.parallel([
+          Animated.timing(textScale, {
+            toValue: 1.15,
+            duration: 50,
+            useNativeDriver: true,
+          }),
+          Animated.timing(textRotation, {
+            toValue: 8,
+            duration: 50,
+            useNativeDriver: true,
+          }),
+        ]),
+        // Bounce back
+        Animated.parallel([
+          Animated.timing(textScale, {
+            toValue: 0.9,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(textRotation, {
+            toValue: -8,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+        ]),
+        // Secondary bounce
+        Animated.parallel([
+          Animated.timing(textScale, {
+            toValue: 1.05,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(textRotation, {
+            toValue: 4,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+        ]),
+        // Return to normal
+        Animated.parallel([
+          Animated.timing(textScale, {
+            toValue: 1,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+          Animated.timing(textRotation, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }),
+        ]),
+        // El vurduktan sonra yazı gitsin
+        Animated.delay(200),
+        Animated.timing(textScale, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(() => {
+      // Repeat animation every 4 seconds
+      setTimeout(() => {
+        startSlapAnimation();
+      }, 4000);
+    });
+  };
+
+  // Logo heartbeat animation (keep existing)
   const startLogoHeartbeat = () => {
     Animated.sequence([
       // First beat
@@ -121,13 +275,20 @@ export default function MusicPlayerTabBar({
     });
   };
 
-  // Start animation on mount
+  // Start animations on mount
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const heartbeatTimer = setTimeout(() => {
       startLogoHeartbeat();
-    }, 2000); // Start after 2 seconds
+    }, 2000); // Start heartbeat after 2 seconds
 
-    return () => clearTimeout(timer);
+    const slapTimer = setTimeout(() => {
+      startSlapAnimation();
+    }, 3000); // Start slap animation after 3 seconds
+
+    return () => {
+      clearTimeout(heartbeatTimer);
+      clearTimeout(slapTimer);
+    };
   }, []);
 
   // Track visual state changes and validate consistency
@@ -268,25 +429,68 @@ export default function MusicPlayerTabBar({
 
       {/* Main footer container - only icons */}
       <View style={styles.container}>
-      {/* Left Logo - Playlist Toggle */}
+      {/* Left Logo - Playlist Toggle with Slap Animation */}
       <View style={styles.leftLogo}>
         <TouchableOpacity 
           onPress={() => {
             onPlaylistToggle?.();
           }}
         >
-          <Animated.View
-            style={{
-              transform: [{ scale: logoScale }],
-              opacity: logoOpacity,
-            }}
-          >
-            <Image
-              source={require('@/assets/images/naberla.svg')}
-              style={styles.logoImage}
-              contentFit="contain"
-            />
-          </Animated.View>
+          <View style={styles.logoContainer}>
+            {/* Main Logo */}
+            <Animated.View
+              style={{
+                transform: [{ scale: logoScale }],
+                opacity: logoOpacity,
+              }}
+            >
+              <Image
+                source={require('@/assets/images/naberla.svg')}
+                style={styles.logoImage}
+                contentFit="contain"
+              />
+            </Animated.View>
+            
+            {/* Slap Me Text Overlay */}
+            <Animated.View
+              style={[
+                styles.slapTextContainer,
+                {
+                  transform: [
+                    { scale: textScale },
+                    { rotate: textRotation.interpolate({
+                        inputRange: [-180, 180],
+                        outputRange: ['-180deg', '180deg']
+                      })
+                    }
+                  ],
+                }
+              ]}
+            >
+              <Text style={styles.slapText}>sLAP{'\n'}mE!</Text>
+            </Animated.View>
+            
+            {/* Hand Animation */}
+            <Animated.View
+              style={[
+                styles.handContainer,
+                {
+                  opacity: handOpacity,
+                  transform: [
+                    { translateX: handPosition },
+                    { rotate: handRotation.interpolate({
+                        inputRange: [-180, 180],
+                        outputRange: ['-180deg', '180deg']
+                      })
+                    },
+                    { scale: handScale }
+                  ],
+                }
+              ]}
+            >
+              <Text style={styles.handEmoji}>👋🏽</Text>
+            </Animated.View>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -363,10 +567,45 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
+  logoContainer: {
+    position: 'relative',
+    width: 100,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
   logoImage: {
     width: 100, // 80'den 100'e çıkarıldı (%25 büyük)
     height: 40, // 32'den 40'a çıkarıldı (%25 büyük)
     marginLeft: -10, // Logo'yu daha sola taşı
+  },
+  slapTextContainer: {
+    position: 'absolute',
+    top: -58, // 50px yukarı çıktı (-8 - 50 = -58)
+    left: 20, // 5px sola alındı (25 - 5 = 20)
+    zIndex: 10,
+    pointerEvents: 'none',
+  },
+  slapText: {
+    color: '#ffffff',
+    fontSize: 18.72, // %30 daha büyük (14.4 * 1.3 = 18.72)
+    fontWeight: 'bold',
+    textAlign: 'center',
+    lineHeight: 21.84, // %30 daha büyük (16.8 * 1.3 = 21.84)
+    fontFamily: Platform.OS === 'ios' ? 'Marker Felt' : 'monospace',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  handContainer: {
+    position: 'absolute',
+    top: -5,
+    left: -50,
+    zIndex: 5,
+    pointerEvents: 'none',
+  },
+  handEmoji: {
+    fontSize: 28, // Büyütüldü (20 → 28)
   },
   controls: {
     flex: 1,

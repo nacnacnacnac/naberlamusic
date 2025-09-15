@@ -25,10 +25,12 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       // Funnel Display fontunu import et
-      const link = document.createElement('link');
-      link.href = 'https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300;400;500;600;700;800&display=swap';
-      link.rel = 'stylesheet';
-      document.head.appendChild(link);
+      const funnelLink = document.createElement('link');
+      funnelLink.href = 'https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300;400;500;600;700;800&display=swap';
+      funnelLink.rel = 'stylesheet';
+      funnelLink.onload = () => console.log('✅ Funnel Display font loaded');
+      document.head.appendChild(funnelLink);
+      
       
       // Global CSS style ekle
       const style = document.createElement('style');
@@ -48,6 +50,7 @@ export default function RootLayout() {
         input, textarea, button {
           font-family: 'Funnel Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
         }
+        
       `;
       document.head.appendChild(style);
     }
