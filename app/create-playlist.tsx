@@ -14,6 +14,7 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { CustomIcon } from '@/components/ui/CustomIcon';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { useVimeo } from '@/contexts/VimeoContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,8 +32,8 @@ export default function CreatePlaylistScreen() {
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreatePlaylist = async () => {
-    // Check if user is authenticated
-    if (!isAuthenticated || !user) {
+    // Check if user is authenticated (bypass for web)
+    if (Platform.OS !== 'web' && (!isAuthenticated || !user)) {
       router.replace({
         pathname: '/guest-signin',
         params: { 
@@ -142,13 +143,12 @@ export default function CreatePlaylistScreen() {
       style={[styles.container, styles.darkContainer]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       {/* Header */}
       <ThemedView style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={24} color="#e0af92" />
+            <CustomIcon name="chevron-left" size={24} color="#e0af92" />
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>New Playlist</ThemedText>
         <ThemedView style={styles.headerSpacer} />
@@ -202,7 +202,7 @@ export default function CreatePlaylistScreen() {
             {isCreating ? (
               <ActivityIndicator color="#000000" size="small" />
             ) : (
-              <IconSymbol name="plus" size={20} color="#000000" />
+              <CustomIcon name="plus" size={20} color="#000000" />
             )}
             <ThemedText style={styles.buttonText}>
               {isCreating ? 'Creating...' : 'Create Playlist'}

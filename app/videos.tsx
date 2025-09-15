@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, FlatList, ScrollView, TouchableOpacity, RefreshControl, StatusBar, Alert, Platform } from 'react-native';
+import { StyleSheet, FlatList, ScrollView, TouchableOpacity, RefreshControl, StatusBar, Alert, Platform, View } from 'react-native';
 import { Image } from 'expo-image';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, Stack } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { CustomIcon } from '@/components/ui/CustomIcon';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { Playlist } from '@/types/playlist';
 import SwipeablePlaylistItem from '@/components/SwipeablePlaylistItem';
@@ -62,10 +63,18 @@ export default function PlaylistsScreen() {
   const loadPlaylists = async () => {
     try {
       setIsLoading(true);
-      // Only show user's personal playlists in this screen
-      const userPlaylists = await hybridPlaylistService.getUserPlaylists();
-      console.log('📱 Loaded user playlists for videos screen:', userPlaylists.length);
-      setPlaylists(userPlaylists);
+      // Web'de local storage'dan playlist'leri yükle, native'de user playlists
+      if (Platform.OS === 'web') {
+        // Web için local storage'dan playlist'leri al
+        const localPlaylists = await hybridPlaylistService.getUserPlaylists();
+        console.log('🌐 Loaded local playlists for web:', localPlaylists.length);
+        setPlaylists(localPlaylists);
+      } else {
+        // Native için normal user playlists
+        const userPlaylists = await hybridPlaylistService.getUserPlaylists();
+        console.log('📱 Loaded user playlists for videos screen:', userPlaylists.length);
+        setPlaylists(userPlaylists);
+      }
     } catch (error) {
       console.error('Error loading playlists:', error);
       Alert.alert('Hata', 'Playlist\'ler yüklenirken bir hata oluştu.');
@@ -116,18 +125,18 @@ export default function PlaylistsScreen() {
   // Loading durumu
   if (isLoading && playlists.length === 0) {
     return (
-      <ThemedView style={[styles.container, styles.darkContainer]}>
+      <View style={[styles.container, styles.darkContainer]}>
         <StatusBar barStyle="light-content" backgroundColor="#000000" />
         <ThemedView style={styles.centerContent}>
           <IconSymbol name="arrow.clockwise" size={48} color="#e0af92" />
           <ThemedText style={styles.loadingText}>Loading playlists...</ThemedText>
         </ThemedView>
-      </ThemedView>
+      </View>
     );
   }
 
   return (
-    <ThemedView style={[styles.container, styles.darkContainer]}>
+    <View style={[styles.container, styles.darkContainer]}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       <ThemedView style={styles.header}>
@@ -136,7 +145,7 @@ export default function PlaylistsScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <IconSymbol name="chevron.left" size={24} color="#e0af92" />
+            <CustomIcon name="chevron-left" size={24} color="#e0af92" />
           </TouchableOpacity>
           <ThemedText style={styles.headerTitle}>My Playlists</ThemedText>
         </ThemedView>
@@ -148,12 +157,12 @@ export default function PlaylistsScreen() {
             style={styles.createButton}
             onPress={handleCreatePlaylist}
           >
-            <IconSymbol name="plus" size={16} color="#e0af92" />
+            <CustomIcon name="plus" size={16} color="#e0af92" />
           </TouchableOpacity>
         </ThemedView>
       </ThemedView>
       
-      {!isAuthenticated ? (
+      {false ? ( // Web'de authentication bypass
         <ThemedView style={styles.centerContent}>
           <Image 
             source={require('@/assets/images/playlist.svg')}
@@ -191,7 +200,7 @@ export default function PlaylistsScreen() {
             </TouchableOpacity>
           )}
         </ThemedView>
-      ) : playlists.length === 0 ? (
+      ) : (Platform.OS !== 'web' && playlists.length === 0) ? (
         <ThemedView style={styles.centerContent}>
           <Image 
             source={require('@/assets/images/playlist.svg')}
@@ -213,33 +222,36 @@ export default function PlaylistsScreen() {
           </TouchableOpacity>
         </ThemedView>
       ) : (
-        <ScrollView
-          style={styles.flatList}
-          contentContainerStyle={styles.playlistList}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={['#e0af92']}
-              tintColor="#e0af92"
-            />
-          }
-        >
-          {playlists.map((item) => (
-            <React.Fragment key={item.id}>
-              {renderPlaylistItem({ item })}
-            </React.Fragment>
-          ))}
-        </ScrollView>
+        <View style={styles.contentArea}>
+          <ScrollView
+            style={styles.flatList}
+            contentContainerStyle={styles.playlistList}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={['#e0af92']}
+                tintColor="#e0af92"
+              />
+            }
+          >
+            {playlists.map((item) => (
+              <React.Fragment key={item.id}>
+                {renderPlaylistItem({ item })}
+              </React.Fragment>
+            ))}
+          </ScrollView>
+        </View>
       )}
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minHeight: Platform.OS === 'web' ? '100vh' : undefined,
   },
   darkContainer: {
     backgroundColor: '#000000',
@@ -352,11 +364,30 @@ const styles = StyleSheet.create({
     borderColor: '#333333',
     marginBottom: 15,
   },
+  webSignInMessage: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  webSignInText: {
+    color: '#999999',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  backToMainButton: {
+    backgroundColor: '#e0af92',
+    marginTop: 10,
+  },
   playlistList: {
     padding: 20,
     paddingBottom: 40,
   },
   flatList: {
     flex: 1,
+  },
+  contentArea: {
+    flex: 1,
+    backgroundColor: '#000000',
+    minHeight: Platform.OS === 'web' ? '80vh' : undefined,
   },
 });

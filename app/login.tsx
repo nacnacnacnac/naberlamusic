@@ -14,7 +14,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 // Asset imports for web
 const appStoreImage = Platform.OS === 'web' ? '/images/appstore2.png' : require('@/assets/images/appstore2.png');
 const androidStoreImage = Platform.OS === 'web' ? '/images/android_store.png' : require('@/assets/images/android_store.png');
-const backgroundVideo = require('@/assets/videos/backweb.mp4');
+const backgroundVideo = require('@/assets/videos/NLA.mp4');
 
 const { width } = Dimensions.get('window');
 

@@ -7,6 +7,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { CustomIcon } from '@/components/ui/CustomIcon';
 import { useVimeo } from '@/contexts/VimeoContext';
 import { vimeoService } from '@/services/vimeoService';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
@@ -17,6 +18,14 @@ import Toast from '@/components/Toast';
 import MusicPlayerTabBar from '@/components/MusicPlayerTabBar';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
 import { useAuth } from '@/contexts/AuthContext';
+import CustomModal from '@/components/CustomModal';
+import LeftModal from '@/components/LeftModal';
+import PlaylistModal from '@/components/PlaylistModal';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
+import MainPlaylistModal from '@/components/MainPlaylistModal';
+
+// Background video import
+const backgroundVideo = require('@/assets/videos/NLA2.mp4');
 
 // Integration Testing Infrastructure
 interface IntegrationTestState {
@@ -77,7 +86,13 @@ export default function HomeScreen() {
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [isPlaylistExpanded, setIsPlaylistExpanded] = useState(true);
   const playlistAnimation = useRef(new Animated.Value(1)).current;
-  const videoHeightAnimation = useRef(new Animated.Value(Platform.OS === 'web' ? 1 : 0)).current;
+  const [showPlaylistModal, setShowPlaylistModal] = useState(false);
+  const [showMainPlaylistModal, setShowMainPlaylistModal] = useState(false);
+  const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
+  const [createPlaylistVideoId, setCreatePlaylistVideoId] = useState<string>('');
+  const [createPlaylistVideoTitle, setCreatePlaylistVideoTitle] = useState<string>('');
+  const [playlistRefreshTrigger, setPlaylistRefreshTrigger] = useState(0);
+  const videoHeightAnimation = useRef(new Animated.Value(Platform.OS === 'web' ? 0.7 : 0)).current;
   const [pendingAutoPlay, setPendingAutoPlay] = useState(false);
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
   const [expandedPlaylists, setExpandedPlaylists] = useState<Set<string>>(new Set());
@@ -209,12 +224,16 @@ export default function HomeScreen() {
 
   // Toggle user playlist expansion
   const togglePlaylistExpansion = (playlistId: string) => {
+    console.log('🎵 Toggle playlist expansion for ID:', playlistId);
     const newExpanded = new Set(expandedPlaylists);
     const isExpanding = !newExpanded.has(playlistId);
+    console.log('🎵 Is expanding:', isExpanding);
     
     if (newExpanded.has(playlistId)) {
+      console.log('🎵 Collapsing playlist:', playlistId);
       newExpanded.delete(playlistId);
     } else {
+      console.log('🎵 Expanding playlist:', playlistId);
       // Close all other playlists when opening a new one
       newExpanded.clear();
       newExpanded.add(playlistId);
@@ -222,6 +241,7 @@ export default function HomeScreen() {
       // Scroll to top when expanding a playlist
       playlistScrollRef.current?.scrollTo({ y: 0, animated: true });
     }
+    console.log('🎵 New expanded playlists:', Array.from(newExpanded));
     setExpandedPlaylists(newExpanded);
   };
 
@@ -232,6 +252,24 @@ export default function HomeScreen() {
     const videoIndex = videos.findIndex(v => v.id === video.id);
     
     debugLog.main('PLAYING NEW VIDEO:', `${video.title} at index: ${videoIndex}`);
+    
+    // FORCE STOP ALL AUDIO BEFORE PLAYING NEW VIDEO
+    try {
+      const { Audio } = require('expo-av');
+      console.log('🔇 FORCE STOPPING ALL AUDIO BEFORE NEW VIDEO');
+      
+      // Try to access and stop any global audio instances
+      if (Audio._instances) {
+        Audio._instances.forEach((instance: any) => {
+          try {
+            if (instance.unloadAsync) instance.unloadAsync();
+            if (instance.stopAsync) instance.stopAsync();
+          } catch (e) {}
+        });
+      }
+    } catch (e) {
+      console.log('⚠️ Audio cleanup error in playVideo:', e);
+    }
     
     // Direct video switching with proper state management
     setCurrentVideo(video);
@@ -397,10 +435,13 @@ export default function HomeScreen() {
 
   // Toggle playlist visibility with smooth animation
   const togglePlaylistVisibility = () => {
+    console.log('🎵 Toggle playlist - Current state:', isPlaylistExpanded);
     const newState = !isPlaylistExpanded;
+    console.log('🎵 Toggle playlist - New state will be:', newState);
     
     if (newState) {
       // Opening playlist - animate in playlist and shrink video
+      console.log('🎵 Opening playlist...');
       setIsPlaylistExpanded(true);
       Animated.parallel([
         Animated.timing(playlistAnimation, {
@@ -413,9 +454,12 @@ export default function HomeScreen() {
           duration: 300,
           useNativeDriver: false,
         })
-      ]).start();
+      ]).start(() => {
+        console.log('🎵 Playlist opened successfully');
+      });
     } else {
       // Closing playlist - animate out playlist and expand video
+      console.log('🎵 Closing playlist...');
       Animated.parallel([
         Animated.timing(playlistAnimation, {
           toValue: 0,
@@ -428,7 +472,31 @@ export default function HomeScreen() {
           useNativeDriver: false,
         })
       ]).start(() => {
+        console.log('🎵 Playlist closed successfully');
         setIsPlaylistExpanded(false);
+      });
+    }
+  };
+
+  // Handle heart icon press - create playlist for mobile, show main playlist modal for web
+  const handleHeartIconPress = () => {
+    if (Platform.OS === 'web') {
+      // Web'de main playlist modal'ını aç
+      setShowMainPlaylistModal(true);
+    } else {
+      // Mobile'da playlist oluşturma
+      if (!isAuthenticated) {
+        router.push('/guest-signin');
+        return;
+      }
+      
+      // Playlist oluşturma sayfasına git
+      router.push({
+        pathname: '/create-playlist',
+        params: { 
+          videoId: currentVideo?.id || '', 
+          videoTitle: currentVideo?.name || currentVideo?.title || '' 
+        }
       });
     }
   };
@@ -655,8 +723,8 @@ export default function HomeScreen() {
   );
 
   const handleAddToPlaylist = (video: SimplifiedVimeoVideo) => {
-    // Check if user is authenticated
-    if (!isAuthenticated) {
+    // Web'de authentication bypass
+    if (Platform.OS !== 'web' && !isAuthenticated) {
       // Navigate to guest sign-in page instead of modal
       router.push({
         pathname: '/guest-signin',
@@ -669,6 +737,15 @@ export default function HomeScreen() {
       return;
     }
 
+    // Web'de custom modal kullan
+    if (Platform.OS === 'web') {
+      setCreatePlaylistVideoId(video.id);
+      setCreatePlaylistVideoTitle(video.name || video.title || 'Untitled Video');
+      setShowCreatePlaylistModal(true);
+      return;
+    }
+
+    // Native'de normal navigation
     // Use cached playlists instead of API call for instant response
     if (userPlaylists.length === 0) {
       // Hiç playlist yoksa yeni oluştur
@@ -724,7 +801,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <ThemedView style={[styles.container, styles.darkContainer]}>
+    <ThemedView style={[styles.container, styles.darkContainer, Platform.OS === 'web' ? { justifyContent: 'flex-end', paddingBottom: 34 } : {}]}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       {/* Safe Area for Camera Notch */}
@@ -792,8 +869,53 @@ export default function HomeScreen() {
           </>
         ) : (
           <View style={styles.noVideoContainer}>
-            {/* Sadece siyah background - video yok */}
-            <View style={styles.noVideoBackground} />
+            {/* Background Video - NLA.mp4 */}
+            {Platform.OS === 'web' ? (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                zIndex: -1,
+                overflow: 'hidden'
+              }}>
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    minWidth: '100%',
+                    minHeight: '100%',
+                    width: 'auto',
+                    height: 'auto',
+                    transform: 'translate(-50%, -50%)',
+                    objectFit: 'cover'
+                  }}
+                >
+                  <source src={backgroundVideo} type="video/mp4" />
+                </video>
+              </div>
+            ) : (
+              <Video
+                source={backgroundVideo}
+                style={styles.backgroundVideoStyle}
+                shouldPlay
+                isLooping
+                isMuted
+                resizeMode="cover"
+              />
+            )}
+            
+            {/* Dark overlay for better text readability */}
+            <LinearGradient
+              colors={['rgba(0,0,0,0.2)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.6)']}
+              style={styles.backgroundVideoOverlay}
+            />
           </View>
         )}
       </Animated.View>
@@ -814,7 +936,7 @@ export default function HomeScreen() {
                 style={styles.addToPlaylistButton}
                 onPress={() => handleAddToPlaylist(currentVideo)}
               >
-                <IconSymbol name="plus" size={16} color="#e0af92" />
+                <CustomIcon name="plus" size={16} color="#e0af92" />
               </TouchableOpacity>
             </View>
           </ThemedView>
@@ -823,8 +945,8 @@ export default function HomeScreen() {
         </ThemedView>
       )}
 
-      {/* Playlist Area - Show only when expanded with smooth animation */}
-      {!isFullscreen && (
+      {/* Playlist Area - Show only when expanded with smooth animation - Hidden on Web */}
+      {!isFullscreen && Platform.OS !== 'web' && (
         <Animated.View
           style={{
             opacity: playlistAnimation,
@@ -838,10 +960,20 @@ export default function HomeScreen() {
               inputRange: [0, 1],
               outputRange: [0, 1000] // 0'dan 1000px'e kadar
             }),
-            overflow: 'hidden'
+            overflow: 'hidden',
+            marginTop: Platform.OS === 'web' ? 0 : 0,
+            marginBottom: Platform.OS === 'web' ? 0 : 0,
+            paddingBottom: Platform.OS === 'web' ? 0 : 0,
+            backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.9)' : 'transparent', // Siyah background
+            position: Platform.OS === 'web' ? 'absolute' : 'relative',
+            bottom: Platform.OS === 'web' ? -300 : 'auto', // DAHA DA DAHA DA AŞAĞI!
+            left: Platform.OS === 'web' ? 0 : 'auto',
+            right: Platform.OS === 'web' ? 0 : 'auto',
+            width: Platform.OS === 'web' ? '100%' : 'auto',
           }}
         >
           <ScrollView 
+          ref={playlistScrollRef}
           style={styles.playlistArea}
           showsVerticalScrollIndicator={false}
           scrollEnabled={true}
@@ -855,6 +987,18 @@ export default function HomeScreen() {
             />
           }
         >
+          {/* Playlist Header with Close Button */}
+          <ThemedView style={styles.playlistHeaderContainer}>
+            <ThemedText style={styles.playlistHeaderTitle}>Playlists</ThemedText>
+            <TouchableOpacity 
+              style={styles.playlistCloseButton}
+              onPress={togglePlaylistVisibility}
+              activeOpacity={0.7}
+            >
+              <CustomIcon name="keyboard-arrow-down" size={20} color="#e0af92" />
+            </TouchableOpacity>
+          </ThemedView>
+
           {/* All Videos section hidden - cleaner UI */}
 
           {/* Admin Panel Playlists */}
@@ -875,8 +1019,8 @@ export default function HomeScreen() {
                   />
                   <ThemedText style={styles.playlistTitle}>{playlist.name}</ThemedText>
                 </ThemedView>
-                <IconSymbol 
-                  name={expandedPlaylists.has(playlist.id) ? "chevron.down" : "chevron.right"} 
+                <CustomIcon 
+                  name={expandedPlaylists.has(playlist.id) ? "keyboard-arrow-down" : "chevron-right"} 
                   size={16} 
                   color="#e0af92" 
                 />
@@ -938,7 +1082,7 @@ export default function HomeScreen() {
                           </View>
                           <View style={styles.playlistItemActions}>
                             {(currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && (
-                              <IconSymbol name="speaker.wave.2.fill" size={16} color="#e0af92" />
+                              <CustomIcon name="volume-up" size={16} color="#e0af92" />
                             )}
                           </View>
                         </TouchableOpacity>
@@ -977,7 +1121,7 @@ export default function HomeScreen() {
       />
 
       {/* Music Player Footer */}
-      {currentVideo && !isFullscreen && (
+      {(currentVideo || Platform.OS === 'web') && !isFullscreen && (
         <MusicPlayerTabBar
           currentVideo={currentVideo}
           isPaused={isPaused}
@@ -985,17 +1129,87 @@ export default function HomeScreen() {
           onPrevious={playPreviousVideo}
           onNext={playNextVideo}
           onPlaylistPress={() => {
-            router.push('/videos');
+            if (Platform.OS === 'web') {
+              setShowPlaylistModal(true);
+            } else {
+              router.push('/videos');
+            }
           }}
           onAddToPlaylist={() => {
             handleAddToPlaylist(currentVideo);
           }}
-          onPlaylistToggle={togglePlaylistVisibility}
+          onPlaylistToggle={handleHeartIconPress}
           testState={testState}
           onTestStateChange={setTestState}
         />
       )}
 
+      {/* Main Playlist Modal for Web - Sol taraftan */}
+      {Platform.OS === 'web' && (
+        <LeftModal
+          visible={showMainPlaylistModal}
+          onClose={() => setShowMainPlaylistModal(false)}
+          width={500}
+          height={600}
+        >
+          <MainPlaylistModal 
+            onClose={() => setShowMainPlaylistModal(false)}
+            userPlaylists={userPlaylists}
+            expandedPlaylists={expandedPlaylists}
+            onTogglePlaylistExpansion={togglePlaylistExpansion}
+            onPlayVideo={playVideo}
+            currentVideo={currentVideo}
+            onRefresh={onRefresh}
+            refreshing={refreshing}
+            refreshTrigger={playlistRefreshTrigger}
+          />
+        </LeftModal>
+      )}
+
+      {/* Custom Playlist Modal for Web - Sağ taraftan */}
+      {Platform.OS === 'web' && (
+        <CustomModal
+          visible={showPlaylistModal}
+          onClose={() => setShowPlaylistModal(false)}
+          width={400}
+          height={600}
+        >
+          <PlaylistModal 
+            onClose={() => setShowPlaylistModal(false)} 
+            onCreatePlaylist={(videoId, videoTitle) => {
+              setCreatePlaylistVideoId(videoId || '');
+              setCreatePlaylistVideoTitle(videoTitle || '');
+              setShowPlaylistModal(false);
+              setShowCreatePlaylistModal(true);
+            }}
+            refreshTrigger={playlistRefreshTrigger}
+          />
+        </CustomModal>
+      )}
+
+      {/* Custom Create Playlist Modal for Web */}
+      {Platform.OS === 'web' && (
+        <CustomModal
+          visible={showCreatePlaylistModal}
+          onClose={() => setShowCreatePlaylistModal(false)}
+          width={400}
+          height={600}
+        >
+          <CreatePlaylistModal 
+            onClose={() => setShowCreatePlaylistModal(false)}
+            onSuccess={() => {
+              // Playlist'leri yenile
+              refreshPlaylists();
+              // PlaylistModal'ı refresh et
+              setPlaylistRefreshTrigger(prev => prev + 1);
+              // My Playlists modal'ını aç
+              setShowPlaylistModal(true);
+            }}
+            videoId={createPlaylistVideoId}
+            videoTitle={createPlaylistVideoTitle}
+          />
+        </CustomModal>
+      )}
 
     </ThemedView>
   );
@@ -1056,13 +1270,16 @@ const styles = StyleSheet.create({
 
   // Player Area
   playerArea: {
-    height: Platform.OS === 'web' ? '70vh' : 300, // Web'de daha büyük responsive
-    maxHeight: Platform.OS === 'web' ? '70vh' : 300, // Web'de viewport height kullan
-    minHeight: Platform.OS === 'web' ? 500 : 300, // Web'de daha büyük minimum yükseklik
+    height: Platform.OS === 'web' ? '100vh' : 300, // Web'de tam ekran
+    maxHeight: Platform.OS === 'web' ? '100vh' : 300, // Tam ekran max height
+    minHeight: Platform.OS === 'web' ? '100vh' : 300, // Tam ekran minimum
     width: '100%', // Prevent horizontal expansion
     backgroundColor: Platform.OS === 'web' ? 'transparent' : '#000000', // Web'de transparent, mobile'da black
-    marginTop: 5, // Eski haline döndür
-    position: 'relative', // For overlay positioning
+    marginTop: Platform.OS === 'web' ? 0 : 5, // Web'de margin yok
+    position: Platform.OS === 'web' ? 'fixed' : 'relative', // Web'de fixed positioning
+    top: Platform.OS === 'web' ? 0 : 'auto', // Web'de en üstten başla
+    left: Platform.OS === 'web' ? 0 : 'auto', // Web'de en soldan başla
+    zIndex: Platform.OS === 'web' ? -1 : 'auto', // Web'de arka planda
     overflow: 'hidden', // Prevent content from expanding beyond bounds
     // Debug styling (commented out)
     // borderWidth: 2,
@@ -1084,7 +1301,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000000', // Tutarlı siyah
+    backgroundColor: Platform.OS === 'web' ? 'transparent' : '#000000', // Web'de transparent
     position: 'relative',
   },
   noVideoBackground: {
@@ -1094,6 +1311,22 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#000000',
+  },
+  backgroundVideoStyle: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  backgroundVideoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   selectVideo: {
     position: 'absolute',
@@ -1199,9 +1432,29 @@ const styles = StyleSheet.create({
   // Playlist Area
   playlistArea: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.9)' : 'transparent',
     position: 'relative',
     paddingBottom: 100, // Reduced padding since we now use spacer items for proper spacing
+  },
+  playlistHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  playlistHeaderTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#e0af92',
+  },
+  playlistCloseButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(224, 175, 146, 0.1)',
   },
   userPlaylistContainer: {
     marginTop: 0,
@@ -1249,15 +1502,15 @@ const styles = StyleSheet.create({
   },
   playlistScroll: {
     flex: 1,
-    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.8)' : '#000000',
+    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.95)' : '#000000',
   },
   userPlaylistScroll: {
     maxHeight: 500, // Large height for expanded playlist videos
-    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.8)' : '#000000',
+    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.95)' : '#000000',
   },
   userPlaylistScrollExpanded: {
     maxHeight: 600, // Even larger height when playlist is the only one expanded
-    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.8)' : '#000000',
+    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.95)' : '#000000',
   },
   playlistItem: {
     flexDirection: 'row',

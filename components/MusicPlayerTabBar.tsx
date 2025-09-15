@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Animated, Easing } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text, Animated, Easing, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { CustomIcon } from '@/components/ui/CustomIcon';
 import { Image } from 'expo-image';
 
 // Footer Testing Infrastructure
@@ -64,7 +65,8 @@ export default function MusicPlayerTabBar({
   testState,
   onTestStateChange
 }: MusicPlayerTabBarProps) {
-  if (!currentVideo) return null;
+  // Web'de currentVideo yokken de göster, mobile'da sadece currentVideo varken göster
+  if (!currentVideo && Platform.OS !== 'web') return null;
 
   // Footer testing state
   const footerTestRef = useRef<FooterTestState>({
@@ -257,7 +259,7 @@ export default function MusicPlayerTabBar({
     <>
       {/* Simple black gradient for icons */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
+        colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
         style={styles.iconGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -290,24 +292,32 @@ export default function MusicPlayerTabBar({
 
       {/* Music Controls - Centered */}
       <View style={styles.controls}>
-        <TouchableOpacity style={styles.controlButton} onPress={() => {
-          onPrevious();
-        }}>
-          <IconSymbol name="backward.fill" size={20} color="#ffffff" />
+        <TouchableOpacity 
+          style={[styles.controlButton, !currentVideo && styles.disabledButton]} 
+          onPress={currentVideo ? () => onPrevious() : undefined}
+          disabled={!currentVideo}
+        >
+          <CustomIcon name="skip-previous" size={20} color={currentVideo ? "#ffffff" : "#666666"} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.playPauseButton} onPress={handlePlayPausePress}>
-          <IconSymbol 
-            name={isPaused ? "play.fill" : "pause.fill"} 
+        <TouchableOpacity 
+          style={[styles.playPauseButton, !currentVideo && styles.disabledButton]} 
+          onPress={currentVideo ? handlePlayPausePress : undefined}
+          disabled={!currentVideo}
+        >
+          <CustomIcon 
+            name={isPaused ? "play" : "pause"} 
             size={28} 
-            color="#e0af92" 
+            color={currentVideo ? "#e0af92" : "#666666"} 
           />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.controlButton} onPress={() => {
-          onNext();
-        }}>
-          <IconSymbol name="forward.fill" size={20} color="#ffffff" />
+        <TouchableOpacity 
+          style={[styles.controlButton, !currentVideo && styles.disabledButton]} 
+          onPress={currentVideo ? () => onNext() : undefined}
+          disabled={!currentVideo}
+        >
+          <CustomIcon name="skip-next" size={20} color={currentVideo ? "#ffffff" : "#666666"} />
         </TouchableOpacity>
       </View>
 
@@ -317,7 +327,7 @@ export default function MusicPlayerTabBar({
           style={styles.actionButton} 
           onPress={onPlaylistPress}
         >
-          <IconSymbol name="list.bullet" size={24} color="#e0af92" />
+          <CustomIcon name="playlist" size={24} color="#e0af92" />
         </TouchableOpacity>
       </View>
       </View>
@@ -331,7 +341,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 190, // Çok daha yukarı çıkar
+    height: 250, // Yukarı doğru uzat (190 → 250)
     zIndex: 1,
   },
   container: {
@@ -354,8 +364,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoImage: {
-    width: 80,
-    height: 32,
+    width: 100, // 80'den 100'e çıkarıldı (%25 büyük)
+    height: 40, // 32'den 40'a çıkarıldı (%25 büyük)
     marginLeft: -10, // Logo'yu daha sola taşı
   },
   controls: {
@@ -403,6 +413,9 @@ const styles = StyleSheet.create({
   playlistIcon: {
     width: 18,
     height: 18,
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   
   // Debug styles for footer testing

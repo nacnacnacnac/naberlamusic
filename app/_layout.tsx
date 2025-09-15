@@ -14,11 +14,44 @@ import { VimeoProvider } from '@/contexts/VimeoContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
 
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  // Web için Google Font import
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      // Funnel Display fontunu import et
+      const link = document.createElement('link');
+      link.href = 'https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300;400;500;600;700;800&display=swap';
+      link.rel = 'stylesheet';
+      document.head.appendChild(link);
+      
+      // Global CSS style ekle
+      const style = document.createElement('style');
+      style.textContent = `
+        * {
+          font-family: 'Funnel Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+        
+        body, html {
+          font-family: 'Funnel Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+        
+        /* React Native Text elementleri için */
+        [data-testid*="text"], 
+        .css-text,
+        span, p, h1, h2, h3, h4, h5, h6,
+        input, textarea, button {
+          font-family: 'Funnel Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   // Hide navigation bar globally on Android
   useEffect(() => {
@@ -98,10 +131,12 @@ export default function RootLayout() {
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack
               screenOptions={{
-                headerShown: Platform.OS !== 'web', // Web'de tüm header'ları gizle
+                headerShown: false, // Tüm header'ları gizle
                 headerStyle: { backgroundColor: '#000000' },
                 headerTintColor: '#ffffff',
-                headerTitleStyle: { color: '#ffffff' }
+                headerTitleStyle: { color: '#ffffff' },
+                contentStyle: { backgroundColor: '#000000' }, // Tüm sayfalar siyah background
+                animation: 'fade'
               }}
             >
               <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -109,33 +144,46 @@ export default function RootLayout() {
               <Stack.Screen 
                 name="create-playlist" 
                 options={{ 
-                  headerShown: Platform.OS === 'android',
-                  title: 'Create Playlist',
-                  headerStyle: { backgroundColor: '#000000' },
-                  headerTintColor: '#ffffff',
-                  headerTitleStyle: { color: '#ffffff' }
+                  headerShown: false,
+                  presentation: 'modal',
+                  animation: Platform.OS === 'web' ? 'slide_from_right' : 'slide_from_bottom',
+                  gestureEnabled: true,
+                  gestureDirection: Platform.OS === 'web' ? 'horizontal' : 'vertical',
+                  contentStyle: { 
+                    backgroundColor: '#000000',
+                    width: Platform.OS === 'web' ? 400 : undefined,
+                    maxWidth: Platform.OS === 'web' ? 400 : undefined
+                  }
                 }} 
               />
               <Stack.Screen 
                 name="select-playlist" 
                 options={{ 
-                  headerShown: Platform.OS === 'android',
-                  title: 'Select Playlist',
-                  headerStyle: { backgroundColor: '#000000' },
-                  headerTintColor: '#ffffff',
-                  headerTitleStyle: { color: '#ffffff' }
+                  headerShown: false,
+                  presentation: 'modal',
+                  animation: Platform.OS === 'web' ? 'slide_from_right' : 'slide_from_bottom',
+                  gestureEnabled: true,
+                  gestureDirection: Platform.OS === 'web' ? 'horizontal' : 'vertical',
+                  contentStyle: { 
+                    backgroundColor: '#000000',
+                    width: Platform.OS === 'web' ? 400 : undefined,
+                    maxWidth: Platform.OS === 'web' ? 400 : undefined
+                  }
                 }} 
               />
               <Stack.Screen 
                 name="videos" 
                 options={{ 
-                  headerShown: Platform.OS === 'android',
-                  title: 'Videos',
-                  headerStyle: { backgroundColor: '#000000' },
-                  headerTintColor: '#ffffff',
-                  headerTitleStyle: { color: '#ffffff' },
-                  presentation: 'modal',
-                  animation: 'slide_from_right'
+                  headerShown: false,
+                  presentation: Platform.OS === 'web' ? 'modal' : 'modal',
+                  animation: Platform.OS === 'web' ? 'slide_from_right' : 'slide_from_bottom',
+                  gestureEnabled: true,
+                  gestureDirection: Platform.OS === 'web' ? 'horizontal' : 'vertical',
+                  contentStyle: { 
+                    backgroundColor: '#000000',
+                    width: Platform.OS === 'web' ? 400 : undefined,
+                    maxWidth: Platform.OS === 'web' ? 400 : undefined
+                  }
                 }} 
               />
               <Stack.Screen 

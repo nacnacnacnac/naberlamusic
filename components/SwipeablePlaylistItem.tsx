@@ -6,12 +6,14 @@ import {
   View,
   Animated,
   Text,
+  Platform,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { CustomIcon } from '@/components/ui/CustomIcon';
 import { Playlist } from '@/types/playlist';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 
@@ -28,33 +30,60 @@ export default function SwipeablePlaylistItem({
 }: SwipeablePlaylistItemProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const [isSwiping, setIsSwiping] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
 
   const handleDelete = async () => {
-    Alert.alert(
-      'Delete Playlist',
-      `Are you sure you want to delete "${playlist.name}"?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            swipeableRef.current?.close();
+    if (Platform.OS === 'web') {
+      // Web için inline confirmation göster
+      setShowDeleteConfirm(true);
+    } else {
+      // Native için Alert kullan (swipe ile)
+      Alert.alert(
+        'Delete Playlist',
+        `Are you sure you want to delete "${playlist.name}"?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+            onPress: () => {
+              swipeableRef.current?.close();
+            },
           },
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await hybridPlaylistService.deletePlaylist(playlist.id);
-              onDelete(); // Refresh the list
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete playlist');
-            }
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: deletePlaylist,
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteConfirm(false);
+    await deletePlaylist();
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    swipeableRef.current?.close();
+  };
+
+  const deletePlaylist = async () => {
+    try {
+      setErrorMessage(null); // Clear any previous errors
+      await hybridPlaylistService.deletePlaylist(playlist.id);
+      onDelete(); // Refresh the list
+    } catch (error) {
+      if (Platform.OS === 'web') {
+        setErrorMessage('Failed to delete playlist. Please try again.');
+        // Clear error after 3 seconds
+        setTimeout(() => setErrorMessage(null), 3000);
+      } else {
+        Alert.alert('Error', 'Failed to delete playlist');
+      }
+    }
   };
 
   const renderRightActions = (progress: Animated.AnimatedAddition, dragX: Animated.AnimatedAddition) => {
@@ -65,7 +94,7 @@ export default function SwipeablePlaylistItem({
           onPress={handleDelete}
           activeOpacity={0.8}
         >
-          <IconSymbol name="trash" size={22} color="white" />
+          <CustomIcon name="delete" size={22} color="white" />
           <Text style={styles.deleteText}>Delete</Text>
         </TouchableOpacity>
       </View>
@@ -86,12 +115,13 @@ export default function SwipeablePlaylistItem({
   return (
     <Swipeable
       ref={swipeableRef}
-      renderRightActions={renderRightActions}
-      rightThreshold={40}
+      renderRightActions={Platform.OS === 'web' ? undefined : renderRightActions}
+      rightThreshold={Platform.OS === 'web' ? 0 : 40}
       friction={2}
       overshootRight={false}
       shouldCancelWhenOutside={true}
       enableTrackpadTwoFingerGesture={false}
+      enabled={Platform.OS !== 'web'}
       onSwipeableWillOpen={() => {
         setIsSwiping(true);
       }}
@@ -112,31 +142,64 @@ export default function SwipeablePlaylistItem({
       >
         <ThemedView style={styles.content}>
           <View style={styles.iconContainer}>
-            <IconSymbol name="heart.fill" size={24} color="#e0af92" />
+            <CustomIcon name="heart" size={24} color="#e0af92" />
           </View>
           
           <View style={styles.textContainer}>
-            <ThemedText style={styles.playlistName} numberOfLines={1}>
-              {playlist.name}
-            </ThemedText>
-            <View style={styles.statsContainer}>
-              <ThemedText style={styles.videoCount}>
-                {playlist.videos?.length || 0} video{(playlist.videos?.length || 0) !== 1 ? 's' : ''}
-              </ThemedText>
-              {getTotalDuration() > 0 && (
-                <>
-                  <ThemedText style={styles.separator}>•</ThemedText>
-                  <ThemedText style={styles.duration}>
-                    {formatDuration(getTotalDuration())}
+            {showDeleteConfirm && Platform.OS === 'web' ? (
+              <View style={styles.confirmationContainer}>
+                <Text style={styles.confirmationText}>
+                  Delete "{playlist.name}"?
+                </Text>
+                <View style={styles.confirmationButtons}>
+                  <TouchableOpacity 
+                    style={styles.cancelButton} 
+                    onPress={cancelDelete}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.deleteButton} 
+                    onPress={confirmDelete}
+                  >
+                    <Text style={styles.deleteButtonText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <>
+                <ThemedText style={styles.playlistName} numberOfLines={1}>
+                  {playlist.name}
+                </ThemedText>
+                <View style={styles.statsContainer}>
+                  <ThemedText style={styles.videoCount}>
+                    {playlist.videos?.length || 0} video{(playlist.videos?.length || 0) !== 1 ? 's' : ''}
                   </ThemedText>
-                </>
-              )}
-            </View>
+                  {getTotalDuration() > 0 && (
+                    <>
+                      <ThemedText style={styles.separator}>•</ThemedText>
+                      <ThemedText style={styles.duration}>
+                        {formatDuration(getTotalDuration())}
+                      </ThemedText>
+                    </>
+                  )}
+                </View>
+                {errorMessage && (
+                  <Text style={styles.errorMessage}>
+                    {errorMessage}
+                  </Text>
+                )}
+              </>
+            )}
           </View>
           
-          <View style={styles.chevronContainer}>
-            <IconSymbol name="chevron.right" size={16} color="#666666" />
-          </View>
+          <TouchableOpacity 
+            style={styles.deleteIconContainer}
+            onPress={handleDelete}
+            activeOpacity={0.7}
+          >
+            <CustomIcon name="delete" size={18} color="#666666" />
+          </TouchableOpacity>
         </ThemedView>
       </TouchableOpacity>
     </Swipeable>
@@ -192,8 +255,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888888',
   },
-  chevronContainer: {
-    padding: 4,
+  deleteIconContainer: {
+    padding: 8,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   rightActionsContainer: {
     flexDirection: 'row',
@@ -218,8 +284,56 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deleteText: {
-    color: 'white',
+    color: '#ffffff',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  errorMessage: {
+    color: '#ff6b6b',
+    fontSize: 12,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  confirmationContainer: {
+    padding: 0,
+    backgroundColor: 'transparent',
+  },
+  confirmationText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  confirmationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#333333',
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  deleteButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

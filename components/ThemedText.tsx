@@ -1,4 +1,4 @@
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps, Platform } from 'react-native';
 
 import { useThemeColor } from '@/hooks/useThemeColor';
 
@@ -37,24 +37,29 @@ const styles = StyleSheet.create({
   default: {
     fontSize: 16,
     lineHeight: 24,
+    fontFamily: Platform.OS === 'web' ? 'Funnel Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif' : undefined,
   },
   defaultSemiBold: {
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '600',
+    fontFamily: Platform.OS === 'web' ? 'Funnel Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif' : undefined,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     lineHeight: 32,
+    fontFamily: Platform.OS === 'web' ? 'Funnel Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif' : undefined,
   },
   subtitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    fontFamily: Platform.OS === 'web' ? 'Funnel Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif' : undefined,
   },
   link: {
     lineHeight: 30,
     fontSize: 16,
     color: '#0a7ea4',
+    fontFamily: Platform.OS === 'web' ? 'Funnel Display, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif' : undefined,
   },
 });

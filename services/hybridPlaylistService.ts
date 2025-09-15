@@ -1,7 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { Playlist, PlaylistVideo } from '@/types/playlist';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
 import { adminApiService } from './adminApiService';
+import { webOnlyPlaylistService } from './webOnlyPlaylistService';
 
 class HybridPlaylistService {
   private readonly STORAGE_KEY = 'naber_la_user_playlists'; // Only user playlists
@@ -87,7 +89,10 @@ class HybridPlaylistService {
           isAdminPlaylist: false
         }));
         
-        const cachedResult = [...prefixedCachedPlaylists, ...prefixedUserPlaylists];
+        // Get web-only playlists (only on web)
+        const webOnlyPlaylists = Platform.OS === 'web' ? await webOnlyPlaylistService.getWebOnlyPlaylists() : [];
+        
+        const cachedResult = [...prefixedCachedPlaylists, ...prefixedUserPlaylists, ...webOnlyPlaylists];
         
         // Only refresh in background if cache is older than 2 minutes
         const lastRefresh = await AsyncStorage.getItem('playlists_last_refresh');
@@ -125,10 +130,13 @@ class HybridPlaylistService {
         isAdminPlaylist: false
       }));
       
+      // Get web-only playlists (only on web)
+      const webOnlyPlaylists = Platform.OS === 'web' ? await webOnlyPlaylistService.getWebOnlyPlaylists() : [];
+      
       // Save refresh timestamp
       await AsyncStorage.setItem('playlists_last_refresh', Date.now().toString());
       
-      return [...prefixedAdminPlaylists, ...prefixedUserPlaylists];
+      return [...prefixedAdminPlaylists, ...prefixedUserPlaylists, ...webOnlyPlaylists];
       
     } catch (error) {
       console.warn('⚠️ Admin API failed, showing only user playlists:', error);

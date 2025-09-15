@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { CustomIcon } from '@/components/ui/CustomIcon';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { adminApiService } from '@/services/adminApiService';
 import { hybridVimeoService } from '@/services/hybridVimeoService';
@@ -36,7 +37,7 @@ export default function DebugApiScreen() {
               style={styles.backButton}
               onPress={() => router.back()}
             >
-              <IconSymbol name="chevron.left" size={24} color="#e0af92" />
+              <CustomIcon name="chevron-left" size={24} color="#e0af92" />
             </TouchableOpacity>
             <ThemedText style={styles.title}>Access Denied</ThemedText>
           </ThemedView>
@@ -518,7 +519,7 @@ export default function DebugApiScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <IconSymbol name="chevron.left" size={24} color="#FFFFFF" />
+          <CustomIcon name="chevron-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         
         <ThemedText style={styles.headerTitle}>API Debug</ThemedText>

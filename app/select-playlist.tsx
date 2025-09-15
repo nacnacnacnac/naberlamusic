@@ -13,6 +13,7 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { CustomIcon } from '@/components/ui/CustomIcon';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { useVimeo } from '@/contexts/VimeoContext';
 import { Playlist } from '@/types/playlist';
@@ -182,13 +183,12 @@ export default function SelectPlaylistScreen() {
 
   return (
     <ThemedView style={[styles.container, styles.darkContainer]}>
-      <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       {/* Header */}
       <ThemedView style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={24} color="#e0af92" />
+          <CustomIcon name="chevron-left" size={24} color="#e0af92" />
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Select Playlist</ThemedText>
         <ThemedView style={styles.headerSpacer} />

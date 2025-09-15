@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { CustomIcon } from '@/components/ui/CustomIcon';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import Toast from '@/components/Toast';
 
@@ -168,7 +169,7 @@ export default function AdminSettingsScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <IconSymbol name="chevron.left" size={24} color="#FFFFFF" />
+          <CustomIcon name="chevron-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         
         <ThemedText style={styles.headerTitle}>Admin Settings</ThemedText>

@@ -5,6 +5,7 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
+import { CustomIcon } from '@/components/ui/CustomIcon';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function GuestSignInScreen() {
@@ -76,7 +77,7 @@ export default function GuestSignInScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <IconSymbol name="chevron.left" size={24} color="#e0af92" />
+            <CustomIcon name="chevron-left" size={24} color="#e0af92" />
           </TouchableOpacity>
           <ThemedText style={styles.headerTitle}>Sign In Required</ThemedText>
         </ThemedView>
