@@ -92,7 +92,12 @@ class HybridPlaylistService {
         // Get web-only playlists (only on web)
         const webOnlyPlaylists = Platform.OS === 'web' ? await webOnlyPlaylistService.getWebOnlyPlaylists() : [];
         
-        const cachedResult = [...prefixedCachedPlaylists, ...prefixedUserPlaylists, ...webOnlyPlaylists];
+        // Filter out web-only playlists from cached results if not on web
+        const filteredCachedPlaylists = Platform.OS === 'web' 
+          ? prefixedCachedPlaylists 
+          : prefixedCachedPlaylists.filter(playlist => !playlist.isWebOnlyPlaylist);
+        
+        const cachedResult = [...filteredCachedPlaylists, ...prefixedUserPlaylists, ...webOnlyPlaylists];
         
         // Only refresh in background if cache is older than 2 minutes
         const lastRefresh = await AsyncStorage.getItem('playlists_last_refresh');
@@ -133,10 +138,15 @@ class HybridPlaylistService {
       // Get web-only playlists (only on web)
       const webOnlyPlaylists = Platform.OS === 'web' ? await webOnlyPlaylistService.getWebOnlyPlaylists() : [];
       
+      // Filter out web-only playlists from admin playlists if not on web
+      const filteredAdminPlaylists = Platform.OS === 'web' 
+        ? prefixedAdminPlaylists 
+        : prefixedAdminPlaylists.filter(playlist => !playlist.isWebOnlyPlaylist);
+      
       // Save refresh timestamp
       await AsyncStorage.setItem('playlists_last_refresh', Date.now().toString());
       
-      return [...prefixedAdminPlaylists, ...prefixedUserPlaylists, ...webOnlyPlaylists];
+      return [...filteredAdminPlaylists, ...prefixedUserPlaylists, ...webOnlyPlaylists];
       
     } catch (error) {
       console.warn('⚠️ Admin API failed, showing only user playlists:', error);
@@ -186,8 +196,11 @@ class HybridPlaylistService {
    */
   private async cacheAdminPlaylistsLocally(playlists: Playlist[]): Promise<void> {
     try {
-      await AsyncStorage.setItem(this.ADMIN_CACHE_KEY, JSON.stringify(playlists));
-      console.log('💾 Cached admin playlists:', playlists.length);
+      // Filter out web-only playlists before caching (so mobile doesn't see them)
+      const playlistsToCache = playlists.filter(playlist => !playlist.isWebOnlyPlaylist);
+      
+      await AsyncStorage.setItem(this.ADMIN_CACHE_KEY, JSON.stringify(playlistsToCache));
+      console.log('💾 Cached admin playlists:', playlistsToCache.length, '(filtered web-only)');
     } catch (error) {
       console.error('Error caching admin playlists:', error);
     }
@@ -604,6 +617,21 @@ class HybridPlaylistService {
    */
   getPlaylistDuration(playlist: Playlist): number {
     return playlist.videos.reduce((total, video) => total + video.duration, 0);
+  }
+
+  /**
+   * Clear all cached data (including web-only playlists)
+   */
+  async clearCache(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(this.STORAGE_KEY);
+      await AsyncStorage.removeItem(this.ADMIN_CACHE_KEY);
+      await AsyncStorage.removeItem(this.SYNC_KEY);
+      await AsyncStorage.removeItem('playlists_last_refresh');
+      console.log('🧹 All playlist cache cleared (web-only playlists removed from mobile)');
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+    }
   }
 }
 
