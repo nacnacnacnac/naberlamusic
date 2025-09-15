@@ -153,7 +153,7 @@ export default function LoginScreen() {
       Animated.parallel([
         // Logo wrapper movement - sola başlayıp sağa kayma
         Animated.timing(logoWrapperX, {
-          toValue: Platform.OS === 'web' ? 35 : 0, // Web'de 35px sağa (15px daha), native'de merkez
+          toValue: Platform.OS === 'web' ? (isMobileWebPortrait ? 0 : 35) : 0, // Mobil web: 0 (merkez), Desktop: 35px sağa, Native: 0
           duration: 800,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
