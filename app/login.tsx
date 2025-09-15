@@ -40,7 +40,7 @@ export default function LoginScreen() {
   const naberX = useRef(new Animated.Value(28)).current; // Start N 70% more to the right
   const laX = useRef(new Animated.Value(8)).current; // Start A 40% more to the right (was 4, now 8)
   const logoOpacity = useRef(new Animated.Value(1)).current;
-  const logoWrapperX = useRef(new Animated.Value(0)).current; // Start centered
+  const logoWrapperX = useRef(new Animated.Value(Platform.OS === 'web' ? (isMobileWebPortrait ? -35 : -30) : 0)).current; // Web'de solda başla: mobil -35px, desktop -30px
   
   // Dynamic mask animation values
   const naberMaskWidth = useRef(new Animated.Value(0)).current; // Start with 0 width (hidden)
@@ -151,13 +151,13 @@ export default function LoginScreen() {
       
       // Step 2: Naber and La slide out with synchronized mask effect + Logo wrapper slides to final position
       Animated.parallel([
-        // Logo wrapper stays centered (no movement needed)
-        // Animated.timing(logoWrapperX, {
-        //   toValue: 0, // Already centered
-        //   duration: 800,
-        //   easing: Easing.out(Easing.cubic),
-        //   useNativeDriver: true,
-        // }),
+        // Logo wrapper movement - sola başlayıp sağa kayma
+        Animated.timing(logoWrapperX, {
+          toValue: Platform.OS === 'web' ? 35 : 0, // Web'de 35px sağa (15px daha), native'de merkez
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
         
         // Naber: slides LEFT from under heart (NABER on left side)
         Animated.timing(naberX, {
@@ -824,7 +824,7 @@ export default function LoginScreen() {
             position: 'fixed',
             // Mobile web: center horizontally, move up from bottom
             bottom: isMobileWebPortrait ? '60px' : (window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px'),
-            left: isMobileWebPortrait ? '50%' : (window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px'),
+            left: isMobileWebPortrait ? 'calc(50% - 10px)' : (window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px'),
             transform: isMobileWebPortrait ? 'translateX(-50%)' : 'none',
             display: 'flex',
             flexDirection: isMobileWebPortrait ? 'column' : 'row',
@@ -1852,8 +1852,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     // Mobile web adjustments
     ...(isMobileWebPortrait && {
-      marginTop: height * 0.15, // Push logo down on mobile web
-      marginBottom: 40,
+      marginTop: height * 0.08 - 340, // 200px daha yukarı (140+200=340)
+      marginBottom: 20,
+      marginRight: -40, // 5px sola (45-5=40)
     }),
   },
   logoContainer: {
@@ -1944,6 +1945,13 @@ const styles = StyleSheet.create({
     borderWidth: 1, // Thinner border (was 2, now 1)
     borderColor: '#666666', // Dark grey color
     backgroundColor: 'transparent', // Transparent inside
+    // Mobile web adjustments - ripple ana butonun arkasında olmalı
+    ...(isMobileWebPortrait && {
+      bottom: height * 0.35 + 60, // Ana buton ile aynı pozisyon (60px yukarı)
+      left: 'calc(50% - 50px)', // Ana buton ile aynı pozisyon (50px sola)
+      transform: 'translateX(-50%)', // Transform korunuyor
+      zIndex: 1, // Ana butonun arkasında
+    }),
   },
   enterIconButton: {
     width: 70, // Bigger circle to fit the arrow (was 60, now 70)
@@ -2015,7 +2023,9 @@ const styles = StyleSheet.create({
     zIndex: 3,
     // Mobile web adjustments
     ...(isMobileWebPortrait && {
-      bottom: height * 0.25, // Move button up from bottom on mobile web
+      bottom: height * 0.35 + 60, // 60px daha yukarı
+      left: 'calc(50% - 50px)', // 20px daha sola (30+20=50px)
+      transform: 'translateX(-50%)', // Transform korunuyor
     }),
   },
   authButton: {
