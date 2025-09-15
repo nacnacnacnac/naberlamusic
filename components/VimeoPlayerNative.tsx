@@ -206,7 +206,7 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       setError(null);
       
       try {
-        // Get video files using backend token from hybridVimeoService
+        // Direkt backend token ile dene (vimeoService.getVideoUrl yok)
         console.log('🎬 Using backend token for video:', video.id);
         const token = await hybridVimeoService.getCurrentToken();
         
@@ -224,9 +224,11 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
         const videoData = await response.json();
         
         if (videoData?.files && videoData.files.length > 0) {
-          // Find MP4 files
+          // Find MP4 files (sadece M3U8'i filtrele, progressive_redirect'i kabul et)
           const mp4Files = videoData.files.filter((file: any) => 
-            file.type === 'video/mp4' && file.link && !file.link.includes('progressive_redirect')
+            file.type === 'video/mp4' && 
+            file.link && 
+            !file.link.includes('.m3u8')  // Sadece M3U8'i filtrele
           );
           
           // Prefer HD quality, fallback to first available
@@ -391,16 +393,14 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
           key={`video-${video?.id}-${videoUri}`}
           src={videoUri}
                 style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  minWidth: '100%',
-                  minHeight: '100%',
-                  width: 'auto',
-                  height: 'auto',
-                  transform: 'translate(-50%, -50%)',
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: '100vh',
                   objectFit: 'cover',
-                  backgroundColor: '#000000'
+                  backgroundColor: '#000000',
+                  zIndex: -1
                 }}
                 controls={false}
                 autoplay={false}

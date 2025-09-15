@@ -792,20 +792,8 @@ export default function HomeScreen() {
           </>
         ) : (
           <View style={styles.noVideoContainer}>
-            {/* Background Video when no video selected */}
-            <Video
-              source={{ uri: 'https://naberla.org/videos/select.mp4' }}
-              style={styles.selectVideo}
-              shouldPlay
-              isLooping
-              isMuted
-              resizeMode="cover"
-            />
-            {/* Dark Overlay */}
-            <LinearGradient
-              colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']}
-              style={styles.selectVideoOverlay}
-            />
+            {/* Sadece siyah background - video yok */}
+            <View style={styles.noVideoBackground} />
           </View>
         )}
       </Animated.View>
@@ -1098,6 +1086,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#000000', // Tutarlı siyah
     position: 'relative',
+  },
+  noVideoBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
   },
   selectVideo: {
     position: 'absolute',
