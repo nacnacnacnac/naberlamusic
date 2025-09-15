@@ -14,6 +14,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 // Asset imports for web
 const appStoreImage = Platform.OS === 'web' ? '/images/appstore2.png' : require('@/assets/images/appstore2.png');
 const androidStoreImage = Platform.OS === 'web' ? '/images/android_store.png' : require('@/assets/images/android_store.png');
+const spotifyStoreImage = Platform.OS === 'web' ? '/spotify_store.png' : require('@/assets/images/spotify_store.png');
 const backgroundVideo = require('@/assets/videos/NLA.mp4');
 
 const { width, height } = Dimensions.get('window');
@@ -827,16 +828,16 @@ export default function LoginScreen() {
             left: isMobileWebPortrait ? 'calc(50% - 10px)' : (window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px'),
             transform: isMobileWebPortrait ? 'translateX(-50%)' : 'none',
             display: 'flex',
-            flexDirection: isMobileWebPortrait ? 'column' : 'row',
+            flexDirection: 'row', // Her zaman yan yana
             alignItems: 'center',
-            gap: isMobileWebPortrait ? '15px' : '10px',
+            gap: isMobileWebPortrait ? '10px' : '10px',
             zIndex: 10,
           }}>
             <img 
               src={appStoreImage}
               alt="App Store"
               style={{
-                width: isMobileWebPortrait ? '140px' : (window.innerWidth <= 480 ? '80px' : window.innerWidth <= 768 ? '100px' : '120px'),
+                width: isMobileWebPortrait ? '100px' : (window.innerWidth <= 480 ? '80px' : window.innerWidth <= 768 ? '100px' : '120px'),
                 height: 'auto',
                 opacity: 0.6,
                 transition: 'all 0.3s ease',
@@ -863,7 +864,7 @@ export default function LoginScreen() {
               src={androidStoreImage}
               alt="Google Play Store"
               style={{
-                width: isMobileWebPortrait ? '140px' : (window.innerWidth <= 480 ? '80px' : window.innerWidth <= 768 ? '100px' : '120px'),
+                width: isMobileWebPortrait ? '100px' : (window.innerWidth <= 480 ? '80px' : window.innerWidth <= 768 ? '100px' : '120px'),
                 height: 'auto',
                 opacity: 0.6,
                 transition: 'all 0.3s ease',
@@ -885,6 +886,33 @@ export default function LoginScreen() {
                 e.target.style.display = 'none';
               }}
               // onClick={() => window.open('https://play.google.com/store/apps/details?id=com.nacnac.naberla', '_blank')} // Temporarily disabled
+            />
+            <img 
+              src={spotifyStoreImage}
+              alt="Spotify"
+              style={{
+                width: isMobileWebPortrait ? '100px' : (window.innerWidth <= 480 ? '80px' : window.innerWidth <= 768 ? '100px' : '120px'),
+                height: 'auto',
+                opacity: 0.6,
+                transition: 'all 0.3s ease',
+                cursor: 'pointer',
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                filter: 'drop-shadow(0 0 10px rgba(224, 175, 146, 0.2))',
+                objectFit: 'contain',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.opacity = '1';
+                e.target.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.opacity = '0.6';
+                e.target.style.transform = 'scale(1)';
+              }}
+              onError={(e) => {
+                console.log('Spotify Store image failed to load:', e);
+                e.target.style.display = 'none';
+              }}
+              onClick={() => window.open('https://open.spotify.com/artist/5RBJnpmTFmrarwjb1y4qVn?si=NNCU37YQSeuMLSoOsBsrZA', '_blank')}
             />
           </div>
 
@@ -1852,7 +1880,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     // Mobile web adjustments
     ...(isMobileWebPortrait && {
-      marginTop: height * 0.08 - 340, // 200px daha yukarı (140+200=340)
+      marginTop: height * 0.08 - 135, // 15px daha aşağı indi (150-15=135)
       marginBottom: 20,
       marginRight: -40, // 5px sola (45-5=40)
     }),
@@ -1947,8 +1975,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent', // Transparent inside
     // Mobile web adjustments - ripple ana butonun arkasında olmalı
     ...(isMobileWebPortrait && {
-      bottom: height * 0.35 + 60, // Ana buton ile aynı pozisyon (60px yukarı)
-      left: 'calc(50% - 50px)', // Ana buton ile aynı pozisyon (50px sola)
+      bottom: 145, // Ana buton ile aynı pozisyon (10px daha yukarı)
+      left: 'calc(50% - 47px)', // Ana buton ile aynı pozisyon (3px sağa)
       transform: 'translateX(-50%)', // Transform korunuyor
       zIndex: 1, // Ana butonun arkasında
     }),
@@ -2023,8 +2051,8 @@ const styles = StyleSheet.create({
     zIndex: 3,
     // Mobile web adjustments
     ...(isMobileWebPortrait && {
-      bottom: height * 0.35 + 60, // 60px daha yukarı
-      left: 'calc(50% - 50px)', // 20px daha sola (30+20=50px)
+      bottom: 145, // 10px daha yukarı çıktı (135+10=145)
+      left: 'calc(50% - 47px)', // 3px sağa (50-3=47px)
       transform: 'translateX(-50%)', // Transform korunuyor
     }),
   },

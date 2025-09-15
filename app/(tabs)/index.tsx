@@ -1203,7 +1203,6 @@ export default function HomeScreen() {
         <LeftModal
           visible={showMainPlaylistModal}
           onClose={() => setShowMainPlaylistModal(false)}
-          width={500}
           height={600}
         >
           <MainPlaylistModal 

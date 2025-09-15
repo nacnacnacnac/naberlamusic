@@ -16,10 +16,14 @@ export default function LeftModal({
   visible, 
   onClose, 
   children, 
-  width = 500, // Videos'tan (400px) biraz daha geniş
+  width, 
   height = screenHeight * 0.8 
 }: LeftModalProps) {
-  const slideAnim = useRef(new Animated.Value(-width)).current; // Sol taraftan başlar
+  // Mobil detection ve width hesaplama component içinde
+  const isMobile = screenWidth <= 768;
+  const modalWidth = width || (isMobile ? (screenWidth * 0.60) + 125 : 500); // Mobilde 125px daha geniş (45+60+20)
+  
+  const slideAnim = useRef(new Animated.Value(-modalWidth)).current; // Sol taraftan başlar
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -41,7 +45,7 @@ export default function LeftModal({
       // Modal kapanırken
       Animated.parallel([
         Animated.timing(slideAnim, {
-          toValue: -width, // Sol tarafa gider
+          toValue: -modalWidth, // Sol tarafa gider
           duration: 250,
           useNativeDriver: true,
         }),
@@ -52,9 +56,9 @@ export default function LeftModal({
         }),
       ]).start();
     }
-  }, [visible, slideAnim, opacityAnim, width]);
+  }, [visible, slideAnim, opacityAnim, modalWidth]);
 
-  if (!visible && slideAnim._value === -width) {
+  if (!visible && slideAnim._value === -modalWidth) {
     return null;
   }
 
@@ -74,8 +78,9 @@ export default function LeftModal({
         style={[
           styles.modalContainer,
           {
-            width,
+            width: modalWidth,
             height,
+            left: 0, // Her zaman sol kenarda
             transform: [{ translateX: slideAnim }],
           },
         ]}
@@ -116,7 +121,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     position: 'absolute',
-    left: 0, // Sol tarafta
+    left: 0, // Sol kenarda sabit
     bottom: 0,
     backgroundColor: '#000000',
     borderTopRightRadius: 20, // Sağ üst köşe yuvarlatılmış
