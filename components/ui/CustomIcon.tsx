@@ -3,7 +3,7 @@ import { Platform, Image, View } from 'react-native';
 import { IconSymbol } from './IconSymbol';
 
 interface CustomIconProps {
-  name: 'play' | 'pause' | 'skip-next' | 'skip-previous' | 'volume-up' | 'playlist' | 'chevron-up' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'rewind' | 'fast-forward' | 'keyboard-arrow-down' | 'heart' | 'delete';
+  name: 'play' | 'pause' | 'skip-next' | 'skip-previous' | 'volume-up' | 'playlist' | 'chevron-up' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'rewind' | 'fast-forward' | 'keyboard-arrow-down' | 'heart' | 'delete' | 'share' | 'link';
   size?: number;
   color?: string;
   style?: any;
@@ -26,6 +26,8 @@ const iconMapping = {
   'delete': 'icons8-rewind-50.png', // Geçici olarak rewind kullan
   'rewind': 'icons8-rewind-50.png',
   'fast-forward': 'icons8-fast-forward-30.png',
+  'share': 'icons8-plus-50.png', // Geçici olarak plus kullan
+  'link': 'icons8-plus-50.png', // Geçici olarak plus kullan
 };
 
 const fallbackMapping = {
@@ -45,6 +47,8 @@ const fallbackMapping = {
   'delete': 'trash',
   'rewind': 'backward.fill',
   'fast-forward': 'forward.fill',
+  'share': 'square.and.arrow.up',
+  'link': 'link',
 };
 
 export function CustomIcon({ name, size = 24, color = '#e0af92', style }: CustomIconProps) {

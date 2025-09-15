@@ -24,6 +24,7 @@ import LeftModal from '@/components/LeftModal';
 import PlaylistModal from '@/components/PlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import MainPlaylistModal from '@/components/MainPlaylistModal';
+import ShareButton, { ShareModal } from '@/components/ShareButton';
 
 // Background video import
 const backgroundVideo = require('@/assets/videos/NLA2.mp4');
@@ -90,6 +91,7 @@ export default function HomeScreen() {
   const playlistAnimation = useRef(new Animated.Value(1)).current;
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showMainPlaylistModal, setShowMainPlaylistModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
   const [createPlaylistVideoId, setCreatePlaylistVideoId] = useState<string>('');
   const [createPlaylistVideoTitle, setCreatePlaylistVideoTitle] = useState<string>('');
@@ -838,6 +840,36 @@ export default function HomeScreen() {
       ]}>
         {currentVideo ? (
           <>
+            {/* Web Video Controls Bar */}
+            {Platform.OS === 'web' && !isFullscreen && (
+              <View style={styles.webVideoControls}>
+                <View style={styles.webVideoInfo}>
+                  <Text style={styles.webVideoTitle} numberOfLines={1}>
+                    {currentVideo.name || currentVideo.title || 'Untitled Video'}
+                  </Text>
+                </View>
+                <View style={styles.webVideoActions}>
+                  <ShareButton
+                    video={currentVideo}
+                    size="medium"
+                    variant="icon"
+                    color="#ffffff"
+                    onShareSuccess={() => {
+                      setToastMessage('Şarkı paylaşıldı!');
+                      setToastType('success');
+                      setToastVisible(true);
+                    }}
+                  />
+                  <TouchableOpacity 
+                    style={styles.webActionButton}
+                    onPress={() => handleAddToPlaylist(currentVideo)}
+                  >
+                    <CustomIcon name="plus" size={20} color="#ffffff" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+            
             <VimeoPlayerNative
               ref={vimeoPlayerRef}
               video={currentVideo}
@@ -984,6 +1016,19 @@ export default function HomeScreen() {
               </ThemedText>
             </ThemedView>
             <View style={styles.headerActions}>
+              
+              {/* Share Button */}
+              <ShareButton
+                video={currentVideo}
+                size="small"
+                variant="icon"
+                color="#e0af92"
+                onShareSuccess={() => {
+                  setToastMessage('Şarkı paylaşıldı!');
+                  setToastType('success');
+                  setToastVisible(true);
+                }}
+              />
               
               {/* Add to Playlist Icon */}
               <TouchableOpacity 
@@ -1262,6 +1307,15 @@ export default function HomeScreen() {
             videoTitle={createPlaylistVideoTitle}
           />
         </CustomModal>
+      )}
+
+      {/* Share Modal */}
+      {currentVideo && (
+        <ShareModal
+          video={currentVideo}
+          visible={showShareModal}
+          onClose={() => setShowShareModal(false)}
+        />
       )}
 
     </ThemedView>
@@ -1735,5 +1789,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
     textAlign: 'right',
+  },
+  
+  // Web Video Controls Styles
+  webVideoControls: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  webVideoInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  webVideoTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'web' ? 'Funnel Display, sans-serif' : undefined,
+  },
+  webVideoActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  webActionButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

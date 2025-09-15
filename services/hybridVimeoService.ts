@@ -268,6 +268,13 @@ class HybridVimeoService {
     return vimeoService.getVideoAccessStatus?.(videoIds) ?? {};
   }
 
+  async getVideoById(videoId: string) {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+    return vimeoService.getVideo(videoId);
+  }
+
   async logAccessDeniedError(videoId: string, error: string) {
     return vimeoService.logAccessDeniedError?.(videoId, error);
   }
