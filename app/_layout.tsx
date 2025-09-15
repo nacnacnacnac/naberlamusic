@@ -21,9 +21,25 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  // Web için Google Font import
+  // Web için Google Font import ve Google Analytics
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      // Google Analytics (gtag.js) ekle
+      const gtagScript = document.createElement('script');
+      gtagScript.async = true;
+      gtagScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-PDK56CL49Y';
+      document.head.appendChild(gtagScript);
+
+      const gtagConfig = document.createElement('script');
+      gtagConfig.innerHTML = `
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-PDK56CL49Y');
+      `;
+      document.head.appendChild(gtagConfig);
+      console.log('✅ Google Analytics (gtag.js) loaded');
+
       // Funnel Display fontunu import et
       const funnelLink = document.createElement('link');
       funnelLink.href = 'https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300;400;500;600;700;800&display=swap';
