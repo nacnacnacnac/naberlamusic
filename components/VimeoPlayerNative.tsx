@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { StyleSheet, View, TouchableOpacity, Image, ActivityIndicator, Animated, DeviceEventEmitter } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Image, ActivityIndicator, Animated, DeviceEventEmitter, Platform } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -51,9 +51,9 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   const [isReady, setIsReady] = useState(false);
   const heartbeatAnim = useRef(new Animated.Value(1)).current;
 
-  // Media session for background controls - always active when video exists
+  // Media session for background controls - only for native platforms
   const { updatePlaybackState } = useMediaSession(
-    video ? {
+    Platform.OS !== 'web' && video ? {
       title: video.name || 'Naber-la Video',
       artist: 'Naber-la',
       duration: duration || 0,
@@ -66,30 +66,61 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   useImperativeHandle(ref, () => ({
     async play() {
       try {
+        console.log('🎬 VimeoPlayerNative.play() called');
         setShouldPlay(true);
-        if (videoRef.current) {
-          await videoRef.current.playAsync();
-          await updatePlaybackState(true);
-          setTimeout(() => {
+        if (Platform.OS === 'web') {
+          // Web HTML5 video element
+          const videoElement = document.querySelector('video');
+          console.log('🎬 Web video element found:', !!videoElement);
+          if (videoElement) {
+            videoElement.muted = false; // Sesli oynat
+            await videoElement.play();
+            setIsPlaying(true);
             onPlayStateChange?.(false);
-          }, 100);
+            console.log('🎬 Web video play() successful');
+          }
+        } else {
+          // Native Expo Video component
+          if (videoRef.current) {
+            await videoRef.current.playAsync();
+            await updatePlaybackState(true);
+            setTimeout(() => {
+              onPlayStateChange?.(false);
+            }, 100);
+          }
         }
       } catch (error: any) {
+        console.log('❌ Play error:', error);
         onError?.(error.message);
       }
     },
 
     async pause() {
       try {
+        console.log('⏸️ VimeoPlayerNative.pause() called');
         setShouldPlay(false);
-        if (videoRef.current) {
-          await videoRef.current.pauseAsync();
-          await updatePlaybackState(false);
-          setTimeout(() => {
+        if (Platform.OS === 'web') {
+          // Web HTML5 video element
+          const videoElement = document.querySelector('video');
+          console.log('⏸️ Web video element found:', !!videoElement);
+          if (videoElement) {
+            videoElement.pause();
+            setIsPlaying(false);
             onPlayStateChange?.(true);
-          }, 100);
+            console.log('⏸️ Web video pause() successful');
+          }
+        } else {
+          // Native Expo Video component
+          if (videoRef.current) {
+            await videoRef.current.pauseAsync();
+            await updatePlaybackState(false);
+            setTimeout(() => {
+              onPlayStateChange?.(true);
+            }, 100);
+          }
         }
       } catch (error: any) {
+        console.log('❌ Pause error:', error);
         onError?.(error.message);
       }
     },
@@ -170,14 +201,18 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     const fetchVideoUrl = async () => {
       if (!video?.id) return;
       
+      console.log('🎬 Loading new video:', video.id, video.name);
       setIsLoading(true);
       setError(null);
       
       try {
-        // Get video files directly from Vimeo API
+        // Get video files using backend token from hybridVimeoService
+        console.log('🎬 Using backend token for video:', video.id);
+        const token = await hybridVimeoService.getCurrentToken();
+        
         const response = await fetch(`https://api.vimeo.com/videos/${video.id}?fields=files`, {
           headers: {
-            'Authorization': `Bearer ${await vimeoService.getCurrentToken()}`,
+            'Authorization': `Bearer ${token}`,
             'Accept': 'application/vnd.vimeo.*+json;version=3.4'
           }
         });
@@ -191,9 +226,8 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
         if (videoData?.files && videoData.files.length > 0) {
           // Find MP4 files
           const mp4Files = videoData.files.filter((file: any) => 
-            file.type === 'video/mp4' && file.link
+            file.type === 'video/mp4' && file.link && !file.link.includes('progressive_redirect')
           );
-          
           
           // Prefer HD quality, fallback to first available
           const bestFile = mp4Files.find((file: any) => 
@@ -201,6 +235,8 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
           ) || mp4Files[0];
           
           if (bestFile?.link) {
+            console.log('🎬 Setting video URI for:', video.id, video.name);
+            console.log('🎬 Direct Video URL:', bestFile.link.substring(0, 50) + '...');
             setVideoUri(bestFile.link);
             // Reset video position for new video
             setCurrentTime(0);
@@ -215,7 +251,7 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
               }
             }, 500);
           } else {
-            throw new Error('No playable video file found');
+            throw new Error('No direct MP4 file found (avoiding progressive_redirect)');
           }
         } else {
           throw new Error('No video files available');
@@ -251,9 +287,24 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
 
   // Handle video ready
   const handleVideoReady = () => {
+    console.log('🎬 handleVideoReady called, shouldPlay:', shouldPlay);
     setIsLoading(false);
     setError(null);
-    // DON'T trigger play state change on ready - video should start paused
+    
+    // If shouldPlay is true, trigger play for web
+    if (Platform.OS === 'web' && shouldPlay) {
+      console.log('🎬 Auto-triggering play on video ready (web)');
+      setTimeout(() => {
+        const videoElement = document.querySelector('video');
+        if (videoElement) {
+          videoElement.muted = false; // Sesli başlasın
+          videoElement.play().catch(error => {
+            console.log('❌ Auto-play failed on ready:', error);
+          });
+        }
+      }, 100);
+    }
+    
     onReady?.();
   };
 
@@ -322,31 +373,90 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   };
 
   return (
-    <ThemedView style={[styles.container, { height: playerHeight }]}>
+    <ThemedView style={[
+      styles.container, 
+      Platform.OS === 'web' ? styles.webContainer : { height: playerHeight }
+    ]}>
       {/* Native Video Player */}
       <TouchableOpacity 
-        style={styles.videoContainer}
+        style={Platform.OS === 'web' ? styles.webVideoContainer : styles.videoContainer}
         onPress={handleVideoTap}
         activeOpacity={1}
       >
         {videoUri && (
           <View style={{ overflow: 'hidden', flex: 1 }}>
-            <Video
-              key={`video-${video?.id}-${videoUri}`}
-              ref={videoRef}
-              source={{ uri: videoUri }}
-              style={styles.video}
-              useNativeControls={false}
-              shouldPlay={shouldPlay}
-              isLooping={false}
-              isMuted={false}
-              volume={1.0}
-              showsTimecodes={false}
-              onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-              onLoad={() => {
-              }}
-              resizeMode="contain"
-            />
+            {Platform.OS === 'web' ? (
+              // Web'de HTML5 video kullan - responsive
+        <video
+          key={`video-${video?.id}-${videoUri}`}
+          src={videoUri}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  minWidth: '100%',
+                  minHeight: '100%',
+                  width: 'auto',
+                  height: 'auto',
+                  transform: 'translate(-50%, -50%)',
+                  objectFit: 'cover',
+                  backgroundColor: '#000000'
+                }}
+                controls={false}
+                autoplay={false}
+                loop={false}
+                muted={false}
+                onLoadedMetadata={(e) => {
+                  const videoElement = e.target as HTMLVideoElement;
+                  setDuration(videoElement.duration);
+                  handleVideoReady();
+                }}
+                onTimeUpdate={(e) => {
+                  const videoElement = e.target as HTMLVideoElement;
+                  setCurrentTime(videoElement.currentTime);
+                  onTimeUpdate?.(videoElement.currentTime, videoElement.duration);
+                }}
+                onPlay={() => {
+                  setIsPlaying(true);
+                  onPlayStateChange?.(false);
+                }}
+                onPause={() => {
+                  setIsPlaying(false);
+                  onPlayStateChange?.(true);
+                }}
+                onError={(e) => {
+                  const videoElement = e.target as HTMLVideoElement;
+                  console.error('❌ HTML5 video error:', {
+                    error: e,
+                    videoSrc: videoElement?.src,
+                    videoId: video?.id,
+                    networkState: videoElement?.networkState,
+                    readyState: videoElement?.readyState,
+                    errorCode: videoElement?.error?.code,
+                    errorMessage: videoElement?.error?.message
+                  });
+                  handleVideoError(`Video error: ${videoElement?.error?.message || 'Playback failed'}`);
+                }}
+              />
+            ) : (
+              // Native'de Expo Video kullan
+              <Video
+                key={`video-${video?.id}-${videoUri}`}
+                ref={videoRef}
+                source={{ uri: videoUri }}
+                style={styles.video}
+                useNativeControls={false}
+                shouldPlay={shouldPlay}
+                isLooping={false}
+                isMuted={false}
+                volume={1.0}
+                showsTimecodes={false}
+                onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+                onLoad={() => {
+                }}
+                resizeMode="contain"
+              />
+            )}
           </View>
         )}
 
@@ -382,9 +492,30 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  webContainer: {
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    overflow: 'visible',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '100%',
+    width: '100%',
+  },
   videoContainer: {
     flex: 1,
     position: 'relative',
+  },
+  webVideoContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   video: {
     flex: 1,

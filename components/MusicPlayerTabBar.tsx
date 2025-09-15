@@ -47,6 +47,7 @@ interface MusicPlayerTabBarProps {
   onNext: () => void;
   onPlaylistPress: () => void;
   onAddToPlaylist: () => void;
+  onPlaylistToggle?: () => void;
   testState?: any;
   onTestStateChange?: (state: any) => void;
 }
@@ -59,6 +60,7 @@ export default function MusicPlayerTabBar({
   onNext,
   onPlaylistPress,
   onAddToPlaylist,
+  onPlaylistToggle,
   testState,
   onTestStateChange
 }: MusicPlayerTabBarProps) {
@@ -264,12 +266,11 @@ export default function MusicPlayerTabBar({
 
       {/* Main footer container - only icons */}
       <View style={styles.container}>
-      {/* Left Logo */}
+      {/* Left Logo - Playlist Toggle */}
       <View style={styles.leftLogo}>
         <TouchableOpacity 
           onPress={() => {
-            const { router } = require('expo-router');
-            router.push('/profile');
+            onPlaylistToggle?.();
           }}
         >
           <Animated.View

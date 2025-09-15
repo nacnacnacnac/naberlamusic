@@ -6,7 +6,7 @@ import { Platform, AppState, TouchableOpacity } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -96,7 +96,14 @@ export default function RootLayout() {
       <AuthProvider>
         <VimeoProvider>
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <Stack>
+            <Stack
+              screenOptions={{
+                headerShown: Platform.OS !== 'web', // Web'de tüm header'ları gizle
+                headerStyle: { backgroundColor: '#000000' },
+                headerTintColor: '#ffffff',
+                headerTitleStyle: { color: '#ffffff' }
+              }}
+            >
               <Stack.Screen name="login" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen 
@@ -143,7 +150,16 @@ export default function RootLayout() {
                   animation: 'slide_from_bottom'
                 }} 
               />
-              <Stack.Screen name="+not-found" />
+              <Stack.Screen 
+                name="+not-found" 
+                options={{ 
+                  headerShown: Platform.OS !== 'web', // Web'de header gizle
+                  title: 'Not Found',
+                  headerStyle: { backgroundColor: '#000000' },
+                  headerTintColor: '#ffffff',
+                  headerTitleStyle: { color: '#ffffff' }
+                }} 
+              />
             </Stack>
             <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} hideTransitionAnimation="fade" />
           </ThemeProvider>

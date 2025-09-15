@@ -84,7 +84,12 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./public/favicon.ico"
+      "favicon": "./public/favicon.ico",
+      "splash": {
+        "image": "./assets/images/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#000000"
+      }
     },
     "plugins": [
       "expo-router",

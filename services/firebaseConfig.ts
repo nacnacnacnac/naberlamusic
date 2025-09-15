@@ -1,7 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, initializeAuth, getReactNativePersistence } from 'firebase/auth';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+
+// Conditional import for Google Sign-In (only for native platforms)
+let GoogleSignin: any = null;
+if (Platform.OS !== 'web') {
+  GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
+}
 
 // Firebase configuration
 const firebaseConfig = {
@@ -30,17 +36,15 @@ try {
   console.log('🔥 Firebase Auth already initialized, using existing instance');
 }
 
-// Configure Google Sign-In
-GoogleSignin.configure({
-  webClientId: '127637606270-bn9m33t2gqfrhrqa7r9t4prrgdievflf.apps.googleusercontent.com',
-  iosClientId: '127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb.apps.googleusercontent.com',
-  offlineAccess: true, // Enable offline access
-  hostedDomain: '', // Specify the G Suite domain (if any)
-  forceCodeForRefreshToken: true, // Force code for refresh token
-  accountName: '', // Specify account name
-  googleServicePlistPath: '', // Path to GoogleService-Info.plist
-  openIdNonce: '', // OpenID nonce
-  profileImageSize: 120, // Profile image size
-});
+// Configure Google Sign-In (only for native platforms)
+if (GoogleSignin) {
+  GoogleSignin.configure({
+    webClientId: '127637606270-bn9m33t2gqfrhrqa7r9t4prrgdievflf.apps.googleusercontent.com',
+    iosClientId: '127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb.apps.googleusercontent.com',
+    offlineAccess: true,
+    forceCodeForRefreshToken: true,
+    profileImageSize: 120,
+  });
+}
 
 export { auth, GoogleAuthProvider, GoogleSignin };

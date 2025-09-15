@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image, DeviceEventEmitter, Alert, RefreshControl } from 'react-native';
+import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image, DeviceEventEmitter, Alert, RefreshControl, Platform, Animated } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Video } from 'expo-av';
@@ -76,6 +76,9 @@ export default function HomeScreen() {
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [isPlaylistExpanded, setIsPlaylistExpanded] = useState(true);
+  const playlistAnimation = useRef(new Animated.Value(1)).current;
+  const videoHeightAnimation = useRef(new Animated.Value(Platform.OS === 'web' ? 1 : 0)).current;
+  const [pendingAutoPlay, setPendingAutoPlay] = useState(false);
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
   const [expandedPlaylists, setExpandedPlaylists] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
@@ -235,15 +238,44 @@ export default function HomeScreen() {
     setCurrentVideoIndex(videoIndex);
     setIsPaused(false); // Set to play immediately
     
-    // Send play command to player after video loads
-    setTimeout(() => {
-      if (vimeoPlayerRef.current) {
-        debugLog.main('🎬 Auto-playing new video');
-        vimeoPlayerRef.current.play().catch(error => {
-          debugLog.error('❌ Auto-play failed:', error);
-        });
-      }
-    }, 1000); // Wait for video to load
+    // Close playlist smoothly when video starts playing
+    Animated.parallel([
+      Animated.timing(playlistAnimation, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }),
+      Animated.timing(videoHeightAnimation, {
+        toValue: 1, // Full size'a genişlet
+        duration: 300,
+        useNativeDriver: false,
+      })
+    ]).start(() => {
+      setIsPlaylistExpanded(false);
+    });
+    
+    // Set pending autoplay flag - will trigger when video is ready
+    setPendingAutoPlay(true);
+    debugLog.main('🎬 Pending autoplay set for new video');
+  };
+
+  const handleVideoReady = () => {
+    debugLog.main('🎬 Video ready callback triggered');
+    
+    // If we have pending autoplay, trigger it now
+    if (pendingAutoPlay) {
+      debugLog.main('🎬 Executing pending autoplay');
+      setPendingAutoPlay(false);
+      
+      setTimeout(() => {
+        if (vimeoPlayerRef.current) {
+          debugLog.main('🎬 Auto-playing video after ready');
+          vimeoPlayerRef.current.play().catch(error => {
+            debugLog.error('❌ Auto-play failed:', error);
+          });
+        }
+      }, 100); // Short delay to ensure video is fully ready
+    }
   };
 
   const handlePlayStateChange = (isPausedFromPlayer: boolean) => {
@@ -361,6 +393,44 @@ export default function HomeScreen() {
 
   const scrollToPlaylist = () => {
     playlistScrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  // Toggle playlist visibility with smooth animation
+  const togglePlaylistVisibility = () => {
+    const newState = !isPlaylistExpanded;
+    
+    if (newState) {
+      // Opening playlist - animate in playlist and shrink video
+      setIsPlaylistExpanded(true);
+      Animated.parallel([
+        Animated.timing(playlistAnimation, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(videoHeightAnimation, {
+          toValue: Platform.OS === 'web' ? 0.7 : 0, // Web'de %70'e küçült
+          duration: 300,
+          useNativeDriver: false,
+        })
+      ]).start();
+    } else {
+      // Closing playlist - animate out playlist and expand video
+      Animated.parallel([
+        Animated.timing(playlistAnimation, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(videoHeightAnimation, {
+          toValue: 1, // Full size'a genişlet
+          duration: 300,
+          useNativeDriver: false,
+        })
+      ]).start(() => {
+        setIsPlaylistExpanded(false);
+      });
+    }
   };
 
   const toggleFullscreen = () => {
@@ -660,8 +730,17 @@ export default function HomeScreen() {
       {/* Safe Area for Camera Notch */}
       <ThemedView style={styles.safeAreaTop} />
       
-      {/* Video Player Area */}
-      <ThemedView style={[styles.playerArea, isFullscreen && styles.fullscreenPlayer]}>
+      {/* Video Player Area with smooth height animation */}
+      <Animated.View style={[
+        styles.playerArea, 
+        isFullscreen && styles.fullscreenPlayer,
+        Platform.OS === 'web' && {
+          height: videoHeightAnimation.interpolate({
+            inputRange: [0.7, 1],
+            outputRange: ['70vh', '100vh']
+          })
+        }
+      ]}>
         {currentVideo ? (
           <>
             <VimeoPlayerNative
@@ -671,6 +750,7 @@ export default function HomeScreen() {
               playerHeight={300}
               onFullscreenToggle={toggleFullscreen}
               onNext={playNextVideo}
+              onReady={handleVideoReady}
               onError={(error) => {
                 debugLog.error('Video player error:', error);
                 setTestState(prev => ({
@@ -700,8 +780,8 @@ export default function HomeScreen() {
               onTimeUpdate={handleTimeUpdate}
             />
             
-            {/* Top Gradient Overlay */}
-            {!isFullscreen && (
+            {/* Top Gradient Overlay - Hidden on web */}
+            {!isFullscreen && Platform.OS !== 'web' && (
               <LinearGradient
                 colors={['rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.5)', 'transparent']}
                 style={styles.topGradientOverlay}
@@ -728,10 +808,10 @@ export default function HomeScreen() {
             />
           </View>
         )}
-      </ThemedView>
+      </Animated.View>
 
-      {/* Video Info Area - Now outside playerArea */}
-      {currentVideo && !isFullscreen && (
+      {/* Video Info Area - Hidden on web for cleaner look */}
+      {currentVideo && !isFullscreen && Platform.OS !== 'web' && (
         <ThemedView style={styles.videoInfoArea}>
           <ThemedView style={styles.titleContainer}>
             <ThemedView style={styles.titleTextContainer}>
@@ -755,9 +835,25 @@ export default function HomeScreen() {
         </ThemedView>
       )}
 
-      {/* Playlist Area */}
+      {/* Playlist Area - Show only when expanded with smooth animation */}
       {!isFullscreen && (
-        <ScrollView 
+        <Animated.View
+          style={{
+            opacity: playlistAnimation,
+            transform: [{ 
+              translateY: playlistAnimation.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0]
+              })
+            }],
+            maxHeight: playlistAnimation.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 1000] // 0'dan 1000px'e kadar
+            }),
+            overflow: 'hidden'
+          }}
+        >
+          <ScrollView 
           style={styles.playlistArea}
           showsVerticalScrollIndicator={false}
           scrollEnabled={true}
@@ -880,6 +976,7 @@ export default function HomeScreen() {
             );
           })}
         </ScrollView>
+        </Animated.View>
       )}
 
 
@@ -905,9 +1002,7 @@ export default function HomeScreen() {
           onAddToPlaylist={() => {
             handleAddToPlaylist(currentVideo);
           }}
-          onProfilePress={() => {
-            router.push('/profile');
-          }}
+          onPlaylistToggle={togglePlaylistVisibility}
           testState={testState}
           onTestStateChange={setTestState}
         />
@@ -923,11 +1018,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   darkContainer: {
-    backgroundColor: 'transparent',
+    backgroundColor: Platform.OS === 'web' ? 'transparent' : '#000000',
   },
   safeAreaTop: {
     height: 0, // Video'yu en yukarı taşı
-    backgroundColor: '#000000',
+    backgroundColor: Platform.OS === 'web' ? 'transparent' : '#000000',
   },
   
   // Setup Screen
@@ -973,10 +1068,11 @@ const styles = StyleSheet.create({
 
   // Player Area
   playerArea: {
-    height: 300, // Fixed player height
-    maxHeight: 300, // Hard constraint to prevent expansion
+    height: Platform.OS === 'web' ? '70vh' : 300, // Web'de daha büyük responsive
+    maxHeight: Platform.OS === 'web' ? '70vh' : 300, // Web'de viewport height kullan
+    minHeight: Platform.OS === 'web' ? 500 : 300, // Web'de daha büyük minimum yükseklik
     width: '100%', // Prevent horizontal expansion
-    backgroundColor: '#000000', // Consistent black background
+    backgroundColor: Platform.OS === 'web' ? 'transparent' : '#000000', // Web'de transparent, mobile'da black
     marginTop: 5, // Eski haline döndür
     position: 'relative', // For overlay positioning
     overflow: 'hidden', // Prevent content from expanding beyond bounds
@@ -1157,15 +1253,15 @@ const styles = StyleSheet.create({
   },
   playlistScroll: {
     flex: 1,
-    backgroundColor: '#000000', // Tam siyah background
+    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.8)' : '#000000',
   },
   userPlaylistScroll: {
     maxHeight: 500, // Large height for expanded playlist videos
-    backgroundColor: '#000000',
+    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.8)' : '#000000',
   },
   userPlaylistScrollExpanded: {
     maxHeight: 600, // Even larger height when playlist is the only one expanded
-    backgroundColor: '#000000',
+    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.8)' : '#000000',
   },
   playlistItem: {
     flexDirection: 'row',
@@ -1174,10 +1270,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#111111', // Daha açık çizgi
-    backgroundColor: '#000000', // Tam siyah background
+    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.6)' : '#000000',
   },
   currentPlaylistItem: {
-    backgroundColor: '#000000', // Arka plan siyah kalsın
+    backgroundColor: Platform.OS === 'web' ? 'rgba(0,0,0,0.8)' : '#000000',
     // Border kaldırıldı - sadece text rengi ile gösterilecek
   },
   playlistItemInfo: {

@@ -31,18 +31,31 @@ class AdminApiService {
     try {
       console.log('🔄 Fetching playlists from admin API...');
       
-      const response = await fetch(`${this.baseUrl}/api/playlists`, {
+      // Web'de farklı endpoint kullan
+      const apiUrl = typeof window !== 'undefined' 
+        ? `${this.baseUrl}/api/playlists?web=true` // Web parametresi ekle
+        : `${this.baseUrl}/api/playlists`;
+      
+      console.log('🌐 API URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
+        // Web için CORS ayarları
+        mode: 'cors',
+        credentials: 'omit',
       });
 
+      console.log('📡 Response status:', response.status, response.statusText);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const result = await response.json();
+      let result = await response.json();
+      console.log('📦 Raw response:', result);
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch playlists');
@@ -84,6 +97,14 @@ class AdminApiService {
       return playlists;
     } catch (error) {
       console.error('❌ Error fetching playlists from admin API:', error);
+      
+      // Web'de network hatası varsa sessizce boş array döndür
+      if (typeof window !== 'undefined' && error instanceof TypeError && error.message.includes('fetch')) {
+        console.log('🌐 Web CORS/network error - returning empty playlists');
+        console.log('💡 Tip: Check if naberla.org API is accessible and CORS is configured');
+        return [];
+      }
+      
       throw error;
     }
   }
