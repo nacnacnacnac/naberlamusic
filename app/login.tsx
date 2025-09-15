@@ -58,6 +58,10 @@ export default function LoginScreen() {
   const authFadeAnim = useRef(new Animated.Value(0)).current;
   const authScaleAnim = useRef(new Animated.Value(1)).current;
 
+  // Transition animation values
+  const fadeOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
 
   // Check if already authenticated - NO AUTO REDIRECT
   useEffect(() => {
@@ -372,11 +376,31 @@ export default function LoginScreen() {
   const handleGuestSignIn = async () => {
     try {
       console.log('👤 Guest button clicked, starting guest mode...');
-      // For guest mode, just navigate to main app without authentication
-      console.log('🚀 Navigating to main app as guest...');
-      router.push('/(tabs)');
+      
+      // Start transition animation
+      setIsTransitioning(true);
+      
+      // Fade to black animation
+      Animated.timing(fadeOverlayOpacity, {
+        toValue: 1,
+        duration: 800, // 0.8 second fade to black
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        // Navigate after fade completes
+        console.log('🚀 Navigating to main app as guest...');
+        router.push('/(tabs)');
+        
+        // Reset transition state after navigation
+        setTimeout(() => {
+          setIsTransitioning(false);
+          fadeOverlayOpacity.setValue(0);
+        }, 100);
+      });
     } catch (error: any) {
       console.error('❌ Guest mode error:', error);
+      setIsTransitioning(false);
+      fadeOverlayOpacity.setValue(0);
       Alert.alert(
         'Guest Mode Failed',
         error.message || 'Failed to enter guest mode'
@@ -1726,6 +1750,16 @@ export default function LoginScreen() {
           </div>
         </div>
       )}
+
+      {/* Fade to Black Transition Overlay */}
+      {isTransitioning && (
+        <Animated.View style={[
+          styles.fadeOverlay,
+          {
+            opacity: fadeOverlayOpacity,
+          }
+        ]} />
+      )}
     </View>
   );
 }
@@ -2001,5 +2035,16 @@ const styles = StyleSheet.create({
     height: 24,
     tintColor: '#fff', // Beyaz renk
     marginLeft: 2, // Play ikonu için sağa kaydırma
+  },
+  
+  // Fade transition overlay
+  fadeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000000',
+    zIndex: 9999, // En üstte olsun
   },
 });
