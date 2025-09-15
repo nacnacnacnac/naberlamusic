@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { CustomIcon } from '@/components/ui/CustomIcon';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 
 interface MainPlaylistModalProps {
   onClose: () => void;
@@ -16,6 +17,7 @@ interface MainPlaylistModalProps {
   onRefresh: () => void;
   refreshing: boolean;
   refreshTrigger?: number;
+  onCreatePlaylist?: (videoId?: string, videoTitle?: string) => void;
 }
 
 export default function MainPlaylistModal({
@@ -27,11 +29,12 @@ export default function MainPlaylistModal({
   currentVideo,
   onRefresh,
   refreshing,
-  refreshTrigger
+  refreshTrigger,
+  onCreatePlaylist
 }: MainPlaylistModalProps) {
   const playlistScrollRef = useRef<ScrollView>(null);
   const [hoveredVideo, setHoveredVideo] = React.useState<string | null>(null);
-  const [currentView, setCurrentView] = React.useState<'main' | 'selectPlaylist'>('main');
+  const [currentView, setCurrentView] = React.useState<'main' | 'selectPlaylist' | 'createPlaylist'>('main');
   const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = React.useState<any>(null);
   const [userPlaylistsForSelection, setUserPlaylistsForSelection] = React.useState<any[]>([]);
 
@@ -74,6 +77,21 @@ export default function MainPlaylistModal({
     }
   };
 
+  // Create Playlist View
+  if (currentView === 'createPlaylist') {
+    return (
+      <CreatePlaylistModal
+        onClose={() => setCurrentView('selectPlaylist')}
+        onSuccess={() => {
+          setCurrentView('main');
+          onRefresh();
+        }}
+        videoId={selectedVideoForPlaylist?.id}
+        videoTitle={selectedVideoForPlaylist?.title}
+      />
+    );
+  }
+
   // Select Playlist View
   if (currentView === 'selectPlaylist' && selectedVideoForPlaylist) {
     return (
@@ -108,7 +126,13 @@ export default function MainPlaylistModal({
         {/* Playlists */}
         <ScrollView style={styles.selectPlaylistScroll} showsVerticalScrollIndicator={false}>
           {/* Create New Playlist */}
-          <TouchableOpacity style={styles.createNewPlaylistItem}>
+          <TouchableOpacity 
+            style={styles.createNewPlaylistItem}
+            onPress={() => {
+              setCurrentView('createPlaylist');
+            }}
+            activeOpacity={0.7}
+          >
             <View style={styles.createPlaylistIcon}>
               <CustomIcon name="plus" size={20} color="#e0af92" />
             </View>

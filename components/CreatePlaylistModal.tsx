@@ -265,10 +265,12 @@ const styles = StyleSheet.create({
   videoInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#000000',
     padding: 15,
     borderRadius: 12,
     marginBottom: 25,
+    borderWidth: 1,
+    borderColor: '#333333',
   },
   videoIcon: {
     width: 40,
@@ -302,7 +304,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   textInput: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#000000',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,

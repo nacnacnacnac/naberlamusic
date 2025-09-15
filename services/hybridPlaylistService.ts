@@ -62,7 +62,7 @@ class HybridPlaylistService {
                 id: `admin_${playlist.id}`,
                 isAdminPlaylist: true
               }));
-              return [...prefixedCachedPlaylists, ...userPlaylists];
+              return [...userPlaylists, ...prefixedCachedPlaylists];
             }
           }
         }
@@ -97,7 +97,7 @@ class HybridPlaylistService {
           ? prefixedCachedPlaylists 
           : prefixedCachedPlaylists.filter(playlist => !playlist.isWebOnlyPlaylist);
         
-        const cachedResult = [...filteredCachedPlaylists, ...prefixedUserPlaylists, ...webOnlyPlaylists];
+        const cachedResult = [...prefixedUserPlaylists, ...filteredCachedPlaylists, ...webOnlyPlaylists];
         
         // Only refresh in background if cache is older than 2 minutes
         const lastRefresh = await AsyncStorage.getItem('playlists_last_refresh');
@@ -146,7 +146,7 @@ class HybridPlaylistService {
       // Save refresh timestamp
       await AsyncStorage.setItem('playlists_last_refresh', Date.now().toString());
       
-      return [...filteredAdminPlaylists, ...prefixedUserPlaylists, ...webOnlyPlaylists];
+      return [...prefixedUserPlaylists, ...filteredAdminPlaylists, ...webOnlyPlaylists];
       
     } catch (error) {
       console.warn('⚠️ Admin API failed, showing only user playlists:', error);
@@ -168,7 +168,14 @@ class HybridPlaylistService {
   private async getLocalPlaylists(): Promise<Playlist[]> {
     try {
       const data = await AsyncStorage.getItem(this.STORAGE_KEY);
-      return data ? JSON.parse(data) : [];
+      const playlists = data ? JSON.parse(data) : [];
+      
+      // Sort by updatedAt descending (most recently updated first)
+      return playlists.sort((a: Playlist, b: Playlist) => {
+        const dateA = new Date(a.updatedAt || a.createdAt || '1970-01-01').getTime();
+        const dateB = new Date(b.updatedAt || b.createdAt || '1970-01-01').getTime();
+        return dateB - dateA; // Most recently updated first
+      });
     } catch (error) {
       console.error('Error getting local playlists:', error);
       return [];
@@ -290,7 +297,7 @@ class HybridPlaylistService {
       updatedAt: new Date().toISOString(),
     };
 
-    playlists.push(newPlaylist);
+    playlists.unshift(newPlaylist); // Add to beginning for immediate display
     await this.cachePlaylistsLocally(playlists);
     
     console.log('✅ Created local playlist:', newPlaylist.name);
