@@ -18,6 +18,7 @@ import Toast from '@/components/Toast';
 import MusicPlayerTabBar from '@/components/MusicPlayerTabBar';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
 import { useAuth } from '@/contexts/AuthContext';
+import { logger } from '@/utils/logger';
 import CustomModal from '@/components/CustomModal';
 import LeftModal from '@/components/LeftModal';
 import PlaylistModal from '@/components/PlaylistModal';
@@ -50,7 +51,7 @@ interface StateSnapshot {
 const isDev = __DEV__;
 const log = (prefix: string) => (msg: string, data?: any) => {
   if (!isDev) return;
-  console.log(prefix + msg, data ?? '');
+  logger.system(prefix + msg, data ?? '');
 };
 const logError = (prefix: string) => (msg: string, data?: any) => {
   if (!isDev) return;
@@ -135,12 +136,12 @@ export default function HomeScreen() {
   // Listen for global stop music events
   useEffect(() => {
     const stopMusicListener = DeviceEventEmitter.addListener('STOP_ALL_MUSIC', () => {
-      console.log('🎵 Received STOP_ALL_MUSIC event - stopping music...');
+      logger.system('🎵 Received STOP_ALL_MUSIC event - stopping music...');
       stopAllMusic();
     });
 
     const stopMusicAfterSignInListener = DeviceEventEmitter.addListener('stopMusic', () => {
-      console.log('🎵 Received stopMusic event after sign-in - stopping guest music...');
+      logger.system('🎵 Received stopMusic event after sign-in - stopping guest music...');
       stopAllMusic();
     });
 
@@ -162,7 +163,7 @@ export default function HomeScreen() {
         );
         
         setUserPlaylists(uniquePlaylists);
-        console.log('Initial playlists loaded:', uniquePlaylists.length, 'unique playlists');
+        logger.system('Initial playlists loaded:', uniquePlaylists.length, 'unique playlists');
       } catch (error) {
         console.error('Error loading playlists:', error);
       }

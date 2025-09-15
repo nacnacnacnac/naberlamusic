@@ -2,6 +2,8 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
+// Production'da console.log'ları kaldır (babel.config.js ile hallediliyor)
+
 // Web için Expo Vector Icons font'larını devre dışı bırak
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
