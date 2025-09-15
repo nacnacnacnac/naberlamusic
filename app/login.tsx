@@ -377,7 +377,7 @@ export default function LoginScreen() {
       
       {/* Background Video */}
       <Video
-        source={{ uri: 'https://naberla.org/videos/background2.mp4' }}
+        source={{ uri: 'https://naberla.org/videos/backweb.mp4' }}
         style={styles.backgroundVideo}
         shouldPlay
         isLooping
