@@ -16,7 +16,11 @@ const appStoreImage = Platform.OS === 'web' ? '/images/appstore2.png' : require(
 const androidStoreImage = Platform.OS === 'web' ? '/images/android_store.png' : require('@/assets/images/android_store.png');
 const backgroundVideo = require('@/assets/videos/NLA.mp4');
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+
+// Mobile web detection
+const isMobileWeb = Platform.OS === 'web' && width <= 768;
+const isMobileWebPortrait = isMobileWeb && height > width;
 
 export default function LoginScreen() {
   const { isLoading, videos } = useVimeo();
@@ -815,20 +819,24 @@ export default function LoginScreen() {
       {/* Web-only Store Logos and Links */}
       {Platform.OS === 'web' && (
         <>
-          {/* App Store Logos - Bottom Left */}
+          {/* App Store Logos - Responsive positioning */}
           <div style={{
             position: 'fixed',
-            bottom: window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px',
-            left: window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px',
+            // Mobile web: center horizontally, move up from bottom
+            bottom: isMobileWebPortrait ? '60px' : (window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px'),
+            left: isMobileWebPortrait ? '50%' : (window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px'),
+            transform: isMobileWebPortrait ? 'translateX(-50%)' : 'none',
             display: 'flex',
-            gap: '10px',
+            flexDirection: isMobileWebPortrait ? 'column' : 'row',
+            alignItems: 'center',
+            gap: isMobileWebPortrait ? '15px' : '10px',
             zIndex: 10,
           }}>
             <img 
               src={appStoreImage}
               alt="App Store"
               style={{
-                width: window.innerWidth <= 480 ? '80px' : window.innerWidth <= 768 ? '100px' : '120px',
+                width: isMobileWebPortrait ? '140px' : (window.innerWidth <= 480 ? '80px' : window.innerWidth <= 768 ? '100px' : '120px'),
                 height: 'auto',
                 opacity: 0.6,
                 transition: 'all 0.3s ease',
@@ -855,7 +863,7 @@ export default function LoginScreen() {
               src={androidStoreImage}
               alt="Google Play Store"
               style={{
-                width: window.innerWidth <= 480 ? '80px' : window.innerWidth <= 768 ? '100px' : '120px',
+                width: isMobileWebPortrait ? '140px' : (window.innerWidth <= 480 ? '80px' : window.innerWidth <= 768 ? '100px' : '120px'),
                 height: 'auto',
                 opacity: 0.6,
                 transition: 'all 0.3s ease',
@@ -880,14 +888,18 @@ export default function LoginScreen() {
             />
           </div>
 
-          {/* Support and Privacy Links - Bottom Right */}
+          {/* Support and Privacy Links - Responsive positioning */}
           <div style={{
             position: 'fixed',
-            bottom: '20px',
-            right: '20px',
+            // Mobile web: center horizontally, move up from bottom
+            bottom: isMobileWebPortrait ? '20px' : '20px',
+            right: isMobileWebPortrait ? 'auto' : '20px',
+            left: isMobileWebPortrait ? '50%' : 'auto',
+            transform: isMobileWebPortrait ? 'translateX(-50%)' : 'none',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
+            flexDirection: isMobileWebPortrait ? 'row' : 'column',
+            alignItems: 'center',
+            gap: isMobileWebPortrait ? '20px' : '10px',
             zIndex: 10,
           }}>
             <a 
@@ -1838,6 +1850,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: '100%',
     paddingHorizontal: 20,
+    // Mobile web adjustments
+    ...(isMobileWebPortrait && {
+      marginTop: height * 0.15, // Push logo down on mobile web
+      marginBottom: 40,
+    }),
   },
   logoContainer: {
     height: 80,
@@ -1996,6 +2013,10 @@ const styles = StyleSheet.create({
   mainButtonContainer: {
     position: 'absolute',
     zIndex: 3,
+    // Mobile web adjustments
+    ...(isMobileWebPortrait && {
+      bottom: height * 0.25, // Move button up from bottom on mobile web
+    }),
   },
   authButton: {
     position: 'absolute',
