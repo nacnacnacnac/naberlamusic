@@ -209,6 +209,54 @@ export default function MainPlaylistModal({
           />
         }
       >
+        {/* Background Loading State - Always visible when no playlists */}
+        {userPlaylists.length === 0 && (
+          <View style={styles.backgroundLoadingContainer}>
+            {Platform.OS === 'web' ? (
+              <div style={{ 
+                textAlign: 'center',
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 1,
+                marginTop: '200px'
+              }}>
+                <img 
+                  src="/loading.gif" 
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    marginBottom: '15px',
+                    display: 'block',
+                    margin: '0 auto 15px auto'
+                  }}
+                  alt="Loading..."
+                />
+                <div style={{ 
+                  color: 'white', 
+                  fontSize: '16px',
+                  fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontWeight: '500'
+                }}>
+                  Loading playlists...
+                </div>
+              </div>
+            ) : (
+              <>
+                <ExpoImage 
+                  source={require('@/assets/loading.gif')} 
+                  style={styles.backgroundLoadingGif}
+                  contentFit="contain"
+                />
+                <ThemedText style={styles.backgroundLoadingText}>
+                  Loading playlists...
+                </ThemedText>
+              </>
+            )}
+          </View>
+        )}
+
         {/* Admin Panel Playlists */}
         {userPlaylists.map((playlist, playlistIndex) => {
           const isLastPlaylist = playlistIndex === userPlaylists.length - 1;
@@ -403,6 +451,46 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+    paddingHorizontal: 20,
+  },
+  loadingGif: {
+    width: 50,
+    height: 50,
+    marginBottom: 15,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#e0af92',
+    textAlign: 'center',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontWeight: '500',
+  },
+  backgroundLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  backgroundLoadingGif: {
+    width: 60,
+    height: 60,
+    marginBottom: 15,
+  },
+  backgroundLoadingText: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontWeight: '500',
   },
   header: {
     flexDirection: 'row',

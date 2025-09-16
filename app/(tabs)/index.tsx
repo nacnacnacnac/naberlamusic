@@ -168,10 +168,10 @@ export default function HomeScreen() {
       try {
         setPlaylistsLoading(true);
         
-        // Add a small delay to ensure loading state is visible
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
         const playlists = await hybridPlaylistService.getPlaylists();
+        
+        // Add a delay to ensure loading state is visible (even with cache)
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Remove duplicates by ID
         const uniquePlaylists = playlists.filter((playlist, index, self) => 
@@ -225,12 +225,13 @@ export default function HomeScreen() {
   const refreshPlaylists = async () => {
     try {
       console.log('🔄 Refreshing playlists...');
+      console.log('🎯 Setting playlistsLoading to TRUE');
       setPlaylistsLoading(true);
       
-      // Add a small delay to ensure loading state is visible
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       const playlists = await hybridPlaylistService.getPlaylists(true); // Force refresh
+      
+      // Add a delay to ensure loading state is visible (even with cache)
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Remove duplicates by ID
       const uniquePlaylists = playlists.filter((playlist, index, self) => 
@@ -246,6 +247,7 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error refreshing playlists:', error);
     } finally {
+      console.log('🎯 Setting playlistsLoading to FALSE');
       setPlaylistsLoading(false);
     }
   };
@@ -1567,30 +1569,6 @@ export default function HomeScreen() {
           {/* All Videos section hidden - cleaner UI */}
 
           {/* Admin Panel Playlists */}
-          {playlistsLoading && (
-            <View style={styles.playlistLoadingContainer}>
-              {Platform.OS === 'web' ? (
-                <img 
-                  src="/loading.gif" 
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    marginBottom: '10px'
-                  }}
-                  alt="Loading..."
-                />
-              ) : (
-                <Image 
-                  source={require('@/assets/loading.gif')} 
-                  style={styles.playlistLoadingGif}
-                  resizeMode="contain"
-                />
-              )}
-              <ThemedText style={styles.playlistLoadingText}>
-                Loading playlists...
-              </ThemedText>
-            </View>
-          )}
           {userPlaylists.map((playlist, playlistIndex) => {
             const isLastPlaylist = playlistIndex === userPlaylists.length - 1;
             return (
@@ -1865,8 +1843,11 @@ const styles = StyleSheet.create({
   playlistLoadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
+    paddingVertical: 50,
     paddingHorizontal: 20,
+    minHeight: 120,
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.1)',
   },
   playlistLoadingGif: {
     width: 40,
