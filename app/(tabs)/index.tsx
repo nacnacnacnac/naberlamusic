@@ -167,6 +167,10 @@ export default function HomeScreen() {
     const loadPlaylists = async () => {
       try {
         setPlaylistsLoading(true);
+        
+        // Add a small delay to ensure loading state is visible
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const playlists = await hybridPlaylistService.getPlaylists();
         
         // Remove duplicates by ID
@@ -222,6 +226,9 @@ export default function HomeScreen() {
     try {
       console.log('🔄 Refreshing playlists...');
       setPlaylistsLoading(true);
+      
+      // Add a small delay to ensure loading state is visible
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       const playlists = await hybridPlaylistService.getPlaylists(true); // Force refresh
       
@@ -1559,8 +1566,8 @@ export default function HomeScreen() {
 
           {/* All Videos section hidden - cleaner UI */}
 
-          {/* Playlist Loading State */}
-          {playlistsLoading && userPlaylists.length === 0 && (
+          {/* Admin Panel Playlists */}
+          {playlistsLoading && (
             <View style={styles.playlistLoadingContainer}>
               {Platform.OS === 'web' ? (
                 <img 
@@ -1584,9 +1591,7 @@ export default function HomeScreen() {
               </ThemedText>
             </View>
           )}
-
-          {/* Admin Panel Playlists */}
-          {!playlistsLoading && userPlaylists.map((playlist, playlistIndex) => {
+          {userPlaylists.map((playlist, playlistIndex) => {
             const isLastPlaylist = playlistIndex === userPlaylists.length - 1;
             return (
             <View key={playlist.id} style={styles.userPlaylistContainer}>
