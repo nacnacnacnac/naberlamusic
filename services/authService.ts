@@ -1,5 +1,5 @@
 import { auth, GoogleAuthProvider, GoogleSignin } from './firebaseConfig';
-import { signInWithCredential, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { signInWithCredential, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -39,51 +39,79 @@ class AuthService {
     try {
       console.log('🔐 Starting Google Sign-In...');
       
-      // Force sign out first to clear any cached state
-      try {
-        await GoogleSignin.signOut();
-        console.log('🧹 Cleared previous Google Sign-In state');
-      } catch (e) {
-        console.log('ℹ️ No previous sign-in to clear');
+      if (Platform.OS === 'web') {
+        // Web Google Sign-In using Firebase popup
+        console.log('🌐 Web Google Sign-In using Firebase popup...');
+        
+        const provider = new GoogleAuthProvider();
+        provider.addScope('email');
+        provider.addScope('profile');
+        
+        const userCredential = await signInWithPopup(auth, provider);
+        
+        const user: User = {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email,
+          displayName: userCredential.user.displayName,
+          photoURL: userCredential.user.photoURL,
+        };
+        
+        this.currentUser = user;
+        await this.saveUserToStorage(user);
+        
+        console.log('✅ Web Google Sign-In successful:', user.email);
+        return user;
+        
+      } else {
+        // Native Google Sign-In using react-native-google-signin
+        console.log('📱 Native Google Sign-In...');
+        
+        // Force sign out first to clear any cached state
+        try {
+          await GoogleSignin.signOut();
+          console.log('🧹 Cleared previous Google Sign-In state');
+        } catch (e) {
+          console.log('ℹ️ No previous sign-in to clear');
+        }
+        
+        // Check if device supports Google Play
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        
+        // Get user info from Google
+        console.log('📱 Google Sign-In dialog opening...');
+        const result = await GoogleSignin.signIn();
+        console.log('✅ Google Sign-In result:', { 
+          hasIdToken: !!result.data?.idToken, 
+          user: result.data?.user?.email,
+          fullResult: result 
+        });
+        
+        const idToken = result.data?.idToken;
+        if (!idToken) {
+          throw new Error('No idToken received from Google Sign-In');
+        }
+        
+        // Create Firebase credential
+        console.log('🔑 Creating Firebase credential...');
+        const googleCredential = GoogleAuthProvider.credential(idToken);
+        
+        // Sign in with Firebase
+        console.log('🔥 Signing in to Firebase...');
+        const userCredential = await signInWithCredential(auth, googleCredential);
+        
+        const user: User = {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email,
+          displayName: userCredential.user.displayName,
+          photoURL: userCredential.user.photoURL,
+        };
+        
+        this.currentUser = user;
+        await this.saveUserToStorage(user);
+        
+        console.log('✅ Native Google Sign-In successful:', user.email);
+        return user;
       }
-      
-      // Check if device supports Google Play
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      
-      // Get user info from Google
-      console.log('📱 Google Sign-In dialog opening...');
-      const result = await GoogleSignin.signIn();
-      console.log('✅ Google Sign-In result:', { 
-        hasIdToken: !!result.data?.idToken, 
-        user: result.data?.user?.email,
-        fullResult: result 
-      });
-      
-      const idToken = result.data?.idToken;
-      if (!idToken) {
-        throw new Error('No idToken received from Google Sign-In');
-      }
-      
-      // Create Firebase credential
-      console.log('🔑 Creating Firebase credential...');
-      const googleCredential = GoogleAuthProvider.credential(idToken);
-      
-      // Sign in with Firebase
-      console.log('🔥 Signing in to Firebase...');
-      const userCredential = await signInWithCredential(auth, googleCredential);
-      
-      const user: User = {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: userCredential.user.displayName,
-        photoURL: userCredential.user.photoURL,
-      };
-      
-      this.currentUser = user;
-      await this.saveUserToStorage(user);
-      
-      console.log('✅ Google Sign-In successful:', user.email);
-      return user;
       
     } catch (error) {
       console.error('❌ Google Sign-In failed:', error);
@@ -181,8 +209,17 @@ class AuthService {
    */
   async signOut(): Promise<void> {
     try {
-      await GoogleSignin.signOut();
+      // Only call GoogleSignin.signOut() on native platforms
+      if (Platform.OS !== 'web' && GoogleSignin) {
+        await GoogleSignin.signOut();
+        console.log('📱 Native Google Sign-In cleared');
+      }
+      
+      // Firebase sign out (works on all platforms)
       await signOut(auth);
+      console.log('🔥 Firebase sign out completed');
+      
+      // Clear stored user data
       await AsyncStorage.removeItem('user');
       this.currentUser = null;
       console.log('✅ Sign out successful');
@@ -257,6 +294,13 @@ class AuthService {
     } catch (error) {
       console.error('❌ Failed to save user to storage:', error);
     }
+  }
+
+  /**
+   * Get current user
+   */
+  getCurrentUser(): User | null {
+    return this.currentUser;
   }
 
   /**

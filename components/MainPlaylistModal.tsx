@@ -5,6 +5,8 @@ import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { CustomIcon } from '@/components/ui/CustomIcon';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
+import { firestoreService } from '@/services/firestoreService';
+import { authService } from '@/services/authService';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 
 interface MainPlaylistModalProps {
@@ -18,6 +20,7 @@ interface MainPlaylistModalProps {
   refreshing: boolean;
   refreshTrigger?: number;
   onCreatePlaylist?: (videoId?: string, videoTitle?: string) => void;
+  onPlusButtonPress?: () => void;
 }
 
 export default function MainPlaylistModal({
@@ -30,17 +33,23 @@ export default function MainPlaylistModal({
   onRefresh,
   refreshing,
   refreshTrigger,
-  onCreatePlaylist
+  onCreatePlaylist,
+  onPlusButtonPress
 }: MainPlaylistModalProps) {
   const playlistScrollRef = useRef<ScrollView>(null);
   const [hoveredVideo, setHoveredVideo] = React.useState<string | null>(null);
   const [currentView, setCurrentView] = React.useState<'main' | 'selectPlaylist' | 'createPlaylist'>('main');
   const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = React.useState<any>(null);
   const [userPlaylistsForSelection, setUserPlaylistsForSelection] = React.useState<any[]>([]);
+  const [deletedPlaylistIds, setDeletedPlaylistIds] = React.useState<Set<string>>(new Set());
+  const [deletingPlaylistId, setDeletingPlaylistId] = React.useState<string | null>(null);
 
   // refreshTrigger değiştiğinde playlist'leri yenile
   React.useEffect(() => {
     if (refreshTrigger !== undefined && refreshTrigger > 0) {
+      console.log('🔄 Refresh trigger activated, clearing deleted playlist IDs');
+      // Clear deleted playlist IDs when refreshing
+      setDeletedPlaylistIds(new Set());
       onRefresh();
     }
   }, [refreshTrigger]);
@@ -87,7 +96,7 @@ export default function MainPlaylistModal({
   if (currentView === 'createPlaylist') {
     return (
       <CreatePlaylistModal
-        onClose={() => setCurrentView('selectPlaylist')}
+        onClose={() => setCurrentView('main')}
         onSuccess={() => {
           setCurrentView('main');
           onRefresh();
@@ -176,6 +185,59 @@ export default function MainPlaylistModal({
     );
   }
 
+  // Handle playlist deletion
+  const handleDeletePlaylist = async (playlistId: string, playlistName: string) => {
+    try {
+      console.log('🗑️ Deleting playlist:', playlistId, playlistName);
+      
+      // Show deleting state
+      setDeletingPlaylistId(playlistId);
+      
+      await hybridPlaylistService.deletePlaylist(playlistId);
+      
+      // Immediately hide from UI
+      setDeletedPlaylistIds(prev => {
+        const newSet = new Set([...prev, playlistId]);
+        console.log('🔍 Updated deletedPlaylistIds:', Array.from(newSet));
+        return newSet;
+      });
+      setDeletingPlaylistId(null);
+      
+      // Force refresh with cache bypass
+      console.log('🔄 Scheduling refresh after deletion...');
+      setTimeout(async () => {
+        console.log('🔄 Executing scheduled refresh...');
+        try {
+          // Force a complete refresh by calling the service directly
+          const currentUser = authService.getCurrentUser();
+          if (currentUser?.uid) {
+            console.log('🔄 Force refreshing playlists from Firestore...');
+            const freshPlaylists = await firestoreService.getUserPlaylists(currentUser.uid);
+            console.log('🔄 Fresh playlists count:', freshPlaylists.length);
+          }
+        } catch (error) {
+          console.error('❌ Error in forced refresh:', error);
+        }
+        // Clear deleted IDs before refresh to show fresh data
+        console.log('🔍 Clearing deletedPlaylistIds before refresh');
+        setDeletedPlaylistIds(new Set());
+        
+        // Force clear any cached data that might contain the deleted playlist
+        console.log('🔄 Forcing complete cache clear...');
+        await hybridPlaylistService.clearAllCaches();
+        
+        onRefresh();
+      }, 500); // Increased delay to ensure Firestore consistency
+      
+    } catch (error) {
+      console.error('❌ Error deleting playlist:', error);
+      setDeletingPlaylistId(null);
+      if (Platform.OS === 'web') {
+        window.alert(`Failed to delete playlist: ${error.message}`);
+      }
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -188,9 +250,13 @@ export default function MainPlaylistModal({
           <CustomIcon name="chevron-left" size={20} color="#e0af92" />
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Playlists</ThemedText>
-        <View style={styles.headerRight}>
-          <CustomIcon name="heart" size={20} color="#e0af92" />
-        </View>
+        <TouchableOpacity 
+          style={styles.headerRight}
+          onPress={() => setCurrentView('createPlaylist')}
+          activeOpacity={0.7}
+        >
+          <CustomIcon name="plus" size={20} color="#e0af92" />
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
@@ -258,29 +324,74 @@ export default function MainPlaylistModal({
         )}
 
         {/* Admin Panel Playlists */}
-        {userPlaylists.map((playlist, playlistIndex) => {
+        {userPlaylists.filter(playlist => {
+          const isDeleted = deletedPlaylistIds.has(playlist.id);
+          if (isDeleted) {
+            console.log('🔍 Filtering out deleted playlist:', playlist.id, playlist.name);
+          }
+          return !isDeleted;
+        }).map((playlist, playlistIndex) => {
           const isLastPlaylist = playlistIndex === userPlaylists.length - 1;
           return (
           <View key={playlist.id} style={styles.userPlaylistContainer}>
-            <TouchableOpacity 
-              style={styles.playlistHeader}
-              onPress={() => onTogglePlaylistExpansion(playlist.id)}
-              activeOpacity={0.7}
+            <View 
+              style={[
+                styles.playlistHeaderContainer,
+                Platform.OS === 'web' && { className: 'playlist-header-container' }
+              ]}
             >
-              <View style={styles.playlistTitleContainer}>
-                <ExpoImage 
-                  source={require('@/assets/images/playlist.svg')}
-                  style={styles.playlistHeaderIcon}
-                  contentFit="contain"
-                />
-                <ThemedText style={styles.playlistTitle}>{playlist.name}</ThemedText>
-              </View>
-              <CustomIcon 
-                name={expandedPlaylists.has(playlist.id) ? "keyboard-arrow-down" : "chevron-right"} 
-                size={16} 
-                color="#e0af92" 
-              />
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.playlistHeader}
+                onPress={() => onTogglePlaylistExpansion(playlist.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.playlistTitleContainer}>
+                  <ExpoImage 
+                    source={require('@/assets/images/playlist.svg')}
+                    style={styles.playlistHeaderIcon}
+                    contentFit="contain"
+                  />
+                  <ThemedText style={styles.playlistTitle}>{playlist.name}</ThemedText>
+                </View>
+                
+                <View style={styles.playlistRightActions}>
+                  {/* Inline Toast - Show when deleting */}
+                  {deletingPlaylistId === playlist.id && (
+                    <View style={styles.inlineToast}>
+                      <ThemedText style={styles.toastText}>Deleting...</ThemedText>
+                    </View>
+                  )}
+                  
+                  {/* Delete Button - Only for user playlists, in circle before arrow */}
+                  {!playlist.isAdminPlaylist && (
+                    <TouchableOpacity 
+                      style={[
+                        styles.deletePlaylistButtonCircle,
+                        Platform.OS === 'web' && { 
+                          className: 'playlist-delete-button'
+                        }
+                      ]}
+                      onPress={(e) => {
+                        e.stopPropagation(); // Prevent playlist expansion
+                        handleDeletePlaylist(playlist.id, playlist.name);
+                      }}
+                      activeOpacity={0.7}
+                      disabled={deletingPlaylistId === playlist.id}
+                    >
+                      <ThemedText style={styles.minusText}>−</ThemedText>
+                    </TouchableOpacity>
+                  )}
+                  
+                  <View style={styles.expandButtonCircle}>
+                    <CustomIcon 
+                      name={expandedPlaylists.has(playlist.id) ? "keyboard-arrow-down" : "chevron-right"} 
+                      size={14} 
+                      color={expandedPlaylists.has(playlist.id) ? "#e0af92" : "#666666"} 
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
             
             {expandedPlaylists.has(playlist.id) && (
               <ScrollView 
@@ -363,8 +474,8 @@ export default function MainPlaylistModal({
                         </View>
                         </TouchableOpacity>
                         
-                        {/* + Button (Admin playlists) or - Button (User playlists) on hover */}
-                        {Platform.OS === 'web' && hoveredVideo === `${playlist.id}-${playlistVideo.id}` && (
+                        {/* + Button (Admin playlists) or - Button (User playlists) */}
+                        {(Platform.OS !== 'web' || hoveredVideo === `${playlist.id}-${playlistVideo.id}`) && (
                           <TouchableOpacity
                             style={[
                               styles.addToPlaylistButton,
@@ -395,10 +506,9 @@ export default function MainPlaylistModal({
                                 // User playlist: Remove from playlist
                                 try {
                                   await hybridPlaylistService.removeVideoFromPlaylist(playlist.id, vimeoIdToUse);
-                                  console.log('✅ Removed video from playlist:', playlistVideo.title);
                                   onRefresh(); // Refresh to show updated playlist
                                 } catch (error) {
-                                  console.error('Error removing video from playlist:', error);
+                                  console.error('❌ Error removing video from playlist:', error);
                                   if (Platform.OS === 'web') {
                                     window.alert('Failed to remove video from playlist');
                                   }
@@ -411,13 +521,13 @@ export default function MainPlaylistModal({
                               <CustomIcon 
                                 name="plus" 
                                 size={16} 
-                                color="white" 
+                                color="#e0af92" 
                               />
                             ) : (
                               <ThemedText style={{
                                 fontSize: 20,
                                 fontWeight: 'bold',
-                                color: 'white',
+                                color: '#333333',
                                 textAlign: 'center',
                                 lineHeight: 16,
                               }}>
@@ -515,7 +625,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(224, 175, 146, 0.1)',
   },
   headerRight: {
-    width: 40,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#333333', // Daha koyu gri border
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -526,6 +641,13 @@ const styles = StyleSheet.create({
   userPlaylistContainer: {
     marginTop: 0,
   },
+  playlistHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1a1a1a',
+  },
   playlistHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -533,8 +655,64 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     backgroundColor: '#000000',
-    borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    flex: 1,
+  },
+  deletePlaylistButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    backgroundColor: '#000000',
+  },
+  deletePlaylistButtonInline: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 8,
+    borderRadius: 4,
+  },
+  playlistRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deletePlaylistButtonCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#333333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  minusText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666666',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  expandButtonCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#333333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inlineToast: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#333333',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  toastText: {
+    fontSize: 12,
+    color: '#e0af92',
+    fontWeight: '500',
   },
   playlistTitleContainer: {
     flexDirection: 'row',
@@ -584,7 +762,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#e0af92',
+    borderColor: '#333333', // Koyu gri çerçeve
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -731,6 +909,6 @@ const styles = StyleSheet.create({
   },
   removeFromPlaylistButton: {
     backgroundColor: 'transparent',
-    borderColor: '#666666',
+    borderColor: '#333333',
   },
 });

@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { Playlist, PlaylistVideo } from '@/types/playlist';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
 
@@ -64,8 +65,20 @@ class AdminApiService {
       const playlistsData = result.playlists || result.data || [];
       console.log('📋 Admin API: Loaded', playlistsData.length, 'playlists');
 
+      // Filter out web-only playlists on mobile platforms
+      const filteredPlaylistsData = Platform.OS === 'web' 
+        ? playlistsData 
+        : playlistsData.filter((adminPlaylist: AdminPlaylist) => {
+            // Filter out playlists that start with 🌐 or have [WEB_ONLY] in description
+            const isWebOnly = adminPlaylist.name?.startsWith('🌐') || 
+                             adminPlaylist.description?.includes('[WEB_ONLY]');
+            return !isWebOnly;
+          });
+
+      console.log(`📱 Filtered ${playlistsData.length - filteredPlaylistsData.length} web-only playlists on mobile`);
+
       // Convert admin format to mobile app format
-      const playlists: Playlist[] = playlistsData.map((adminPlaylist: AdminPlaylist) => {
+      const playlists: Playlist[] = filteredPlaylistsData.map((adminPlaylist: AdminPlaylist) => {
         // Temporarily disable private video filtering to test with new token
         // const knownPrivateIds = ['140178314', '177249678', '178164054'];
         // const filteredVideos = (adminPlaylist.videos || []).filter(video => 

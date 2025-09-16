@@ -385,48 +385,14 @@ export default function LoginScreen() {
   };
 
   const handleMainButtonPress = () => {
-    if (showAuthButtons) {
-      // Hide auth buttons
-      Animated.parallel([
-        Animated.timing(authSlideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(authFadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(authScaleAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setShowAuthButtons(false);
-      });
-    } else {
-      // Show auth buttons
-      setShowAuthButtons(true);
-      Animated.parallel([
-        Animated.timing(authSlideAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(authFadeAnim, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(authScaleAnim, {
-          toValue: 0.8,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
+    // Fade out animasyonu ile index'e git
+    Animated.timing(pageOpacity, {
+      toValue: 0,
+      duration: 500,
+      useNativeDriver: true,
+    }).start(() => {
+      router.replace('/(tabs)');
+    });
   };
 
   const handleGoogleSignIn = async () => {
@@ -435,6 +401,12 @@ export default function LoginScreen() {
       // Navigate to main app after successful sign in
       router.replace('/(tabs)');
     } catch (error: any) {
+      // Popup kapatılması durumunda error gösterme
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.log('User closed the popup');
+        return;
+      }
+      
       Alert.alert(
         'Sign In Failed',
         error.message || 'Failed to sign in with Google'
@@ -699,7 +671,7 @@ export default function LoginScreen() {
           }]}>
             <TouchableOpacity
               style={styles.enterIconButton}
-              onPress={Platform.OS === 'web' ? handleGuestSignIn : handleMainButtonPress}
+              onPress={handleMainButtonPress}
               activeOpacity={0.7}
               disabled={authLoading}
               onMouseEnter={Platform.OS === 'web' ? handleMouseEnter : undefined}
@@ -730,8 +702,8 @@ export default function LoginScreen() {
           {/* Auth Options */}
           {showAuthButtons && (
             <>
-              {/* Google Button - Only on Mobile */}
-              {Platform.OS !== 'web' && (
+              {/* Google Button - All Platforms */}
+              {false && (
                 <Animated.View 
                   style={[
                     styles.authButton,
@@ -748,7 +720,7 @@ export default function LoginScreen() {
                         {
                           translateY: authSlideAnim.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [0, Platform.OS === 'android' ? 0 : 0], // Android'de vurgu butonu ile aynı seviye
+                            outputRange: [0, -200], // 200px yukarı çıkar
                           }),
                         },
                       ],

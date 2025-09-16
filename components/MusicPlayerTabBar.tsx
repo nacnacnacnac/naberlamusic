@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Animated, Easing, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -46,9 +46,9 @@ interface MusicPlayerTabBarProps {
   onPlayPause: () => void;
   onPrevious: () => void;
   onNext: () => void;
-  onPlaylistPress: () => void;
   onAddToPlaylist: () => void;
   onPlaylistToggle?: () => void;
+  onProfilePress?: () => void;
   testState?: any;
   onTestStateChange?: (state: any) => void;
 }
@@ -59,14 +59,15 @@ export default function MusicPlayerTabBar({
   onPlayPause,
   onPrevious,
   onNext,
-  onPlaylistPress,
   onAddToPlaylist,
   onPlaylistToggle,
+  onProfilePress,
   testState,
   onTestStateChange
 }: MusicPlayerTabBarProps) {
   // Web'de currentVideo yokken de göster, mobile'da sadece currentVideo varken göster
   if (!currentVideo && Platform.OS !== 'web') return null;
+  
 
   // Footer testing state
   const footerTestRef = useRef<FooterTestState>({
@@ -91,6 +92,7 @@ export default function MusicPlayerTabBar({
   const handScale = useRef(new Animated.Value(1)).current;
   const textScale = useRef(new Animated.Value(0)).current; // Başlangıçta görünmez
   const textRotation = useRef(new Animated.Value(0)).current;
+
 
   // Slap animation
   const startSlapAnimation = () => {
@@ -289,7 +291,7 @@ export default function MusicPlayerTabBar({
       clearTimeout(heartbeatTimer);
       clearTimeout(slapTimer);
     };
-  }, []);
+  }, []); // Only run on mount
 
 
   // Track visual state changes and validate consistency
@@ -357,6 +359,7 @@ export default function MusicPlayerTabBar({
       footerTestRef.current.visualStateMismatch++;
     }
     
+
     // Call the parent callback
     try {
       footerDebugLog.press('Calling onPlayPause callback');
@@ -500,9 +503,6 @@ export default function MusicPlayerTabBar({
         <TouchableOpacity 
           style={styles.controlButton} 
           onPress={() => {
-            console.log('🎵 Previous button pressed');
-            console.log('🎵 currentVideo exists:', !!currentVideo);
-            console.log('🎵 Platform:', Platform.OS);
             onPrevious();
           }}
         >
@@ -517,9 +517,6 @@ export default function MusicPlayerTabBar({
         <TouchableOpacity 
           style={styles.playPauseButton} 
           onPress={() => {
-            console.log('🎵 Play/Pause button pressed');
-            console.log('🎵 currentVideo exists:', !!currentVideo);
-            console.log('🎵 Platform:', Platform.OS);
             handlePlayPausePress();
           }}
         >
@@ -538,9 +535,6 @@ export default function MusicPlayerTabBar({
         <TouchableOpacity 
           style={styles.controlButton} 
           onPress={() => {
-            console.log('🎵 Next button pressed');
-            console.log('🎵 currentVideo exists:', !!currentVideo);
-            console.log('🎵 Platform:', Platform.OS);
             onNext();
           }}
         >
@@ -553,13 +547,19 @@ export default function MusicPlayerTabBar({
         </TouchableOpacity>
       </View>
 
-      {/* Right Actions */}
+      {/* Right Actions - Profile Icon */}
       <View style={styles.rightActions}>
         <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={onPlaylistPress}
+          style={[styles.actionButton, styles.profileButton]} 
+          onPress={() => {
+            onProfilePress?.();
+          }}
         >
-          <CustomIcon name="playlist" size={24} color="#e0af92" />
+          <Image
+            source={require('@/assets/images/profile.png')}
+            style={styles.profileImage}
+            contentFit="contain"
+          />
         </TouchableOpacity>
       </View>
       </View>
@@ -701,5 +701,17 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  profileButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#444444',
+    width: 44,
+    height: 44,
+    marginRight: 10, // Sola kaydır
+  },
+  profileImage: {
+    width: 28,
+    height: 28,
   },
 });

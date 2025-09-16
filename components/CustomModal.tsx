@@ -8,6 +8,7 @@ interface CustomModalProps {
   children: React.ReactNode;
   width?: number;
   height?: number;
+  bottomOffset?: number;
 }
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -17,7 +18,8 @@ export default function CustomModal({
   onClose, 
   children, 
   width = 400, 
-  height = screenHeight * 0.8 
+  height = screenHeight * 0.8,
+  bottomOffset = 0
 }: CustomModalProps) {
   const slideAnim = useRef(new Animated.Value(width)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -76,6 +78,7 @@ export default function CustomModal({
           {
             width,
             height,
+            bottom: bottomOffset,
             transform: [{ translateX: slideAnim }],
           },
         ]}

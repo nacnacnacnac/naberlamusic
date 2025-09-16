@@ -62,8 +62,9 @@ export default function LeftModal({
     return null;
   }
 
+  // Use React Native Animated for both web and mobile
   return (
-    <View style={styles.overlay} pointerEvents={visible ? 'auto' : 'none'}>
+    <View style={[styles.overlay, { zIndex: Platform.OS === 'web' ? 99999 : 1000 }]} pointerEvents={visible ? 'auto' : 'none'}>
       {/* Background overlay */}
       <TouchableOpacity 
         style={styles.background} 
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1000,
+    // zIndex dinamik olarak set ediliyor
   },
   background: {
     position: 'absolute',
@@ -123,7 +124,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0, // Sol kenarda sabit
     bottom: 0,
-    backgroundColor: '#000000',
+    backgroundColor: '#000000', // Modal background
     borderTopRightRadius: 20, // Sağ üst köşe yuvarlatılmış
     borderBottomRightRadius: 0,
     borderTopLeftRadius: 0,

@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -25,11 +26,17 @@ const app = initializeApp(firebaseConfig);
 // Initialize Auth with persistence
 let auth;
 try {
-  // Try to initialize auth with React Native persistence
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-  console.log('🔥 Firebase Auth initialized with AsyncStorage persistence');
+  if (Platform.OS === 'web') {
+    // Web uses default persistence (localStorage)
+    auth = getAuth(app);
+    console.log('🔥 Firebase Auth initialized for web with localStorage persistence');
+  } else {
+    // Native uses AsyncStorage persistence
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+    console.log('🔥 Firebase Auth initialized with AsyncStorage persistence');
+  }
 } catch (error) {
   // If already initialized, get existing auth instance
   auth = getAuth(app);
@@ -39,7 +46,7 @@ try {
 // Configure Google Sign-In (only for native platforms)
 if (GoogleSignin) {
   GoogleSignin.configure({
-    webClientId: '127637606270-bn9m33t2gqfrhrqa7r9t4prrgdievflf.apps.googleusercontent.com',
+    webClientId: '127637606270-aj62m58jl803s8latldmfi9lvd47msr9.apps.googleusercontent.com',
     iosClientId: '127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb.apps.googleusercontent.com',
     offlineAccess: true,
     forceCodeForRefreshToken: true,
@@ -47,4 +54,8 @@ if (GoogleSignin) {
   });
 }
 
-export { auth, GoogleAuthProvider, GoogleSignin };
+// Initialize Firestore
+const db = getFirestore(app);
+console.log('🔥 Firestore initialized');
+
+export { auth, db, GoogleAuthProvider, GoogleSignin };

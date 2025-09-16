@@ -4,6 +4,8 @@ import { Playlist, PlaylistVideo } from '@/types/playlist';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
 import { adminApiService } from './adminApiService';
 import { webOnlyPlaylistService } from './webOnlyPlaylistService';
+import { firestoreService } from './firestoreService';
+import { authService } from './authService';
 
 class HybridPlaylistService {
   private readonly STORAGE_KEY = 'naber_la_user_playlists'; // Only user playlists
@@ -62,7 +64,12 @@ class HybridPlaylistService {
                 id: `admin_${playlist.id}`,
                 isAdminPlaylist: true
               }));
-              return [...userPlaylists, ...prefixedCachedPlaylists];
+              const prefixedUserPlaylists = userPlaylists.map(playlist => ({
+                ...playlist,
+                id: playlist.id.startsWith('user_') ? playlist.id : `user_${playlist.id}`,
+                isAdminPlaylist: false
+              }));
+              return [...prefixedUserPlaylists, ...prefixedCachedPlaylists];
             }
           }
         }
@@ -97,7 +104,23 @@ class HybridPlaylistService {
           ? prefixedCachedPlaylists 
           : prefixedCachedPlaylists.filter(playlist => !playlist.isWebOnlyPlaylist);
         
-        const cachedResult = [...prefixedUserPlaylists, ...filteredCachedPlaylists, ...webOnlyPlaylists];
+        // Debug: Log playlist sources (removed for performance)
+        
+        let cachedResult = [...prefixedUserPlaylists, ...filteredCachedPlaylists, ...webOnlyPlaylists];
+        
+        // Fix duplicate Liked Songs playlists
+        const likedSongsPlaylists = cachedResult.filter(p => p.isLikedSongs || p.name === 'Liked Songs');
+        if (likedSongsPlaylists.length > 1) {
+          // Keep only the most recent Liked Songs playlist (by updatedAt)
+          const sortedLikedSongs = likedSongsPlaylists.sort((a, b) => 
+            new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
+          );
+          const mostRecentLikedSongs = sortedLikedSongs[0];
+          
+          // Remove all Liked Songs playlists and add back only the most recent one
+          cachedResult = cachedResult.filter(p => !(p.isLikedSongs || p.name === 'Liked Songs'));
+          cachedResult.unshift(mostRecentLikedSongs); // Add to beginning
+        }
         
         // Only refresh in background if cache is older than 2 minutes
         const lastRefresh = await AsyncStorage.getItem('playlists_last_refresh');
@@ -136,17 +159,31 @@ class HybridPlaylistService {
       }));
       
       // Get web-only playlists (only on web)
-      const webOnlyPlaylists = Platform.OS === 'web' ? await webOnlyPlaylistService.getWebOnlyPlaylists() : [];
+      let webOnlyPlaylists: Playlist[] = [];
+      if (Platform.OS === 'web') {
+        try {
+          webOnlyPlaylists = await webOnlyPlaylistService.getWebOnlyPlaylists();
+        } catch (error) {
+          console.warn('⚠️ Web-only playlists failed, continuing without them:', error.message);
+          webOnlyPlaylists = [];
+        }
+      }
       
       // Filter out web-only playlists from admin playlists if not on web
-      const filteredAdminPlaylists = Platform.OS === 'web' 
+      let filteredAdminPlaylists = Platform.OS === 'web' 
         ? prefixedAdminPlaylists 
         : prefixedAdminPlaylists.filter(playlist => !playlist.isWebOnlyPlaylist);
+      
+      // Filter out any admin playlists that conflict with user playlists (same ID)
+      const userPlaylistIds = new Set(prefixedUserPlaylists.map(p => p.id));
+      const finalAdminPlaylists = filteredAdminPlaylists.filter(playlist => !userPlaylistIds.has(playlist.id));
+      
+      const finalPlaylists = [...prefixedUserPlaylists, ...finalAdminPlaylists, ...webOnlyPlaylists];
       
       // Save refresh timestamp
       await AsyncStorage.setItem('playlists_last_refresh', Date.now().toString());
       
-      return [...prefixedUserPlaylists, ...filteredAdminPlaylists, ...webOnlyPlaylists];
+      return finalPlaylists;
       
     } catch (error) {
       console.warn('⚠️ Admin API failed, showing only user playlists:', error);
@@ -159,7 +196,68 @@ class HybridPlaylistService {
    * Get user's personal playlists (local only)
    */
   async getUserPlaylists(): Promise<Playlist[]> {
-    return await this.getLocalPlaylists();
+    try {
+      // Check if user is authenticated
+      const currentUser = authService.getCurrentUser();
+      
+      if (currentUser && currentUser.uid) {
+        
+        try {
+          // Get playlists from Firestore (force fresh data)
+          const firestorePlaylists = await firestoreService.getUserPlaylists(currentUser.uid);
+          
+          // Also get local playlists for migration/backup
+          const localPlaylists = await this.getLocalPlaylists();
+          
+          // If we have local playlists but no Firestore playlists, migrate them
+          if (localPlaylists.length > 0 && firestorePlaylists.length === 0) {
+            console.log('🔄 Migrating local playlists to Firestore...');
+            await this.migrateLocalPlaylistsToFirestore(currentUser.uid, localPlaylists);
+            return localPlaylists;
+          }
+          
+          // Return Firestore playlists (they're already sorted)
+          return firestorePlaylists;
+        } catch (firestoreError) {
+          console.error('❌ Firestore error, falling back to local:', firestoreError);
+          return await this.getLocalPlaylists();
+        }
+      } else {
+        console.log('👤 No authenticated user, using local playlists');
+        return await this.getLocalPlaylists();
+      }
+    } catch (error) {
+      console.error('❌ Error in getUserPlaylists:', error);
+      return await this.getLocalPlaylists();
+    }
+  }
+
+  /**
+   * Migrate local playlists to Firestore
+   */
+  private async migrateLocalPlaylistsToFirestore(userId: string, localPlaylists: Playlist[]): Promise<void> {
+    try {
+      console.log('🔄 Starting migration of', localPlaylists.length, 'local playlists to Firestore');
+      
+      for (const playlist of localPlaylists) {
+        try {
+          // Skip admin playlists
+          if (playlist.isAdminPlaylist) continue;
+          
+          // Create playlist in Firestore
+          const { id, createdAt, updatedAt, ...playlistData } = playlist;
+          await firestoreService.createPlaylist(userId, playlistData);
+          
+          console.log('✅ Migrated playlist:', playlist.name);
+        } catch (error) {
+          console.error('❌ Error migrating playlist:', playlist.name, error);
+        }
+      }
+      
+      console.log('🎉 Migration completed');
+    } catch (error) {
+      console.error('❌ Error during migration:', error);
+    }
   }
 
   /**
@@ -282,9 +380,37 @@ class HybridPlaylistService {
    * Create a new user playlist (always local)
    */
   async createPlaylist(name: string, description?: string): Promise<Playlist> {
-    // User playlists are always created locally
-    console.log('📱 Creating user playlist locally:', name);
-    return await this.createLocalPlaylist(name, description);
+    try {
+      // Check if user is authenticated
+      const currentUser = authService.getCurrentUser();
+      
+      if (currentUser && currentUser.uid) {
+        console.log('🔥 Creating playlist in Firestore:', name);
+        
+        try {
+          // Create in Firestore
+          const playlist = await firestoreService.createPlaylist(currentUser.uid, {
+            name,
+            description: description || '',
+            videos: [],
+            isLocal: false,
+            thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjU2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlMGFmOTIiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IndoaXRlIj7wn46xPC90ZXh0Pjwvc3ZnPg==',
+          });
+          
+          console.log('✅ Playlist created in Firestore:', playlist.id);
+          return playlist;
+        } catch (firestoreError) {
+          console.error('❌ Firestore error, creating locally:', firestoreError);
+          return await this.createLocalPlaylist(name, description);
+        }
+      } else {
+        console.log('👤 No authenticated user, creating playlist locally:', name);
+        return await this.createLocalPlaylist(name, description);
+      }
+    } catch (error) {
+      console.error('❌ Error in createPlaylist:', error);
+      return await this.createLocalPlaylist(name, description);
+    }
   }
 
   /**
@@ -292,6 +418,23 @@ class HybridPlaylistService {
    */
   async getLikedSongsPlaylist(): Promise<Playlist> {
     try {
+      // Check if user is authenticated
+      const currentUser = authService.getCurrentUser();
+      
+      if (currentUser && currentUser.uid) {
+        console.log('🔥 Getting Liked Songs playlist from Firestore');
+        
+        try {
+          // Get or create "Liked Songs" playlist in Firestore
+          return await firestoreService.getLikedSongsPlaylist(currentUser.uid);
+        } catch (firestoreError) {
+          console.error('❌ Firestore error, falling back to local:', firestoreError);
+          // Fall through to local implementation
+        }
+      }
+      
+      // Local implementation (fallback or non-authenticated users)
+      console.log('👤 Using local Liked Songs playlist');
       const playlists = await this.getLocalPlaylists();
       
       // Check if "Liked Songs" playlist already exists
@@ -329,6 +472,36 @@ class HybridPlaylistService {
    */
   async toggleLikedSong(video: SimplifiedVimeoVideo): Promise<boolean> {
     try {
+      // Check if user is authenticated
+      const currentUser = authService.getCurrentUser();
+      console.log('🔍 Current user in toggleLikedSong:', currentUser ? `${currentUser.email} (${currentUser.uid})` : 'null');
+      
+      if (currentUser && currentUser.uid) {
+        console.log('🔥 Toggling liked song in Firestore:', video.name);
+        
+        try {
+          // Check if video is already liked in Firestore
+          const isLiked = await firestoreService.isVideoLiked(currentUser.uid, video.id);
+          
+          if (isLiked) {
+            // Remove from Firestore liked songs
+            await firestoreService.removeLikedSong(currentUser.uid, video.id);
+            console.log('💔 Removed from Firestore Liked Songs:', video.name);
+            return false;
+          } else {
+            // Add to Firestore liked songs
+            await firestoreService.addLikedSong(currentUser.uid, video);
+            console.log('❤️ Added to Firestore Liked Songs:', video.name);
+            return true;
+          }
+        } catch (firestoreError) {
+          console.error('❌ Firestore error, falling back to local:', firestoreError);
+          // Fall through to local implementation
+        }
+      }
+      
+      // Local implementation (fallback or non-authenticated users)
+      console.log('👤 Using local liked songs implementation');
       const likedPlaylist = await this.getLikedSongsPlaylist();
       const playlists = await this.getLocalPlaylists();
       
@@ -499,14 +672,51 @@ class HybridPlaylistService {
       console.log('❌ Attempted to add video to admin playlist:', playlistId);
       throw new Error('Cannot add videos to admin playlists. Only admins can modify global playlists.');
     } else if (playlistId.startsWith('user_')) {
-      // Remove prefix and add to user's local playlist
-      const actualPlaylistId = playlistId.replace('user_', '');
-      console.log('📱 Adding video to user playlist locally:', actualPlaylistId);
-      await this.addVideoToLocalPlaylist(actualPlaylistId, video);
+      // Check if user is authenticated for Firestore
+      const currentUser = authService.getCurrentUser();
+      
+      if (currentUser && currentUser.uid) {
+        // Use Firestore for authenticated users
+        console.log('🔥 Adding video to Firestore playlist:', playlistId);
+        try {
+          await firestoreService.addVideoToPlaylist(playlistId, video);
+          console.log('✅ Video added to Firestore playlist successfully');
+        } catch (firestoreError) {
+          console.error('❌ Firestore error details:', firestoreError);
+          console.error('❌ Firestore error message:', firestoreError.message);
+          console.error('❌ Firestore error code:', firestoreError.code);
+          
+          // Fallback to local storage if Firestore fails
+          console.error('❌ Firestore failed, falling back to local storage');
+          const actualPlaylistId = playlistId.replace('user_', '');
+          await this.addVideoToLocalPlaylist(actualPlaylistId, video);
+        }
+      } else {
+        // Use local storage for non-authenticated users
+        const actualPlaylistId = playlistId.replace('user_', '');
+        console.log('📱 Adding video to user playlist locally:', actualPlaylistId);
+        await this.addVideoToLocalPlaylist(actualPlaylistId, video);
+      }
     } else {
-      // Legacy playlist without prefix - treat as user playlist
-      console.log('📱 Adding video to legacy user playlist locally:', playlistId);
-      await this.addVideoToLocalPlaylist(playlistId, video);
+      // Check if user is authenticated - this might be a Firestore playlist without prefix
+      const currentUser = authService.getCurrentUser();
+      
+      if (currentUser && currentUser.uid) {
+        // This is likely a Firestore playlist, try Firestore first
+        console.log('🔥 Trying Firestore for playlist without prefix:', playlistId);
+        try {
+          await firestoreService.addVideoToPlaylist(playlistId, video);
+          console.log('✅ Video added to Firestore playlist successfully');
+        } catch (firestoreError) {
+          console.error('❌ Firestore error, trying local fallback:', firestoreError);
+          // Fallback to local storage
+          await this.addVideoToLocalPlaylist(playlistId, video);
+        }
+      } else {
+        // Legacy playlist without prefix - treat as user playlist
+        console.log('📱 Adding video to legacy user playlist locally:', playlistId);
+        await this.addVideoToLocalPlaylist(playlistId, video);
+      }
     }
   }
 
@@ -515,10 +725,14 @@ class HybridPlaylistService {
    */
   private async addVideoToLocalPlaylist(playlistId: string, video: SimplifiedVimeoVideo): Promise<void> {
     const playlists = await this.getLocalPlaylists();
+    console.log('🔍 Looking for playlist ID:', playlistId);
+    console.log('🔍 Available local playlists:', playlists.map(p => ({ id: p.id, name: p.name })));
+    
     const playlist = playlists.find(p => p.id === playlistId);
     
     if (!playlist) {
-      throw new Error('Playlist not found');
+      console.error('❌ Playlist not found. Available IDs:', playlists.map(p => p.id));
+      throw new Error(`Playlist not found: ${playlistId}`);
     }
 
     // Check if video already exists
@@ -577,6 +791,35 @@ class HybridPlaylistService {
         throw new Error('Failed to remove video from admin playlist');
       }
     } else {
+      // Check if user is authenticated for Firestore
+      const currentUser = authService.getCurrentUser();
+      
+      if (currentUser && currentUser.uid) {
+        console.log('🔥 Removing video from Firestore playlist:', playlistId, 'videoId:', videoId);
+        
+        try {
+          // Check if this is Liked Songs playlist
+          const cleanPlaylistId = playlistId.replace('user_', '');
+          const localPlaylists = await this.getLocalPlaylists();
+          const playlist = localPlaylists.find(p => p.id === playlistId || p.id === cleanPlaylistId);
+          
+          if (playlist && (playlist.isLikedSongs || playlist.name === 'Liked Songs')) {
+            // Remove from Firestore Liked Songs
+            console.log('🔥 Removing from Firestore Liked Songs:', videoId);
+            await firestoreService.removeLikedSong(currentUser.uid, videoId);
+            console.log('✅ Video removed from Firestore Liked Songs');
+          } else {
+            // Remove from regular Firestore playlist
+            await firestoreService.removeVideoFromPlaylist(cleanPlaylistId, videoId);
+            console.log('✅ Video removed from Firestore playlist');
+          }
+        } catch (firestoreError) {
+          console.error('❌ Firestore error, falling back to local:', firestoreError);
+          // Fall through to local implementation
+        }
+      }
+      
+      // Also update local (for backup/cache)
       await this.removeVideoFromLocalPlaylist(playlistId, videoId);
     }
   }
@@ -714,6 +957,76 @@ class HybridPlaylistService {
    */
   async testAdminApiConnection(): Promise<boolean> {
     return await adminApiService.testConnection();
+  }
+
+  /**
+   * Delete a playlist
+   */
+  async deletePlaylist(playlistId: string): Promise<void> {
+    console.log('🗑️ Deleting playlist:', playlistId);
+    
+    // Check if this is an admin playlist
+    if (playlistId.startsWith('admin_')) {
+      throw new Error('Cannot delete admin playlists. Only admins can modify global playlists.');
+    }
+    
+    // Check if user is authenticated for Firestore
+    const currentUser = authService.getCurrentUser();
+    
+    if (currentUser && currentUser.uid) {
+      // Use Firestore for authenticated users
+      console.log('🔥 Deleting playlist from Firestore:', playlistId);
+      // Remove user_ prefix for Firestore deletion
+      const firestoreId = playlistId.startsWith('user_') ? playlistId.replace('user_', '') : playlistId;
+      try {
+        await firestoreService.deletePlaylist(firestoreId);
+        console.log('✅ Playlist deleted from Firestore successfully');
+      } catch (firestoreError) {
+        console.error('❌ Firestore error, falling back to local:', firestoreError);
+        // Fallback to local storage
+        const actualPlaylistId = playlistId.startsWith('user_') ? playlistId.replace('user_', '') : playlistId;
+        await this.deleteLocalPlaylist(actualPlaylistId);
+      }
+    } else {
+      // Use local storage for non-authenticated users
+      const actualPlaylistId = playlistId.startsWith('user_') ? playlistId.replace('user_', '') : playlistId;
+      console.log('📱 Deleting playlist locally:', actualPlaylistId);
+      await this.deleteLocalPlaylist(actualPlaylistId);
+    }
+  }
+
+  /**
+   * Delete local playlist
+   */
+  private async deleteLocalPlaylist(playlistId: string): Promise<void> {
+    const playlists = await this.getLocalPlaylists();
+    const filteredPlaylists = playlists.filter(p => p.id !== playlistId);
+    
+    if (filteredPlaylists.length === playlists.length) {
+      throw new Error(`Playlist not found: ${playlistId}`);
+    }
+    
+    await AsyncStorage.setItem(this.PLAYLISTS_KEY, JSON.stringify(filteredPlaylists));
+    console.log('✅ Playlist deleted from local storage');
+  }
+
+  /**
+   * Clear all caches (admin, local, etc.)
+   */
+  async clearAllCaches(): Promise<void> {
+    try {
+      console.log('🧹 Clearing all playlist caches...');
+      
+      // Clear admin cache
+      await AsyncStorage.removeItem(this.ADMIN_CACHE_KEY);
+      
+      // Clear sync time to force fresh fetch
+      await AsyncStorage.removeItem(this.SYNC_KEY);
+      
+      console.log('✅ All caches cleared');
+    } catch (error) {
+      console.error('❌ Error clearing caches:', error);
+    }
   }
 
   /**

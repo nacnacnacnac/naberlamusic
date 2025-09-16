@@ -24,6 +24,7 @@ import LeftModal from '@/components/LeftModal';
 import PlaylistModal from '@/components/PlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import MainPlaylistModal from '@/components/MainPlaylistModal';
+import ProfileModal from '@/components/ProfileModal';
 
 // Background video import
 const backgroundVideo = require('@/assets/videos/NLA2.mp4');
@@ -76,7 +77,11 @@ const { width } = Dimensions.get('window');
 export default function HomeScreen() {
   const { videos, isConfigured, isLoading, refreshVideos } = useVimeo();
   const { isConfigured: isBackgroundAudioConfigured } = useBackgroundAudio();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  
+  // Check if user is logged in with Google (not guest/developer)
+  const isGoogleUser = isAuthenticated && user && user.email && !user.email.includes('developer@') && !user.email.includes('guest@');
+  
   const [currentVideo, setCurrentVideo] = useState<SimplifiedVimeoVideo | null>(null);
   const [currentPlaylistContext, setCurrentPlaylistContext] = useState<{playlistId: string, playlistName: string} | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -100,6 +105,7 @@ export default function HomeScreen() {
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showMainPlaylistModal, setShowMainPlaylistModal] = useState(false);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [createPlaylistVideoId, setCreatePlaylistVideoId] = useState<string>('');
   const [createPlaylistVideoTitle, setCreatePlaylistVideoTitle] = useState<string>('');
   const [playlistRefreshTrigger, setPlaylistRefreshTrigger] = useState(0);
@@ -172,10 +178,6 @@ export default function HomeScreen() {
     }, 500); // 500ms delay after page fade-in
   }, []);
 
-  // Log background audio configuration status
-  useEffect(() => {
-    debugLog.main(`Background audio configured: ${isBackgroundAudioConfigured}`);
-  }, [isBackgroundAudioConfigured]);
 
   // Listen for global stop music events
   useEffect(() => {
@@ -211,8 +213,16 @@ export default function HomeScreen() {
           index === self.findIndex(p => p.id === playlist.id)
         );
         
-        setUserPlaylists(uniquePlaylists);
-        logger.system('Initial playlists loaded:', uniquePlaylists.length, 'unique playlists');
+        // Filter playlists based on user type
+        let filteredPlaylists = uniquePlaylists;
+        if (!isGoogleUser) {
+          // Non-Google users: only show admin playlists
+          filteredPlaylists = uniquePlaylists.filter(playlist => playlist.isAdminPlaylist);
+          logger.system('🔒 Non-Google user: filtered to', filteredPlaylists.length, 'admin playlists');
+        }
+        
+        setUserPlaylists(filteredPlaylists);
+        logger.system('Initial playlists loaded:', filteredPlaylists.length, 'playlists for', isGoogleUser ? 'Google user' : 'non-Google user');
         
         // Debug: Clear cache if web-only playlists appear on mobile
         if (Platform.OS !== 'web') {
@@ -240,7 +250,7 @@ export default function HomeScreen() {
       try {
         // Set callback for automatic refresh when sync notifications are received
         autoSyncService.setOnSyncCallback(() => {
-          console.log('🔄 Auto-refreshing playlists due to admin sync notification');
+          // Auto-refreshing playlists due to admin sync
           refreshPlaylists();
         });
         
@@ -251,14 +261,16 @@ export default function HomeScreen() {
     };
     
     loadPlaylists();
-    initializeAutoSync();
-  }, []);
+    // Only initialize auto sync for Google users
+    if (isGoogleUser) {
+      initializeAutoSync();
+    }
+  }, [isGoogleUser]); // Re-run when Google user status changes
 
   // Manual refresh function for pull-to-refresh and admin sync
   const refreshPlaylists = async () => {
     try {
-      console.log('🔄 Refreshing playlists...');
-      console.log('🎯 Setting playlistsLoading to TRUE');
+      // Refreshing playlists...
       setPlaylistsLoading(true);
       
       const playlists = await hybridPlaylistService.getPlaylists(true); // Force refresh
@@ -271,8 +283,9 @@ export default function HomeScreen() {
         index === self.findIndex(p => p.id === playlist.id)
       );
       
+      console.log('🔄 Setting userPlaylists to:', uniquePlaylists.length, 'playlists');
       setUserPlaylists(uniquePlaylists);
-      console.log('Playlists refreshed:', uniquePlaylists.length, 'unique playlists');
+      // Playlists refreshed
       
       // Keep current expanded state (don't auto-expand)
       // Users can manually expand playlists they want to see
@@ -280,30 +293,29 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error refreshing playlists:', error);
     } finally {
-      console.log('🎯 Setting playlistsLoading to FALSE');
+      // Loading complete
       setPlaylistsLoading(false);
     }
   };
 
   // Pull-to-refresh handler
   const onRefresh = async () => {
+    console.log('🔄 onRefresh called - forcing playlist refresh');
     setRefreshing(true);
     await refreshPlaylists();
     setRefreshing(false);
+    console.log('🔄 onRefresh completed');
   };
 
   // Toggle user playlist expansion
   const togglePlaylistExpansion = (playlistId: string) => {
-    console.log('🎵 Toggle playlist expansion for ID:', playlistId);
+    // Toggle playlist expansion
     const newExpanded = new Set(expandedPlaylists);
     const isExpanding = !newExpanded.has(playlistId);
-    console.log('🎵 Is expanding:', isExpanding);
     
     if (newExpanded.has(playlistId)) {
-      console.log('🎵 Collapsing playlist:', playlistId);
       newExpanded.delete(playlistId);
     } else {
-      console.log('🎵 Expanding playlist:', playlistId);
       // Close all other playlists when opening a new one
       newExpanded.clear();
       newExpanded.add(playlistId);
@@ -311,7 +323,6 @@ export default function HomeScreen() {
       // Scroll to top when expanding a playlist
       playlistScrollRef.current?.scrollTo({ y: 0, animated: true });
     }
-    console.log('🎵 New expanded playlists:', Array.from(newExpanded));
     setExpandedPlaylists(newExpanded);
   };
 
@@ -326,7 +337,6 @@ export default function HomeScreen() {
     // FORCE STOP ALL AUDIO BEFORE PLAYING NEW VIDEO
     try {
       const { Audio } = require('expo-av');
-      console.log('🔇 FORCE STOPPING ALL AUDIO BEFORE NEW VIDEO');
       
       // Try to access and stop any global audio instances
       if (Audio._instances) {
@@ -338,7 +348,6 @@ export default function HomeScreen() {
         });
       }
     } catch (e) {
-      console.log('⚠️ Audio cleanup error in playVideo:', e);
     }
     
     // Check if new video is liked
@@ -347,7 +356,6 @@ export default function HomeScreen() {
     // Set playlist context if provided
     if (playlistContext) {
       setCurrentPlaylistContext(playlistContext);
-      console.log('🎵 Set playlist context:', playlistContext.playlistName);
     }
     
     // Direct video switching with proper state management
@@ -400,7 +408,6 @@ export default function HomeScreen() {
 
   // Video Overlay Functions
   const showVideoOverlayWithTimer = () => {
-    console.log('🎬 Showing video overlay');
     
     // Clear any existing timeout first
     if (overlayTimeout.current) {
@@ -425,14 +432,12 @@ export default function HomeScreen() {
   };
 
   const hideVideoOverlay = () => {
-    console.log('🎬 Hiding video overlay');
     // Just animate out, don't change showVideoOverlay state
     Animated.timing(overlayOpacity, {
       toValue: 0,
       duration: 300,
       useNativeDriver: true,
     }).start(() => {
-      console.log('🎬 Overlay hidden but still in DOM');
     });
 
     // Clear timeout
@@ -449,12 +454,9 @@ export default function HomeScreen() {
   };
 
   const handleVideoTap = () => {
-    console.log('🎬 Video tapped - Current video:', currentVideo?.name);
-    console.log('🎬 Video tapped - Overlay state:', showVideoOverlay);
     
     if (currentVideo) {
       // Always show overlay on tap, regardless of current state
-      console.log('🎬 Calling showVideoOverlayWithTimer...');
       showVideoOverlayWithTimer();
     } else {
       console.log('🎬 No current video, cannot show overlay');
@@ -480,6 +482,15 @@ export default function HomeScreen() {
 
   const handleHeartPress = async () => {
     if (!currentVideo) return;
+    
+    console.log('❤️ Heart pressed - isAuthenticated:', isAuthenticated, 'user:', user, 'isGoogleUser:', isGoogleUser);
+    
+    // Check if user is logged in with Google
+    if (!isGoogleUser) {
+      console.log('❌ Not Google user - opening ProfileModal for sign in');
+      setShowProfileModal(true);
+      return;
+    }
     
     try {
       console.log('❤️ Heart pressed for video:', currentVideo.name);
@@ -708,6 +719,22 @@ export default function HomeScreen() {
         }
       });
     }
+  };
+
+  // Handle playlist plus button - opens CreatePlaylist for Google users, ProfileModal for others
+  const handlePlaylistPlusButton = () => {
+    if (isGoogleUser) {
+      setShowMainPlaylistModal(true);
+    } else {
+      // Close MainPlaylistModal and open ProfileModal for sign in
+      setShowMainPlaylistModal(false);
+      setShowProfileModal(true);
+    }
+  };
+
+  // Handle profile button press
+  const handleProfilePress = () => {
+    setShowProfileModal(true);
   };
 
   const toggleFullscreen = () => {
@@ -1605,9 +1632,38 @@ export default function HomeScreen() {
             />
           }
         >
-          {/* Playlist Header with Close Button */}
+          {/* Playlist Header with Preview + Plus Button */}
           <ThemedView style={styles.playlistHeaderContainer}>
-            <ThemedText style={styles.playlistHeaderTitle}>Playlists</ThemedText>
+            <View style={styles.playlistPreviewContainer}>
+              {/* Show first 2 playlists */}
+              {userPlaylists.slice(0, 2).map((playlist, index) => (
+                <TouchableOpacity
+                  key={playlist.id}
+                  style={styles.playlistPreviewItem}
+                  onPress={() => togglePlaylistExpansion(playlist.id)}
+                  activeOpacity={0.7}
+                >
+                  <ExpoImage 
+                    source={require('@/assets/images/playlist.svg')}
+                    style={styles.playlistPreviewIcon}
+                    contentFit="contain"
+                  />
+                  <ThemedText style={styles.playlistPreviewTitle} numberOfLines={1}>
+                    {playlist.name}
+                  </ThemedText>
+                </TouchableOpacity>
+              ))}
+              
+              {/* Plus Button - Available for all users */}
+              <TouchableOpacity
+                style={styles.playlistPlusButton}
+                onPress={handlePlaylistPlusButton}
+                activeOpacity={0.7}
+              >
+                <CustomIcon name="plus" size={20} color="#e0af92" />
+              </TouchableOpacity>
+            </View>
+            
             <TouchableOpacity 
               style={styles.playlistCloseButton}
               onPress={togglePlaylistVisibility}
@@ -1753,17 +1809,11 @@ export default function HomeScreen() {
           onPlayPause={handlePlayPause}
           onPrevious={playPreviousVideo}
           onNext={playNextVideo}
-          onPlaylistPress={() => {
-            if (Platform.OS === 'web') {
-              setShowPlaylistModal(true);
-            } else {
-              router.push('/videos');
-            }
-          }}
           onAddToPlaylist={() => {
             handleAddToPlaylist(currentVideo);
           }}
           onPlaylistToggle={handleHeartIconPress}
+          onProfilePress={handleProfilePress}
           testState={testState}
           onTestStateChange={setTestState}
         />
@@ -1786,6 +1836,7 @@ export default function HomeScreen() {
             onRefresh={onRefresh}
             refreshing={refreshing}
             refreshTrigger={playlistRefreshTrigger}
+            onPlusButtonPress={handlePlaylistPlusButton}
           />
         </LeftModal>
       )}
@@ -1834,6 +1885,21 @@ export default function HomeScreen() {
           />
         </CustomModal>
       )}
+
+          {/* Profile Modal for Web - Sağ alt köşeden açılır */}
+          {Platform.OS === 'web' && (
+            <CustomModal
+              visible={showProfileModal}
+              onClose={() => setShowProfileModal(false)}
+              width={400}
+              height={450} // Daha kompakt
+              bottomOffset={0} // En altta
+            >
+              <ProfileModal 
+                onClose={() => setShowProfileModal(false)}
+              />
+            </CustomModal>
+          )}
 
     </Animated.View>
   );
@@ -2095,6 +2161,43 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.95)',
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
+  },
+  playlistPreviewContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  playlistPreviewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 15,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(224, 175, 146, 0.1)',
+    borderRadius: 8,
+    maxWidth: 120,
+  },
+  playlistPreviewIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 6,
+  },
+  playlistPreviewTitle: {
+    fontSize: 14,
+    color: '#e0af92',
+    fontWeight: '500',
+    flex: 1,
+  },
+  playlistPlusButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(224, 175, 146, 0.1)',
+    borderWidth: 1,
+    borderColor: '#e0af92',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 5,
   },
   playlistHeaderTitle: {
     fontSize: 18,

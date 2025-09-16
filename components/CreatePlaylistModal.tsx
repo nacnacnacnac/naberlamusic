@@ -154,36 +154,36 @@ export default function CreatePlaylistModal({
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {/* Header */}
-      <ThemedView style={styles.header}>
+      <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onClose}>
           <CustomIcon name="chevron-left" size={24} color="#e0af92" />
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>New Playlist</ThemedText>
-        <ThemedView style={styles.headerSpacer} />
-      </ThemedView>
+        <View style={styles.headerSpacer} />
+      </View>
 
       {/* Content */}
-      <ThemedView style={styles.content}>
+      <View style={styles.content}>
         {/* Video Info - Sadece video varsa göster */}
         {videoTitle && videoTitle.trim() !== '' && (
-          <ThemedView style={styles.videoInfo}>
+          <View style={styles.videoInfo}>
             <Image 
               source={require('@/assets/images/playlist.svg')}
               style={styles.videoIcon}
               contentFit="contain"
             />
-            <ThemedView style={styles.videoTextContainer}>
+            <View style={styles.videoTextContainer}>
               <ThemedText style={styles.videoInfoLabel}>Video to add:</ThemedText>
               <ThemedText style={styles.videoTitle} numberOfLines={2}>
                 {videoTitle}
               </ThemedText>
-            </ThemedView>
-          </ThemedView>
+            </View>
+          </View>
         )}
 
         {/* Form */}
-        <ThemedView style={styles.form}>
-          <ThemedView style={styles.inputGroup}>
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
             <ThemedText style={styles.inputLabel}>Playlist Name</ThemedText>
             <TextInput
               style={styles.textInput}
@@ -194,9 +194,9 @@ export default function CreatePlaylistModal({
               maxLength={50}
               autoFocus={false}
             />
-          </ThemedView>
+          </View>
 
-          <ThemedView style={styles.inputGroup}>
+          <View style={styles.inputGroup}>
             <ThemedText style={styles.inputLabel}>Description (Optional)</ThemedText>
             <TextInput
               style={[styles.textInput, styles.textArea]}
@@ -208,7 +208,7 @@ export default function CreatePlaylistModal({
               numberOfLines={3}
               maxLength={200}
             />
-          </ThemedView>
+          </View>
 
           <TouchableOpacity
             style={[styles.createButton, (!playlistName.trim() || isCreating) && styles.createButtonDisabled]}
@@ -224,8 +224,8 @@ export default function CreatePlaylistModal({
               {isCreating ? 'Creating...' : 'Create Playlist'}
             </ThemedText>
           </TouchableOpacity>
-        </ThemedView>
-      </ThemedView>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -243,6 +243,7 @@ const styles = StyleSheet.create({
     paddingBottom: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a1a',
+    backgroundColor: '#000000',
   },
   backButton: {
     padding: 8,
@@ -261,6 +262,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
+    backgroundColor: '#000000',
   },
   videoInfo: {
     flexDirection: 'row',
@@ -280,6 +282,7 @@ const styles = StyleSheet.create({
   },
   videoTextContainer: {
     flex: 1,
+    backgroundColor: '#000000',
   },
   videoInfoLabel: {
     fontSize: 12,
@@ -293,9 +296,11 @@ const styles = StyleSheet.create({
   },
   form: {
     flex: 1,
+    backgroundColor: '#000000',
   },
   inputGroup: {
     marginBottom: 25,
+    backgroundColor: '#000000',
   },
   inputLabel: {
     fontSize: 16,

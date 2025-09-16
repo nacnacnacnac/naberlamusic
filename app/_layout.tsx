@@ -40,6 +40,15 @@ export default function RootLayout() {
       document.head.appendChild(gtagConfig);
       console.log('✅ Google Analytics (gtag.js) loaded');
 
+      // Playlist delete button styles ekle
+      const playlistStyles = document.createElement('style');
+      playlistStyles.innerHTML = `
+        .playlist-delete-button:hover {
+          background-color: #1a1a1a !important;
+        }
+      `;
+      document.head.appendChild(playlistStyles);
+
       // Funnel Display fontunu import et
       const funnelLink = document.createElement('link');
       funnelLink.href = 'https://fonts.googleapis.com/css2?family=Funnel+Display:wght@300;400;500;600;700;800&display=swap';
