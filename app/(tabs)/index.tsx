@@ -101,6 +101,7 @@ export default function HomeScreen() {
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
   const [expandedPlaylists, setExpandedPlaylists] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [playlistsLoading, setPlaylistsLoading] = useState(true);
   const playlistScrollRef = useRef<ScrollView>(null);
 
   // Video Overlay State
@@ -165,6 +166,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadPlaylists = async () => {
       try {
+        setPlaylistsLoading(true);
         const playlists = await hybridPlaylistService.getPlaylists();
         
         // Remove duplicates by ID
@@ -192,6 +194,8 @@ export default function HomeScreen() {
         }
       } catch (error) {
         console.error('Error loading playlists:', error);
+      } finally {
+        setPlaylistsLoading(false);
       }
     };
     
@@ -217,6 +221,7 @@ export default function HomeScreen() {
   const refreshPlaylists = async () => {
     try {
       console.log('🔄 Refreshing playlists...');
+      setPlaylistsLoading(true);
       
       const playlists = await hybridPlaylistService.getPlaylists(true); // Force refresh
       
@@ -233,6 +238,8 @@ export default function HomeScreen() {
       
     } catch (error) {
       console.error('Error refreshing playlists:', error);
+    } finally {
+      setPlaylistsLoading(false);
     }
   };
 
@@ -1552,8 +1559,34 @@ export default function HomeScreen() {
 
           {/* All Videos section hidden - cleaner UI */}
 
+          {/* Playlist Loading State */}
+          {playlistsLoading && userPlaylists.length === 0 && (
+            <View style={styles.playlistLoadingContainer}>
+              {Platform.OS === 'web' ? (
+                <img 
+                  src="/loading.gif" 
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    marginBottom: '10px'
+                  }}
+                  alt="Loading..."
+                />
+              ) : (
+                <Image 
+                  source={require('@/assets/loading.gif')} 
+                  style={styles.playlistLoadingGif}
+                  resizeMode="contain"
+                />
+              )}
+              <ThemedText style={styles.playlistLoadingText}>
+                Loading playlists...
+              </ThemedText>
+            </View>
+          )}
+
           {/* Admin Panel Playlists */}
-          {userPlaylists.map((playlist, playlistIndex) => {
+          {!playlistsLoading && userPlaylists.map((playlist, playlistIndex) => {
             const isLastPlaylist = playlistIndex === userPlaylists.length - 1;
             return (
             <View key={playlist.id} style={styles.userPlaylistContainer}>
@@ -1823,6 +1856,23 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     marginBottom: 20,
+  },
+  playlistLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  playlistLoadingGif: {
+    width: 40,
+    height: 40,
+    marginBottom: 10,
+  },
+  playlistLoadingText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
 
   // Player Area
