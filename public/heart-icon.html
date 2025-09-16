@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Icon - 256x256</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .heart-container {
+            position: relative;
+            width: 256px;
+            height: 256px;
+            cursor: pointer;
+        }
+        .heart-icon {
+            width: 256px;
+            height: 256px;
+            object-fit: contain;
+            transition: transform 0.1s ease;
+        }
+        .heart-icon.heartbeat {
+            animation: logoHeartbeat 0.52s ease-out;
+        }
+        .heart-icon.test-pulse {
+            animation: testPulse 1s infinite;
+        }
+        @keyframes logoHeartbeat {
+            0% { transform: scale(1); }
+            23% { transform: scale(1.15); } /* 120ms / 520ms = 23% */
+            42% { transform: scale(0.95); } /* (120+100)ms / 520ms = 42% */
+            61% { transform: scale(1.1); }  /* (120+100+100)ms / 520ms = 61% */
+            100% { transform: scale(1); }   /* (120+100+100+200)ms / 520ms = 100% */
+        }
+        @keyframes testPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="heart-container" onclick="startHeartbeat()">
+        <img src="hearto.png" alt="Heart Icon" class="heart-icon" id="heartIcon">
+    </div>
+
+    <script>
+        let heartbeatTimer;
+        
+        function startHeartbeat() {
+            const heartIcon = document.getElementById('heartIcon');
+            
+            // Clear any existing timer
+            if (heartbeatTimer) {
+                clearTimeout(heartbeatTimer);
+            }
+            
+            // Add heartbeat animation class
+            heartIcon.classList.add('heartbeat');
+            
+            // Remove animation class after animation completes
+            setTimeout(() => {
+                heartIcon.classList.remove('heartbeat');
+            }, 520); // Animation duration
+            
+            // Start repeating heartbeat every 3 seconds (like in the original)
+            heartbeatTimer = setTimeout(() => {
+                startHeartbeat();
+            }, 3000);
+        }
+        
+        // Test: Add continuous pulse to see if CSS animations work
+        document.addEventListener('DOMContentLoaded', function() {
+            const heartIcon = document.getElementById('heartIcon');
+            heartIcon.classList.add('test-pulse');
+            console.log('Test pulse added');
+        });
+        
+        // Start heartbeat animation after 2 seconds (like in the original)
+        setTimeout(() => {
+            console.log('Starting heartbeat animation');
+            startHeartbeat();
+        }, 2000);
+    </script>
+</body>
+</html>
