@@ -291,6 +291,7 @@ export default function MusicPlayerTabBar({
     };
   }, []);
 
+
   // Track visual state changes and validate consistency
   useEffect(() => {
     const currentVisualState = isPaused ? 'play' : 'pause';
@@ -497,31 +498,58 @@ export default function MusicPlayerTabBar({
       {/* Music Controls - Centered */}
       <View style={styles.controls}>
         <TouchableOpacity 
-          style={[styles.controlButton, !currentVideo && styles.disabledButton]} 
-          onPress={currentVideo ? () => onPrevious() : undefined}
-          disabled={!currentVideo}
+          style={styles.controlButton} 
+          onPress={() => {
+            console.log('🎵 Previous button pressed');
+            console.log('🎵 currentVideo exists:', !!currentVideo);
+            console.log('🎵 Platform:', Platform.OS);
+            onPrevious();
+          }}
         >
           <CustomIcon name="skip-previous" size={20} color={currentVideo ? "#ffffff" : "#666666"} />
+          {__DEV__ && Platform.OS !== 'web' && (
+            <Text style={{position: 'absolute', top: -15, fontSize: 8, color: 'yellow', backgroundColor: 'black'}}>
+              PREV: {currentVideo ? 'ON' : 'OFF'}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.playPauseButton, !currentVideo && styles.disabledButton]} 
-          onPress={currentVideo ? handlePlayPausePress : undefined}
-          disabled={!currentVideo}
+          style={styles.playPauseButton} 
+          onPress={() => {
+            console.log('🎵 Play/Pause button pressed');
+            console.log('🎵 currentVideo exists:', !!currentVideo);
+            console.log('🎵 Platform:', Platform.OS);
+            handlePlayPausePress();
+          }}
         >
           <CustomIcon 
             name={isPaused ? "play" : "pause"} 
             size={28} 
-            color={currentVideo ? "#e0af92" : "#666666"} 
+            color={Platform.OS === 'web' ? (currentVideo ? "#e0af92" : "#666666") : (currentVideo ? "#e0af92" : "#666666")} 
           />
+          {__DEV__ && Platform.OS !== 'web' && (
+            <Text style={{position: 'absolute', top: -15, fontSize: 8, color: 'yellow', backgroundColor: 'black'}}>
+              PLAY: {currentVideo ? 'ON' : 'OFF'}
+            </Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={[styles.controlButton, !currentVideo && styles.disabledButton]} 
-          onPress={currentVideo ? () => onNext() : undefined}
-          disabled={!currentVideo}
+          style={styles.controlButton} 
+          onPress={() => {
+            console.log('🎵 Next button pressed');
+            console.log('🎵 currentVideo exists:', !!currentVideo);
+            console.log('🎵 Platform:', Platform.OS);
+            onNext();
+          }}
         >
           <CustomIcon name="skip-next" size={20} color={currentVideo ? "#ffffff" : "#666666"} />
+          {__DEV__ && Platform.OS !== 'web' && (
+            <Text style={{position: 'absolute', top: -15, fontSize: 8, color: 'yellow', backgroundColor: 'black'}}>
+              NEXT: {currentVideo ? 'ON' : 'OFF'}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 

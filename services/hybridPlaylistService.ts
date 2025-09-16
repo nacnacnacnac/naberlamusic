@@ -170,8 +170,13 @@ class HybridPlaylistService {
       const data = await AsyncStorage.getItem(this.STORAGE_KEY);
       const playlists = data ? JSON.parse(data) : [];
       
-      // Sort by updatedAt descending (most recently updated first)
+      // Sort playlists: "Liked Songs" first, then by updatedAt descending
       return playlists.sort((a: Playlist, b: Playlist) => {
+        // "Liked Songs" playlist always comes first
+        if (a.isLikedSongs && !b.isLikedSongs) return -1;
+        if (!a.isLikedSongs && b.isLikedSongs) return 1;
+        
+        // For other playlists, sort by updatedAt descending
         const dateA = new Date(a.updatedAt || a.createdAt || '1970-01-01').getTime();
         const dateB = new Date(b.updatedAt || b.createdAt || '1970-01-01').getTime();
         return dateB - dateA; // Most recently updated first
@@ -280,6 +285,110 @@ class HybridPlaylistService {
     // User playlists are always created locally
     console.log('📱 Creating user playlist locally:', name);
     return await this.createLocalPlaylist(name, description);
+  }
+
+  /**
+   * Get or create "Liked Songs" playlist
+   */
+  async getLikedSongsPlaylist(): Promise<Playlist> {
+    try {
+      const playlists = await this.getLocalPlaylists();
+      
+      // Check if "Liked Songs" playlist already exists
+      let likedPlaylist = playlists.find(p => p.name === 'Liked Songs' && p.isLikedSongs === true);
+      
+      if (!likedPlaylist) {
+        // Create "Liked Songs" playlist
+        likedPlaylist = {
+          id: `liked_songs_${Date.now()}`,
+          name: 'Liked Songs',
+          description: 'Your favorite songs',
+          videos: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isLocal: true,
+          isLikedSongs: true, // Special flag for liked songs playlist
+          thumbnail: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjU2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlMGFmOTIiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIyNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IndoaXRlIj7inaTvuI88L3RleHQ+PC9zdmc+', // Heart placeholder
+        };
+        
+        // Add to beginning of playlists array
+        playlists.unshift(likedPlaylist);
+        await this.cachePlaylistsLocally(playlists);
+        console.log('✅ Created "Liked Songs" playlist');
+      }
+      
+      return likedPlaylist;
+    } catch (error) {
+      console.error('Error getting/creating Liked Songs playlist:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add/remove video from Liked Songs playlist
+   */
+  async toggleLikedSong(video: SimplifiedVimeoVideo): Promise<boolean> {
+    try {
+      const likedPlaylist = await this.getLikedSongsPlaylist();
+      const playlists = await this.getLocalPlaylists();
+      
+      // Check if video is already liked
+      const isLiked = likedPlaylist.videos.some(v => v.id === video.id);
+      
+      if (isLiked) {
+        // Remove from liked songs
+        likedPlaylist.videos = likedPlaylist.videos.filter(v => v.id !== video.id);
+        console.log('💔 Removed from Liked Songs:', video.name);
+      } else {
+        // Add to liked songs
+        const playlistVideo: PlaylistVideo = {
+          id: video.id,
+          title: video.name || video.title || 'Untitled',
+          description: video.description || '',
+          thumbnail: video.thumbnail || '',
+          duration: video.duration || 0,
+          addedAt: new Date().toISOString(),
+        };
+        likedPlaylist.videos.unshift(playlistVideo); // Add to beginning
+        console.log('❤️ Added to Liked Songs:', video.name);
+      }
+      
+      // Update playlist
+      likedPlaylist.updatedAt = new Date().toISOString();
+      
+      // Update thumbnail to first video's thumbnail if videos exist
+      if (likedPlaylist.videos.length > 0) {
+        likedPlaylist.thumbnail = likedPlaylist.videos[0].thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjU2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlMGFmOTIiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIyNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IndoaXRlIj7inaTvuI88L3RleHQ+PC9zdmc+';
+      } else {
+        likedPlaylist.thumbnail = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjU2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlMGFmOTIiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIyNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IndoaXRlIj7inaTvuI88L3RleHQ+PC9zdmc+';
+      }
+      
+      // Find and update the playlist in the array
+      const playlistIndex = playlists.findIndex(p => p.id === likedPlaylist.id);
+      if (playlistIndex !== -1) {
+        playlists[playlistIndex] = likedPlaylist;
+      }
+      
+      await this.cachePlaylistsLocally(playlists);
+      
+      return !isLiked; // Return new liked state
+    } catch (error) {
+      console.error('Error toggling liked song:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a video is liked
+   */
+  async isVideoLiked(videoId: string): Promise<boolean> {
+    try {
+      const likedPlaylist = await this.getLikedSongsPlaylist();
+      return likedPlaylist.videos.some(v => v.id === videoId);
+    } catch (error) {
+      console.error('Error checking if video is liked:', error);
+      return false;
+    }
   }
 
   /**
@@ -422,7 +531,7 @@ class HybridPlaylistService {
       id: video.id,
       title: video.name || video.title || 'Unknown Video',
       duration: video.duration || 0,
-      thumbnail: video.pictures?.sizes?.[0]?.link || video.thumbnail || 'https://via.placeholder.com/640x360',
+      thumbnail: video.pictures?.sizes?.[0]?.link || video.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=',
       addedAt: new Date().toISOString(),
       vimeo_id: video.id
     };
@@ -454,12 +563,18 @@ class HybridPlaylistService {
     if (useAdminApi) {
       try {
         await adminApiService.removeVideoFromPlaylist(playlistId, videoId);
+        console.log('✅ Video removed from admin playlist via API:', playlistId);
         
-        // Also update local cache
-        await this.removeVideoFromLocalPlaylist(playlistId, videoId);
+        // Try to update local cache if playlist exists locally
+        try {
+          await this.removeVideoFromLocalPlaylist(playlistId, videoId);
+        } catch (localError) {
+          console.log('ℹ️ Playlist not in local cache, skipping local update');
+        }
       } catch (error) {
-        console.warn('⚠️ Admin API failed, removing video locally:', error);
-        await this.removeVideoFromLocalPlaylist(playlistId, videoId);
+        console.warn('⚠️ Admin API failed:', error);
+        // For admin playlists, if API fails, we can't do much locally
+        throw new Error('Failed to remove video from admin playlist');
       }
     } else {
       await this.removeVideoFromLocalPlaylist(playlistId, videoId);
@@ -471,10 +586,20 @@ class HybridPlaylistService {
    */
   private async removeVideoFromLocalPlaylist(playlistId: string, videoId: string): Promise<void> {
     const playlists = await this.getLocalPlaylists();
-    const playlist = playlists.find(p => p.id === playlistId);
+    let playlist = playlists.find(p => p.id === playlistId);
+    
+    // Special handling for Liked Songs playlist - try to find by flag if ID doesn't match
+    if (!playlist && (playlistId.includes('liked_songs') || playlistId.includes('user_liked_songs'))) {
+      playlist = playlists.find(p => p.isLikedSongs === true);
+      if (playlist) {
+        console.log('🔍 Found Liked Songs playlist by flag instead of ID');
+      }
+    }
     
     if (!playlist) {
-      throw new Error('Playlist not found');
+      console.warn('⚠️ Playlist not found in local cache, skipping local removal:', playlistId);
+      console.log('📋 Available local playlist IDs:', playlists.map(p => p.id));
+      return; // Don't throw error, just skip local removal
     }
 
     playlist.videos = playlist.videos.filter(v => v.id !== videoId);

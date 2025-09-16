@@ -16,6 +16,8 @@ export interface Playlist {
   updatedAt: string;
   thumbnail?: string; // İlk video'nun thumbnail'ı
   isAdminPlaylist?: boolean; // Admin playlist mi yoksa user playlist mi
+  isLocal?: boolean; // Local playlist mi
+  isLikedSongs?: boolean; // Liked Songs playlist mi
 }
 
 export interface PlaylistService {

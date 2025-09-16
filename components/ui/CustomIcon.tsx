@@ -1,19 +1,42 @@
 import React from 'react';
-import { Platform, Image, View } from 'react-native';
+import { Platform, View, Image } from 'react-native';
 import { IconSymbol } from './IconSymbol';
 
 interface CustomIconProps {
-  name: 'play' | 'pause' | 'skip-next' | 'skip-previous' | 'volume-up' | 'playlist' | 'chevron-up' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'rewind' | 'fast-forward' | 'keyboard-arrow-down' | 'heart' | 'delete' | 'share' | 'link';
+  name: 'play' | 'pause' | 'skip-next' | 'skip-previous' | 'volume-up' | 'playlist' | 'chevron-up' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'minus' | 'rewind' | 'fast-forward' | 'keyboard-arrow-down' | 'heart' | 'delete';
   size?: number;
   color?: string;
   style?: any;
 }
 
+// Static imports for mobile
+const iconAssets = {
+  'icons8-play-60.png': require('../../assets/iconz/icons8-play-60.png'),
+  'icons8-pause-50.png': require('../../assets/iconz/icons8-pause-50.png'),
+  'icons8-end-30.png': require('../../assets/iconz/icons8-end-30.png'),
+  'icons8-volume-up-50.png': require('../../assets/iconz/icons8-volume-up-50.png'),
+  'icons8-list-60.png': require('../../assets/iconz/icons8-list-60.png'),
+  'icons8-chevron-up-30.png': require('../../assets/iconz/icons8-chevron-up-30.png'),
+  'icons8-less-than-30.png': require('../../assets/iconz/icons8-less-than-30.png'),
+  'icons8-plus-50.png': require('../../assets/iconz/icons8-plus-50.png'),
+  'icons8-rewind-50.png': require('../../assets/iconz/icons8-rewind-50.png'),
+  'icons8-fast-forward-30.png': require('../../assets/iconz/icons8-fast-forward-30.png'),
+  // New controller icons - active and disabled states
+  'play_active.png': require('../../assets/iconz/play_active.png'),
+  'play_disable.png': require('../../assets/iconz/play_disable.png'),
+  'pause_active.png': require('../../assets/iconz/pause_active.png'),
+  'pause_disable.png': require('../../assets/iconz/pause_disable.png'),
+  'left_arrow_active.png': require('../../assets/iconz/left_arrow_active.png'),
+  'left_arrow_disable.png': require('../../assets/iconz/left_arrow_disable.png'),
+  'right_arrow_active.png': require('../../assets/iconz/right_arrow_active.png'),
+  'right_arrow_disable.png': require('../../assets/iconz/right_arrow_disable.png'),
+};
+
 const iconMapping = {
-  'play': 'icons8-play-60.png',
-  'pause': 'icons8-pause-50.png',
-  'skip-next': 'icons8-end-30.png',
-  'skip-previous': 'icons8-end-30.png',
+  'play': 'play_active.png',
+  'pause': 'pause_active.png',
+  'skip-next': 'right_arrow_active.png',
+  'skip-previous': 'left_arrow_active.png',
   'volume-up': 'icons8-volume-up-50.png',
   'playlist': 'icons8-list-60.png',
   'chevron-up': 'icons8-chevron-up-30.png',
@@ -22,12 +45,11 @@ const iconMapping = {
   'chevron-right': 'icons8-less-than-30.png', // Sağa bakacak şekilde döndürülecek
   'keyboard-arrow-down': 'icons8-chevron-up-30.png',
   'plus': 'icons8-plus-50.png',
+  'minus': 'icons8-less-than-30.png', // Geçici olarak less-than kullan
   'heart': 'icons8-plus-50.png', // Geçici olarak plus kullan
   'delete': 'icons8-rewind-50.png', // Geçici olarak rewind kullan
   'rewind': 'icons8-rewind-50.png',
   'fast-forward': 'icons8-fast-forward-30.png',
-  'share': 'icons8-plus-50.png', // Geçici olarak plus kullan
-  'link': 'icons8-plus-50.png', // Geçici olarak plus kullan
 };
 
 const fallbackMapping = {
@@ -43,17 +65,31 @@ const fallbackMapping = {
   'chevron-right': 'chevron.right',
   'keyboard-arrow-down': 'chevron.down',
   'plus': 'plus',
+  'minus': 'minus',
   'heart': 'heart.fill',
   'delete': 'trash',
   'rewind': 'backward.fill',
   'fast-forward': 'forward.fill',
-  'share': 'square.and.arrow.up',
-  'link': 'link',
 };
 
 export function CustomIcon({ name, size = 24, color = '#e0af92', style }: CustomIconProps) {
-  // Web'de özel SVG iconları
-  if (Platform.OS === 'web') {
+  // Player butonları için platform-specific icons
+  const isPlayerButton = ['play', 'pause', 'skip-next', 'skip-previous'].includes(name);
+  
+  // Color prop'undan aktif/disabled durumunu anlayalım (hem web hem mobil)
+  const isDisabled = isPlayerButton && color === '#666666';
+  
+  // Debug logging
+  if (__DEV__ && isPlayerButton && Platform.OS !== 'web') {
+    console.log(`🎨 CustomIcon Debug - ${name}:`, {
+      color,
+      isDisabled,
+      platform: Platform.OS
+    });
+  }
+  
+  // Web'de özel SVG iconları veya player butonları için Image
+  if (Platform.OS === 'web' || isPlayerButton) {
     // Heart icon için özel SVG
     if (name === 'heart') {
       return (
@@ -94,27 +130,69 @@ export function CustomIcon({ name, size = 24, color = '#e0af92', style }: Custom
       );
     }
     
-    const iconFile = iconMapping[name];
+    // Platform-specific icon selection for player buttons
+    let iconFile = iconMapping[name];
+    
+    // Use disabled versions for web when color is gray
+    if (Platform.OS === 'web' && isPlayerButton && isDisabled) {
+      if (name === 'play') iconFile = 'play_disable.png';
+      if (name === 'pause') iconFile = 'pause_disable.png';
+      if (name === 'skip-next') iconFile = 'right_arrow_disable.png';
+      if (name === 'skip-previous') iconFile = 'left_arrow_disable.png';
+    }
+    
+    // Use new controller icons for player buttons on mobile
+    if (Platform.OS !== 'web' && isPlayerButton) {
+      if (isDisabled) {
+        // Disabled versions - ready-made icons
+        if (name === 'play') iconFile = 'play_disable.png';
+        if (name === 'pause') iconFile = 'pause_disable.png';
+        if (name === 'skip-next') iconFile = 'right_arrow_disable.png';
+        if (name === 'skip-previous') iconFile = 'left_arrow_disable.png';
+      } else {
+        // Active versions - ready-made icons
+        if (name === 'play') iconFile = 'play_active.png';
+        if (name === 'pause') iconFile = 'pause_active.png';
+        if (name === 'skip-next') iconFile = 'right_arrow_active.png';
+        if (name === 'skip-previous') iconFile = 'left_arrow_active.png';
+      }
+      
+      // Debug selected icon
+      if (__DEV__) {
+        console.log(`🎨 Selected controller icon for ${name}:`, iconFile);
+        console.log(`🎨 Platform: ${Platform.OS}, isPlayerButton: ${isPlayerButton}, isDisabled: ${isDisabled}`);
+      }
+    }
     
     if (iconFile) {
-      // Rotasyon uygula
+      // Rotasyon uygula (sadece non-player butonları için)
       let rotation = '0deg';
-      if (name === 'chevron-left') rotation = '0deg'; // Sol tarafa baksın
-      if (name === 'chevron-right') rotation = '180deg'; // Sağa baksın
-      if (name === 'keyboard-arrow-down') rotation = '180deg';
-      if (name === 'skip-previous') rotation = '180deg'; // Sol tarafa baksın (ters çevir)
+      
+      // Player butonları için rotation hesaplama - mobilde hazır iconlar
+      if (!(Platform.OS !== 'web' && isPlayerButton)) {
+        if (name === 'chevron-left') rotation = '0deg'; // Sol tarafa baksın
+        if (name === 'chevron-right') rotation = '180deg'; // Sağa baksın
+        if (name === 'keyboard-arrow-down') rotation = '180deg';
+      }
+      
+      // Platform-specific source
+      const imageSource = Platform.OS === 'web' 
+        ? { uri: `/icons/${iconFile}` }
+        : iconAssets[iconFile as keyof typeof iconAssets];
       
       return (
         <View style={[{ width: size, height: size }, style]}>
           <Image
-            source={{ uri: `/icons/${iconFile}` }}
+            source={imageSource}
             style={{
               width: size,
               height: size,
-              tintColor: color,
-              transform: [{ rotate: rotation }],
+              // Sadece non-player butonları için tintColor kullan (hazır renkli iconlar)
+              ...(!isPlayerButton ? { tintColor: color } : {}),
+              // Rotation sadece gerektiğinde uygula
+              ...(rotation !== '0deg' ? { transform: [{ rotate: rotation }] } : {}),
             }}
-            contentFit="contain"
+            resizeMode="contain"
           />
         </View>
       );
@@ -123,6 +201,11 @@ export function CustomIcon({ name, size = 24, color = '#e0af92', style }: Custom
   
   // Fallback to IconSymbol for native or if custom icon not available
   const fallbackName = fallbackMapping[name];
+  
+  if (__DEV__ && isPlayerButton) {
+    console.log(`🚨 FALLBACK KULLANILIYOR! ${name} -> ${fallbackName}`);
+  }
+  
   return (
     <IconSymbol 
       name={fallbackName as any}

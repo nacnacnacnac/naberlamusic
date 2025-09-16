@@ -161,15 +161,6 @@ export default function RootLayout() {
               <Stack.Screen name="login" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen 
-                name="song/[id]" 
-                options={{ 
-                  headerShown: false,
-                  presentation: 'card',
-                  animation: 'slide_from_bottom',
-                  contentStyle: { backgroundColor: '#000000' }
-                }} 
-              />
-              <Stack.Screen 
                 name="create-playlist" 
                 options={{ 
                   headerShown: false,

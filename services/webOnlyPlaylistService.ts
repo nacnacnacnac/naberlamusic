@@ -15,6 +15,11 @@ class WebOnlyPlaylistService {
       return [];
     }
 
+    // Temporarily disabled until API endpoint is ready
+    console.log('⚠️ Web-only playlists temporarily disabled - API endpoint not ready');
+    return [];
+
+    /* TODO: Enable when API endpoint is ready
     try {
       console.log('🌐 Fetching web-only playlists from naberla.org API...');
       
@@ -50,6 +55,7 @@ class WebOnlyPlaylistService {
       console.error('❌ Error fetching web-only playlists:', error);
       return [];
     }
+    */
   }
 
   /**
@@ -60,6 +66,11 @@ class WebOnlyPlaylistService {
       return false;
     }
 
+    // Temporarily disabled until API endpoint is ready
+    console.log('⚠️ Web-only API connection test temporarily disabled');
+    return false;
+
+    /* TODO: Enable when API endpoint is ready
     try {
       const response = await fetch(`${this.WEB_API_BASE_URL}/api/web-playlists/test`, {
         method: 'GET',
@@ -72,6 +83,7 @@ class WebOnlyPlaylistService {
       console.error('❌ Web-only API connection test failed:', error);
       return false;
     }
+    */
   }
 }
 

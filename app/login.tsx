@@ -925,9 +925,9 @@ export default function LoginScreen() {
             left: isMobileWebPortrait ? '50%' : 'auto',
             transform: isMobileWebPortrait ? 'translateX(-50%)' : 'none',
             display: 'flex',
-            flexDirection: isMobileWebPortrait ? 'row' : 'column',
+            flexDirection: 'row', // Her zaman yan yana
             alignItems: 'center',
-            gap: isMobileWebPortrait ? '20px' : '10px',
+            gap: '10px', // Sabit gap
             zIndex: 10,
           }}>
             <a 
@@ -958,6 +958,14 @@ export default function LoginScreen() {
             >
               Support
             </a>
+            <span style={{
+              color: '#666666',
+              fontSize: '0.9rem',
+              fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+              fontWeight: '300',
+            }}>
+              •
+            </span>
             <a 
               href="#"
               onClick={(e) => {
@@ -1973,6 +1981,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, // Thinner border (was 2, now 1)
     borderColor: '#666666', // Dark grey color
     backgroundColor: 'transparent', // Transparent inside
+    // Web adjustments - 200px yukarı
+    ...(Platform.OS === 'web' && !isMobileWebPortrait && {
+      bottom: 200, // 200px yukarı
+    }),
     // Mobile web adjustments - ripple ana butonun arkasında olmalı
     ...(isMobileWebPortrait && {
       bottom: 145, // Ana buton ile aynı pozisyon (10px daha yukarı)
@@ -2049,6 +2061,10 @@ const styles = StyleSheet.create({
   mainButtonContainer: {
     position: 'absolute',
     zIndex: 3,
+    // Web adjustments - 200px yukarı
+    ...(Platform.OS === 'web' && !isMobileWebPortrait && {
+      bottom: 200, // 200px yukarı
+    }),
     // Mobile web adjustments
     ...(isMobileWebPortrait && {
       bottom: 145, // 10px daha yukarı çıktı (135+10=145)

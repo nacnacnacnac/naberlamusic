@@ -12,7 +12,7 @@ interface MainPlaylistModalProps {
   userPlaylists: any[];
   expandedPlaylists: Set<string>;
   onTogglePlaylistExpansion: (playlistId: string) => void;
-  onPlayVideo: (video: any) => void;
+  onPlayVideo: (video: any, playlistContext?: {playlistId: string, playlistName: string}) => void;
   currentVideo: any;
   onRefresh: () => void;
   refreshing: boolean;
@@ -60,7 +60,7 @@ export default function MainPlaylistModal({
           html: `<iframe src="https://player.vimeo.com/video/${selectedVideoForPlaylist.id}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
         },
         pictures: {
-          sizes: [{ link: selectedVideoForPlaylist.thumbnail || 'https://via.placeholder.com/640x360' }]
+          sizes: [{ link: selectedVideoForPlaylist.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=' }]
         }
       };
 
@@ -112,7 +112,7 @@ export default function MainPlaylistModal({
         {/* Video Info */}
         <View style={styles.videoInfoSection}>
           <ExpoImage 
-            source={{ uri: selectedVideoForPlaylist.thumbnail || 'https://via.placeholder.com/60x40' }}
+            source={{ uri: selectedVideoForPlaylist.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij7wn46xPC90ZXh0Pjwvc3ZnPg==' }}
             style={styles.selectedVideoThumbnail}
             contentFit="cover"
           />
@@ -245,7 +245,10 @@ export default function MainPlaylistModal({
                         key={`${playlist.id}-${playlistVideo.id}`}
                         style={[
                           styles.playlistItem,
-                          (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentPlaylistItem
+                          ((currentVideo?.id && playlistVideo.id && currentVideo.id === playlistVideo.id) || 
+                           (currentVideo?.id && playlistVideo.vimeo_id && currentVideo.id === playlistVideo.vimeo_id) ||
+                           (currentVideo?.vimeo_id && playlistVideo.id && currentVideo.vimeo_id === playlistVideo.id) ||
+                           (currentVideo?.vimeo_id && playlistVideo.vimeo_id && currentVideo.vimeo_id === playlistVideo.vimeo_id)) && styles.currentPlaylistItem
                         ]}
                         onMouseEnter={() => Platform.OS === 'web' && setHoveredVideo(`${playlist.id}-${playlistVideo.id}`)}
                         onMouseLeave={() => Platform.OS === 'web' && setHoveredVideo(null)}
@@ -264,16 +267,19 @@ export default function MainPlaylistModal({
                                 html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
                               },
                               pictures: {
-                                sizes: [{ link: playlistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+                                sizes: [{ link: playlistVideo.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=' }]
                               }
                             };
                             
-                            onPlayVideo(syntheticVideo);
+                            onPlayVideo(syntheticVideo, {
+                              playlistId: playlist.id,
+                              playlistName: playlist.name
+                            });
                           }}
                           activeOpacity={0.7}
                         >
                         <ExpoImage 
-                          source={{ uri: playlistVideo.thumbnail || 'https://via.placeholder.com/100x56' }}
+                          source={{ uri: playlistVideo.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjU2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiMzMzMiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1zaXplPSIxMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iIGZpbGw9IiM5OTkiPvCfjrE8L3RleHQ+PC9zdmc+' }}
                           style={styles.videoThumbnail}
                           contentFit="cover"
                         />
@@ -281,7 +287,10 @@ export default function MainPlaylistModal({
                           <ThemedText 
                             style={[
                               styles.videoTitle,
-                              (currentVideo?.id === playlistVideo.id || currentVideo?.id === playlistVideo.vimeo_id) && styles.currentVideoTitle
+                              ((currentVideo?.id && playlistVideo.id && currentVideo.id === playlistVideo.id) || 
+                               (currentVideo?.id && playlistVideo.vimeo_id && currentVideo.id === playlistVideo.vimeo_id) ||
+                               (currentVideo?.vimeo_id && playlistVideo.id && currentVideo.vimeo_id === playlistVideo.id) ||
+                               (currentVideo?.vimeo_id && playlistVideo.vimeo_id && currentVideo.vimeo_id === playlistVideo.vimeo_id)) && styles.currentVideoTitle
                             ]} 
                             numberOfLines={2}
                           >
@@ -293,32 +302,67 @@ export default function MainPlaylistModal({
                         </View>
                         </TouchableOpacity>
                         
-                        {/* + Button on hover */}
+                        {/* + Button (Admin playlists) or - Button (User playlists) on hover */}
                         {Platform.OS === 'web' && hoveredVideo === `${playlist.id}-${playlistVideo.id}` && (
                           <TouchableOpacity
-                            style={styles.addToPlaylistButton}
+                            style={[
+                              styles.addToPlaylistButton,
+                              !playlist.isAdminPlaylist && styles.removeFromPlaylistButton // Gri background for user playlists
+                            ]}
                             onPress={async () => {
                               const vimeoIdToUse = playlistVideo.vimeo_id || playlistVideo.id;
-                              setSelectedVideoForPlaylist({
-                                id: vimeoIdToUse,
-                                title: playlistVideo.title,
-                                thumbnail: playlistVideo.thumbnail
-                              });
                               
-                              // User playlist'leri yükle
-                              try {
-                                const userPlaylists = await hybridPlaylistService.getUserPlaylists();
-                                setUserPlaylistsForSelection(userPlaylists);
-                              } catch (error) {
-                                console.error('Error loading user playlists:', error);
-                                setUserPlaylistsForSelection([]);
+                              if (playlist.isAdminPlaylist) {
+                                // Admin playlist: Show add to user playlist modal
+                                setSelectedVideoForPlaylist({
+                                  id: vimeoIdToUse,
+                                  title: playlistVideo.title,
+                                  thumbnail: playlistVideo.thumbnail
+                                });
+                                
+                                // User playlist'leri yükle
+                                try {
+                                  const userPlaylists = await hybridPlaylistService.getUserPlaylists();
+                                  setUserPlaylistsForSelection(userPlaylists);
+                                } catch (error) {
+                                  console.error('Error loading user playlists:', error);
+                                  setUserPlaylistsForSelection([]);
+                                }
+                                
+                                setCurrentView('selectPlaylist');
+                              } else {
+                                // User playlist: Remove from playlist
+                                try {
+                                  await hybridPlaylistService.removeVideoFromPlaylist(playlist.id, vimeoIdToUse);
+                                  console.log('✅ Removed video from playlist:', playlistVideo.title);
+                                  onRefresh(); // Refresh to show updated playlist
+                                } catch (error) {
+                                  console.error('Error removing video from playlist:', error);
+                                  if (Platform.OS === 'web') {
+                                    window.alert('Failed to remove video from playlist');
+                                  }
+                                }
                               }
-                              
-                              setCurrentView('selectPlaylist');
                             }}
                             activeOpacity={0.8}
                           >
-                            <CustomIcon name="plus" size={16} color="#e0af92" />
+                            {playlist.isAdminPlaylist ? (
+                              <CustomIcon 
+                                name="plus" 
+                                size={16} 
+                                color="white" 
+                              />
+                            ) : (
+                              <ThemedText style={{
+                                fontSize: 20,
+                                fontWeight: 'bold',
+                                color: 'white',
+                                textAlign: 'center',
+                                lineHeight: 16,
+                              }}>
+                                −
+                              </ThemedText>
+                            )}
                           </TouchableOpacity>
                         )}
                       </View>
@@ -583,5 +627,9 @@ const styles = StyleSheet.create({
   selectPlaylistCount: {
     fontSize: 14,
     color: '#888888',
+  },
+  removeFromPlaylistButton: {
+    backgroundColor: 'transparent',
+    borderColor: '#666666',
   },
 });

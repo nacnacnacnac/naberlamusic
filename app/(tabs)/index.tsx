@@ -24,11 +24,11 @@ import LeftModal from '@/components/LeftModal';
 import PlaylistModal from '@/components/PlaylistModal';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import MainPlaylistModal from '@/components/MainPlaylistModal';
-import ShareButton, { ShareModal } from '@/components/ShareButton';
 
 // Background video import
 const backgroundVideo = require('@/assets/videos/NLA2.mp4');
 const overlayImage = require('@/assets/images/ten.png');
+const heartImage = require('@/assets/hearto.png');
 
 // Integration Testing Infrastructure
 interface IntegrationTestState {
@@ -78,6 +78,7 @@ export default function HomeScreen() {
   const { isConfigured: isBackgroundAudioConfigured } = useBackgroundAudio();
   const { isAuthenticated } = useAuth();
   const [currentVideo, setCurrentVideo] = useState<SimplifiedVimeoVideo | null>(null);
+  const [currentPlaylistContext, setCurrentPlaylistContext] = useState<{playlistId: string, playlistName: string} | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = useState<number>(-1);
   const [toastVisible, setToastVisible] = useState(false);
@@ -91,7 +92,6 @@ export default function HomeScreen() {
   const playlistAnimation = useRef(new Animated.Value(1)).current;
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showMainPlaylistModal, setShowMainPlaylistModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
   const [createPlaylistVideoId, setCreatePlaylistVideoId] = useState<string>('');
   const [createPlaylistVideoTitle, setCreatePlaylistVideoTitle] = useState<string>('');
@@ -102,6 +102,13 @@ export default function HomeScreen() {
   const [expandedPlaylists, setExpandedPlaylists] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
   const playlistScrollRef = useRef<ScrollView>(null);
+
+  // Video Overlay State
+  const [showVideoOverlay, setShowVideoOverlay] = useState(false);
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+  const overlayTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [isHeartFavorited, setIsHeartFavorited] = useState(false);
+  const heartScale = useRef(new Animated.Value(1)).current;
 
   // Integration Testing State
   const [testState, setTestState] = useState<IntegrationTestState>({
@@ -221,14 +228,8 @@ export default function HomeScreen() {
       setUserPlaylists(uniquePlaylists);
       console.log('Playlists refreshed:', uniquePlaylists.length, 'unique playlists');
       
-      // Auto-expand playlists that have videos
-      const newExpanded = new Set<string>();
-      uniquePlaylists.forEach(playlist => {
-        if (playlist.videos && playlist.videos.length > 0) {
-          newExpanded.add(playlist.id);
-        }
-      });
-      setExpandedPlaylists(newExpanded);
+      // Keep current expanded state (don't auto-expand)
+      // Users can manually expand playlists they want to see
       
     } catch (error) {
       console.error('Error refreshing playlists:', error);
@@ -268,10 +269,10 @@ export default function HomeScreen() {
 
   // Sign out functionality removed - no auth system
 
-  const playVideo = (video: SimplifiedVimeoVideo) => {
+  const playVideo = (video: SimplifiedVimeoVideo, playlistContext?: {playlistId: string, playlistName: string}) => {
     const videoIndex = videos.findIndex(v => v.id === video.id);
     
-    debugLog.main('PLAYING NEW VIDEO:', `${video.title} at index: ${videoIndex}`);
+    debugLog.main('PLAYING NEW VIDEO:', `${video.title || video.name || 'Unknown'} at index: ${videoIndex}`);
     
     // FORCE STOP ALL AUDIO BEFORE PLAYING NEW VIDEO
     try {
@@ -289,6 +290,15 @@ export default function HomeScreen() {
       }
     } catch (e) {
       console.log('⚠️ Audio cleanup error in playVideo:', e);
+    }
+    
+    // Check if new video is liked
+    checkIfVideoIsLiked(video.id);
+    
+    // Set playlist context if provided
+    if (playlistContext) {
+      setCurrentPlaylistContext(playlistContext);
+      console.log('🎵 Set playlist context:', playlistContext.playlistName);
     }
     
     // Direct video switching with proper state management
@@ -331,9 +341,139 @@ export default function HomeScreen() {
           vimeoPlayerRef.current.play().catch(error => {
             debugLog.error('❌ Auto-play failed:', error);
           });
+          
+          // Show video overlay immediately when song changes
+          showVideoOverlayWithTimer();
         }
       }, 100); // Short delay to ensure video is fully ready
     }
+  };
+
+  // Video Overlay Functions
+  const showVideoOverlayWithTimer = () => {
+    console.log('🎬 Showing video overlay');
+    
+    // Clear any existing timeout first
+    if (overlayTimeout.current) {
+      clearTimeout(overlayTimeout.current);
+      overlayTimeout.current = null;
+    }
+
+    // Show overlay
+    setShowVideoOverlay(true);
+    
+    // Animate in
+    Animated.timing(overlayOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    // Hide after 4 seconds
+    overlayTimeout.current = setTimeout(() => {
+      hideVideoOverlay();
+    }, 4000);
+  };
+
+  const hideVideoOverlay = () => {
+    console.log('🎬 Hiding video overlay');
+    // Just animate out, don't change showVideoOverlay state
+    Animated.timing(overlayOpacity, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      console.log('🎬 Overlay hidden but still in DOM');
+    });
+
+    // Clear timeout
+    if (overlayTimeout.current) {
+      clearTimeout(overlayTimeout.current);
+      overlayTimeout.current = null;
+    }
+  };
+
+  const handleVideoHover = () => {
+    if (Platform.OS === 'web' && currentVideo) {
+      showVideoOverlayWithTimer();
+    }
+  };
+
+  const handleVideoTap = () => {
+    console.log('🎬 Video tapped - Current video:', currentVideo?.name);
+    console.log('🎬 Video tapped - Overlay state:', showVideoOverlay);
+    
+    if (currentVideo) {
+      // Always show overlay on tap, regardless of current state
+      console.log('🎬 Calling showVideoOverlayWithTimer...');
+      showVideoOverlayWithTimer();
+    } else {
+      console.log('🎬 No current video, cannot show overlay');
+    }
+  };
+
+  // Test function to show overlay immediately
+  const testShowOverlay = () => {
+    console.log('🎬 TEST: Showing overlay immediately');
+    showVideoOverlayWithTimer();
+  };
+
+  const checkIfVideoIsLiked = async (videoId: string) => {
+    try {
+      const isLiked = await hybridPlaylistService.isVideoLiked(videoId);
+      setIsHeartFavorited(isLiked);
+      console.log('💖 Video liked status:', isLiked);
+    } catch (error) {
+      console.error('Error checking if video is liked:', error);
+      setIsHeartFavorited(false);
+    }
+  };
+
+  const handleHeartPress = async () => {
+    if (!currentVideo) return;
+    
+    try {
+      console.log('❤️ Heart pressed for video:', currentVideo.name);
+      const newLikedState = await hybridPlaylistService.toggleLikedSong(currentVideo);
+      setIsHeartFavorited(newLikedState);
+      
+      // Update playlists state immediately for better UX
+      try {
+        const updatedPlaylists = await hybridPlaylistService.getPlaylists();
+        const uniquePlaylists = updatedPlaylists.filter((playlist, index, self) => 
+          index === self.findIndex(p => p.id === playlist.id)
+        );
+        setUserPlaylists(uniquePlaylists);
+      } catch (error) {
+        console.error('Error updating playlists after heart toggle:', error);
+      }
+      
+      console.log(`${newLikedState ? '❤️ Added to' : '💔 Removed from'} Liked Songs:`, currentVideo.name);
+    } catch (error) {
+      console.error('Error toggling liked song:', error);
+    }
+    
+    // Heart scale animation
+    Animated.sequence([
+      Animated.timing(heartScale, {
+        toValue: 1.2,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(heartScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handleHeartHover = (isHovering: boolean) => {
+    Animated.timing(heartScale, {
+      toValue: isHovering ? 1.1 : 1,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handlePlayStateChange = (isPausedFromPlayer: boolean) => {
@@ -529,21 +669,83 @@ export default function HomeScreen() {
 
   const playNextVideo = () => {
     console.log('🎵 PLAY NEXT VIDEO CALLED - videos.length:', videos.length, 'currentIndex:', currentVideoIndex);
+    console.log('🎵 userPlaylists.length:', userPlaylists.length);
+    console.log('🎵 currentVideo:', currentVideo ? currentVideo.name : 'null');
+    console.log('🎵 currentPlaylistContext:', currentPlaylistContext);
     
-    // Find current video in playlists
+    // Find current video in the specific playlist context
     let currentPlaylist = null;
     let currentVideoIndexInPlaylist = -1;
     
-    for (const playlist of userPlaylists) {
-      if (playlist.videos && playlist.videos.length > 0) {
-        const videoIndex = playlist.videos.findIndex((v: any) => 
-          v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id ||
-          v.id === currentVideo?.vimeo_id || v.vimeo_id === currentVideo?.vimeo_id
-        );
+    // If we have playlist context, use that specific playlist
+    if (currentPlaylistContext) {
+      currentPlaylist = userPlaylists.find(p => p.id === currentPlaylistContext.playlistId);
+      if (currentPlaylist && currentPlaylist.videos) {
+        console.log('🎵 Searching in playlist:', currentPlaylistContext.playlistName, 'with', currentPlaylist.videos.length, 'videos');
+        console.log('🎵 Looking for video ID:', currentVideo?.id, 'or vimeo_id:', currentVideo?.vimeo_id);
+        
+        const videoIndex = currentPlaylist.videos.findIndex((v: any) => {
+          // Sadece tanımlı değerler için eşleşme kontrol et
+          const currentId = currentVideo?.id;
+          const currentVimeoId = currentVideo?.vimeo_id;
+          const playlistId = v.id;
+          const playlistVimeoId = v.vimeo_id;
+          
+          const match = (currentId && playlistId && currentId === playlistId) ||
+                       (currentId && playlistVimeoId && currentId === playlistVimeoId) ||
+                       (currentVimeoId && playlistId && currentVimeoId === playlistId) ||
+                       (currentVimeoId && playlistVimeoId && currentVimeoId === playlistVimeoId);
+          
+          console.log(`🎵 Checking video ${v.title} (ID: ${playlistId}, vimeo_id: ${playlistVimeoId}) against current ${currentVideo?.title || currentVideo?.name} (ID: ${currentId}, vimeo_id: ${currentVimeoId}) - Match: ${match}`);
+          return match;
+        });
         if (videoIndex !== -1) {
-          currentPlaylist = playlist;
           currentVideoIndexInPlaylist = videoIndex;
-          break;
+          console.log('🎵 Using playlist context:', currentPlaylistContext.playlistName);
+          console.log('🎵 Found current video at index:', videoIndex, 'Video:', currentVideo?.title || currentVideo?.name);
+          console.log('🎵 Playlist order:');
+          currentPlaylist.videos.forEach((v: any, i: number) => {
+            console.log(`  ${i}: ${v.title} (ID: ${v.id || v.vimeo_id})`);
+          });
+        } else {
+          console.log('🎵 ❌ Current video not found in playlist!');
+        }
+      }
+    }
+    
+    // Fallback: Find current video in playlists (prioritize admin playlists over Liked Songs)
+    if (!currentPlaylist) {
+      // First, try to find in non-Liked Songs playlists (admin playlists have priority)
+      for (const playlist of userPlaylists) {
+        if (playlist.videos && playlist.videos.length > 0 && !playlist.isLikedSongs) {
+          const videoIndex = playlist.videos.findIndex((v: any) => 
+            v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id ||
+            v.id === currentVideo?.vimeo_id || v.vimeo_id === currentVideo?.vimeo_id
+          );
+          if (videoIndex !== -1) {
+            currentPlaylist = playlist;
+            currentVideoIndexInPlaylist = videoIndex;
+            console.log('🎵 Found in admin playlist:', playlist.name);
+            break;
+          }
+        }
+      }
+      
+      // If not found in admin playlists, then check Liked Songs
+      if (!currentPlaylist) {
+        for (const playlist of userPlaylists) {
+          if (playlist.videos && playlist.videos.length > 0 && playlist.isLikedSongs) {
+            const videoIndex = playlist.videos.findIndex((v: any) => 
+              v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id ||
+              v.id === currentVideo?.vimeo_id || v.vimeo_id === currentVideo?.vimeo_id
+            );
+            if (videoIndex !== -1) {
+              currentPlaylist = playlist;
+              currentVideoIndexInPlaylist = videoIndex;
+              console.log('🎵 Found in Liked Songs playlist');
+              break;
+            }
+          }
         }
       }
     }
@@ -554,6 +756,7 @@ export default function HomeScreen() {
     }
     
     const nextIndex = (currentVideoIndexInPlaylist + 1) % currentPlaylist.videos.length;
+    console.log('🎵 Current index in playlist:', currentVideoIndexInPlaylist, 'Next index:', nextIndex, 'Playlist length:', currentPlaylist.videos.length);
     const nextPlaylistVideo = currentPlaylist.videos[nextIndex];
     
     // Convert playlist video to Vimeo format
@@ -561,40 +764,93 @@ export default function HomeScreen() {
     const nextVideo = {
       id: vimeoIdToUse,
       name: nextPlaylistVideo.title,
+      title: nextPlaylistVideo.title, // Add title field for playVideo function
       description: '',
       duration: nextPlaylistVideo.duration,
       embed: {
         html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
       },
       pictures: {
-        sizes: [{ link: nextPlaylistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+        sizes: [{ link: nextPlaylistVideo.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=' }]
       }
     };
     
     console.log('🎵 Playing next video from playlist:', nextVideo.name, 'at playlist index:', nextIndex);
-    setCurrentVideo(nextVideo);
-    setCurrentVideoIndex(nextIndex);
-    setIsPaused(false);
+    
+    // Use playVideo to properly set all states and maintain playlist context
+    playVideo(nextVideo, currentPlaylistContext);
+    
     debugLog.main('Playing next video:', `${nextVideo.name} at index: ${nextIndex}`);
   };
 
   const playPreviousVideo = () => {
     console.log('🎵 PLAY PREVIOUS VIDEO CALLED - videos.length:', videos.length, 'currentIndex:', currentVideoIndex);
+    console.log('🎵 userPlaylists.length:', userPlaylists.length);
+    console.log('🎵 currentVideo:', currentVideo ? currentVideo.name : 'null');
+    console.log('🎵 currentPlaylistContext:', currentPlaylistContext);
     
-    // Find current video in playlists
+    // Find current video in the specific playlist context
     let currentPlaylist = null;
     let currentVideoIndexInPlaylist = -1;
     
-    for (const playlist of userPlaylists) {
-      if (playlist.videos && playlist.videos.length > 0) {
-        const videoIndex = playlist.videos.findIndex((v: any) => 
-          v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id ||
-          v.id === currentVideo?.vimeo_id || v.vimeo_id === currentVideo?.vimeo_id
-        );
+    // If we have playlist context, use that specific playlist
+    if (currentPlaylistContext) {
+      currentPlaylist = userPlaylists.find(p => p.id === currentPlaylistContext.playlistId);
+      if (currentPlaylist && currentPlaylist.videos) {
+        const videoIndex = currentPlaylist.videos.findIndex((v: any) => {
+          // Sadece tanımlı değerler için eşleşme kontrol et
+          const currentId = currentVideo?.id;
+          const currentVimeoId = currentVideo?.vimeo_id;
+          const playlistId = v.id;
+          const playlistVimeoId = v.vimeo_id;
+          
+          const match = (currentId && playlistId && currentId === playlistId) ||
+                       (currentId && playlistVimeoId && currentId === playlistVimeoId) ||
+                       (currentVimeoId && playlistId && currentVimeoId === playlistId) ||
+                       (currentVimeoId && playlistVimeoId && currentVimeoId === playlistVimeoId);
+          
+          return match;
+        });
         if (videoIndex !== -1) {
-          currentPlaylist = playlist;
           currentVideoIndexInPlaylist = videoIndex;
-          break;
+          console.log('🎵 Using playlist context:', currentPlaylistContext.playlistName);
+        }
+      }
+    }
+    
+    // Fallback: Find current video in playlists (prioritize admin playlists over Liked Songs)
+    if (!currentPlaylist) {
+      // First, try to find in non-Liked Songs playlists (admin playlists have priority)
+      for (const playlist of userPlaylists) {
+        if (playlist.videos && playlist.videos.length > 0 && !playlist.isLikedSongs) {
+          const videoIndex = playlist.videos.findIndex((v: any) => 
+            v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id ||
+            v.id === currentVideo?.vimeo_id || v.vimeo_id === currentVideo?.vimeo_id
+          );
+          if (videoIndex !== -1) {
+            currentPlaylist = playlist;
+            currentVideoIndexInPlaylist = videoIndex;
+            console.log('🎵 Found in admin playlist:', playlist.name);
+            break;
+          }
+        }
+      }
+      
+      // If not found in admin playlists, then check Liked Songs
+      if (!currentPlaylist) {
+        for (const playlist of userPlaylists) {
+          if (playlist.videos && playlist.videos.length > 0 && playlist.isLikedSongs) {
+            const videoIndex = playlist.videos.findIndex((v: any) => 
+              v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id ||
+              v.id === currentVideo?.vimeo_id || v.vimeo_id === currentVideo?.vimeo_id
+            );
+            if (videoIndex !== -1) {
+              currentPlaylist = playlist;
+              currentVideoIndexInPlaylist = videoIndex;
+              console.log('🎵 Found in Liked Songs playlist');
+              break;
+            }
+          }
         }
       }
     }
@@ -605,6 +861,7 @@ export default function HomeScreen() {
     }
     
     const prevIndex = currentVideoIndexInPlaylist <= 0 ? currentPlaylist.videos.length - 1 : currentVideoIndexInPlaylist - 1;
+    console.log('🎵 Current index in playlist:', currentVideoIndexInPlaylist, 'Previous index:', prevIndex, 'Playlist length:', currentPlaylist.videos.length);
     const prevPlaylistVideo = currentPlaylist.videos[prevIndex];
     
     // Convert playlist video to Vimeo format
@@ -612,20 +869,22 @@ export default function HomeScreen() {
     const prevVideo = {
       id: vimeoIdToUse,
       name: prevPlaylistVideo.title,
+      title: prevPlaylistVideo.title, // Add title field for playVideo function
       description: '',
       duration: prevPlaylistVideo.duration,
       embed: {
         html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
       },
       pictures: {
-        sizes: [{ link: prevPlaylistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+        sizes: [{ link: prevPlaylistVideo.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=' }]
       }
     };
     
     console.log('🎵 Playing previous video from playlist:', prevVideo.name, 'at playlist index:', prevIndex);
-    setCurrentVideo(prevVideo);
-    setCurrentVideoIndex(prevIndex);
-    setIsPaused(false);
+    
+    // Use playVideo to properly set all states and maintain playlist context
+    playVideo(prevVideo, currentPlaylistContext);
+    
     debugLog.main('Playing previous video:', `${prevVideo.name} at index: ${prevIndex}`);
   };
 
@@ -726,9 +985,24 @@ export default function HomeScreen() {
         validateStateSync, 
         measureResponseTime, 
         stressTestPlayPause,
-        stopAllMusic 
+        stopAllMusic,
+        testShowOverlay, // Add overlay test function
+        getCurrentVideo: () => currentVideo,
+        getCurrentPlaylistContext: () => currentPlaylistContext,
+        getUserPlaylists: () => userPlaylists,
+        playNextVideo: () => playNextVideo(),
+        playPreviousVideo: () => playPreviousVideo()
       };
     }
+  }, []);
+
+  // Cleanup overlay timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (overlayTimeout.current) {
+        clearTimeout(overlayTimeout.current);
+      }
+    };
   }, []);
 
   // Refresh playlists when screen becomes focused (but with smart caching)
@@ -840,72 +1114,251 @@ export default function HomeScreen() {
       ]}>
         {currentVideo ? (
           <>
-            {/* Web Video Controls Bar */}
-            {Platform.OS === 'web' && !isFullscreen && (
-              <View style={styles.webVideoControls}>
-                <View style={styles.webVideoInfo}>
-                  <Text style={styles.webVideoTitle} numberOfLines={1}>
-                    {currentVideo.name || currentVideo.title || 'Untitled Video'}
-                  </Text>
-                </View>
-                <View style={styles.webVideoActions}>
-                  <ShareButton
-                    video={currentVideo}
-                    size="medium"
-                    variant="icon"
-                    color="#ffffff"
-                    onShareSuccess={() => {
-                      setToastMessage('Şarkı paylaşıldı!');
-                      setToastType('success');
-                      setToastVisible(true);
-                    }}
-                  />
-                  <TouchableOpacity 
-                    style={styles.webActionButton}
-                    onPress={() => handleAddToPlaylist(currentVideo)}
-                  >
-                    <CustomIcon name="plus" size={20} color="#ffffff" />
-                  </TouchableOpacity>
-                </View>
+            {/* Video Player Container with Interaction Handlers */}
+            {Platform.OS === 'web' ? (
+              <div 
+                style={{ width: '100%', height: '100%' }}
+                onMouseEnter={handleVideoHover}
+                onClick={handleVideoTap}
+                onMouseLeave={() => {
+                  // Optional: Hide overlay on mouse leave if you want immediate hiding
+                }}
+              >
+                <VimeoPlayerNative
+                  ref={vimeoPlayerRef}
+                  video={currentVideo}
+                  isFullscreen={isFullscreen}
+                  playerHeight={300}
+                  onFullscreenToggle={toggleFullscreen}
+                  onNext={playNextVideo}
+                  onReady={handleVideoReady}
+                  onError={(error) => {
+                    debugLog.error('Video player error:', error);
+                    setTestState(prev => ({
+                      ...prev,
+                      failedCommands: prev.failedCommands + 1
+                    }));
+                    
+                    // If video has 401 error, add to private list and skip to next video
+                    if (error.includes('401') && currentVideo) {
+                      console.log(`🔄 Video ${currentVideo.id} has domain restrictions, adding to private list and skipping...`);
+                      // Add to private video list for future filtering
+                      import('@/services/vimeoService').then(({ vimeoService }) => {
+                        vimeoService.addToPrivateList(currentVideo.id);
+                      });
+                      
+                      showToast('Video has domain restrictions, skipped', 'info');
+                      setTimeout(() => {
+                        playNextVideo();
+                      }, 1000);
+                    } else {
+                      showToast(error, 'error');
+                    }
+                  }}
+                  onVideoEnd={playNextVideo}
+                  isPaused={isPaused}
+                  onPlayStateChange={handlePlayStateChange}
+                  onTimeUpdate={handleTimeUpdate}
+                />
+              </div>
+            ) : (
+              <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+                <VimeoPlayerNative
+                  ref={vimeoPlayerRef}
+                  video={currentVideo}
+                  isFullscreen={isFullscreen}
+                  playerHeight={300}
+                  onFullscreenToggle={toggleFullscreen}
+                  onNext={playNextVideo}
+                  onReady={handleVideoReady}
+                  onError={(error) => {
+                    debugLog.error('Video player error:', error);
+                    setTestState(prev => ({
+                      ...prev,
+                      failedCommands: prev.failedCommands + 1
+                    }));
+                    
+                    // If video has 401 error, add to private list and skip to next video
+                    if (error.includes('401') && currentVideo) {
+                      console.log(`🔄 Video ${currentVideo.id} has domain restrictions, adding to private list and skipping...`);
+                      // Add to private video list for future filtering
+                      import('@/services/vimeoService').then(({ vimeoService }) => {
+                        vimeoService.addToPrivateList(currentVideo.id);
+                      });
+                      
+                      showToast('Video has domain restrictions, skipped', 'info');
+                      setTimeout(() => {
+                        playNextVideo();
+                      }, 1000);
+                    } else {
+                      showToast(error, 'error');
+                    }
+                  }}
+                  onVideoEnd={playNextVideo}
+                  isPaused={isPaused}
+                  onPlayStateChange={handlePlayStateChange}
+                  onTimeUpdate={handleTimeUpdate}
+                />
               </View>
             )}
-            
-            <VimeoPlayerNative
-              ref={vimeoPlayerRef}
-              video={currentVideo}
-              isFullscreen={isFullscreen}
-              playerHeight={300}
-              onFullscreenToggle={toggleFullscreen}
-              onNext={playNextVideo}
-              onReady={handleVideoReady}
-              onError={(error) => {
-                debugLog.error('Video player error:', error);
-                setTestState(prev => ({
-                  ...prev,
-                  failedCommands: prev.failedCommands + 1
-                }));
-                
-                // If video has 401 error, add to private list and skip to next video
-                if (error.includes('401') && currentVideo) {
-                  console.log(`🔄 Video ${currentVideo.id} has domain restrictions, adding to private list and skipping...`);
-                  // Add to private video list for future filtering
-                  import('@/services/vimeoService').then(({ vimeoService }) => {
-                    vimeoService.addToPrivateList(currentVideo.id);
-                  });
+
+            {/* Universal tap area - ALL PLATFORMS */}
+            {currentVideo && !isFullscreen && (
+              <TouchableOpacity 
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'transparent',
+                  zIndex: 9999,
+                }}
+                onPress={() => {
+                  console.log('🎬 UNIVERSAL TAP DETECTED!');
+                  console.log('🎬 Platform:', Platform.OS);
+                  console.log('🎬 Current video:', currentVideo?.name);
                   
-                  showToast('Video has domain restrictions, skipped', 'info');
-                  setTimeout(() => {
-                    playNextVideo();
-                  }, 1000);
-                } else {
-                  showToast(error, 'error');
-                }
-              }}
-              onVideoEnd={playNextVideo}
-              isPaused={isPaused}
-              onPlayStateChange={handlePlayStateChange}
-              onTimeUpdate={handleTimeUpdate}
-            />
+                  // Smooth overlay animation
+                  if (currentVideo) {
+                    console.log('🎬 Showing overlay with animation...');
+                    setShowVideoOverlay(true);
+                    
+                    // Animate in
+                    Animated.timing(overlayOpacity, {
+                      toValue: 1,
+                      duration: 300,
+                      useNativeDriver: true,
+                    }).start();
+                    
+                    // Hide after 4 seconds with animation
+                    setTimeout(() => {
+                      console.log('🎬 Hiding overlay with animation...');
+                      Animated.timing(overlayOpacity, {
+                        toValue: 0,
+                        duration: 300,
+                        useNativeDriver: true,
+                      }).start();
+                    }, 4000);
+                  }
+                }}
+                activeOpacity={0.8}
+              />
+            )}
+
+            {/* Video Overlay - Song Title */}
+            {currentVideo && !isFullscreen && (
+              <Animated.View 
+                style={[
+                  styles.videoOverlay,
+                  { opacity: overlayOpacity }
+                ]}
+                pointerEvents="none"
+              >
+                
+                {/* Gradient Background */}
+                <LinearGradient
+                  colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.4)', 'transparent']}
+                  style={styles.videoOverlayGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                />
+                
+                {/* Content - Sadece text */}
+                <View style={[
+                  styles.videoOverlayContent,
+                  { 
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    justifyContent: 'flex-start',
+                    alignSelf: 'flex-start',
+                    paddingVertical: 10,
+                    paddingLeft: Platform.OS === 'web' ? 18 : 20, // Web'de minimal sol padding
+                  }
+                ]}>
+                  {/* Sanatçı adı */}
+                  <Text style={[
+                    styles.videoOverlayArtist,
+                    { 
+                      textAlign: 'left',
+                      marginBottom: 2,
+                    }
+                  ]} numberOfLines={1}>
+                    {(() => {
+                      const fullTitle = currentVideo.name || currentVideo.title || 'Untitled Video';
+                      const parts = fullTitle.split(' - ');
+                      return parts.length > 1 ? parts[0] : 'Unknown Artist';
+                    })()}
+                  </Text>
+                  
+                  {/* Şarkı adı */}
+                  <Text style={[
+                    styles.videoOverlaySong,
+                    { 
+                      textAlign: 'left',
+                    }
+                  ]} numberOfLines={1}>
+                    {(() => {
+                      const fullTitle = currentVideo.name || currentVideo.title || 'Untitled Video';
+                      const parts = fullTitle.split(' - ');
+                      return parts.length > 1 ? parts.slice(1).join(' - ') : fullTitle;
+                    })()}
+                  </Text>
+                </View>
+              </Animated.View>
+            )}
+
+            {/* Heart Icon - OUTSIDE overlay */}
+            {currentVideo && !isFullscreen && (
+              <Animated.View 
+                style={[
+                  {
+                    position: 'absolute',
+                    top: Platform.OS === 'web' ? 25 : 20,
+                    right: 25,
+                    opacity: overlayOpacity,
+                    zIndex: 10001, // En yüksek z-index
+                  }
+                ]}
+                pointerEvents="box-none"
+              >
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log('❤️ HEART BUTTON PRESSED!');
+                    handleHeartPress();
+                  }}
+                  activeOpacity={0.7}
+                  style={{ 
+                    padding: 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent', // Debug kaldırıldı
+                  }}
+                >
+                  {Platform.OS === 'web' ? (
+                    <div style={{
+                      width: '36px', // Web'de daha büyük (28px → 36px)
+                      height: '36px',
+                      backgroundColor: isHeartFavorited ? '#e0af92' : 'white',
+                      mask: 'url(/hearto.png) no-repeat center',
+                      maskSize: 'contain',
+                      WebkitMask: 'url(/hearto.png) no-repeat center',
+                      WebkitMaskSize: 'contain',
+                    }} />
+                  ) : (
+                    <Image
+                      source={heartImage}
+                      style={{
+                        width: 20, // Mobile'da küçük
+                        height: 20,
+                        tintColor: isHeartFavorited ? "#e0af92" : "white",
+                      }}
+                      resizeMode="contain"
+                    />
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            )}
             
             {/* Top Gradient Overlay - Hidden on web */}
             {!isFullscreen && Platform.OS !== 'web' && (
@@ -1016,19 +1469,6 @@ export default function HomeScreen() {
               </ThemedText>
             </ThemedView>
             <View style={styles.headerActions}>
-              
-              {/* Share Button */}
-              <ShareButton
-                video={currentVideo}
-                size="small"
-                variant="icon"
-                color="#e0af92"
-                onShareSuccess={() => {
-                  setToastMessage('Şarkı paylaşıldı!');
-                  setToastType('success');
-                  setToastVisible(true);
-                }}
-              />
               
               {/* Add to Playlist Icon */}
               <TouchableOpacity 
@@ -1156,7 +1596,7 @@ export default function HomeScreen() {
                                 html: `<iframe src="https://player.vimeo.com/video/${vimeoIdToUse}" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`
                               },
                               pictures: {
-                                sizes: [{ link: playlistVideo.thumbnail || 'https://via.placeholder.com/640x360' }]
+                                sizes: [{ link: playlistVideo.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=' }]
                               }
                               };
                             playVideo(syntheticVideo);
@@ -1307,15 +1747,6 @@ export default function HomeScreen() {
             videoTitle={createPlaylistVideoTitle}
           />
         </CustomModal>
-      )}
-
-      {/* Share Modal */}
-      {currentVideo && (
-        <ShareModal
-          video={currentVideo}
-          visible={showShareModal}
-          onClose={() => setShowShareModal(false)}
-        />
       )}
 
     </ThemedView>
@@ -1790,41 +2221,52 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
-  
-  // Web Video Controls Styles
-  webVideoControls: {
+
+  // Video Overlay Styles
+  videoOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 60,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    height: Platform.OS === 'web' ? '30%' : 120,
+    zIndex: 1000, // Çok yüksek z-index
+    pointerEvents: 'box-none', // İçerideki elementlerin tıklanabilir olması için
+  },
+  videoOverlayGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  videoOverlayContent: {
+    position: 'absolute',
+    top: Platform.OS === 'web' ? 20 : 15,
+    left: 20,
+    right: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    zIndex: 10,
+    // justifyContent kaldırıldı - şarkı ismi kadar yer kaplasın
+    zIndex: 1001, // Content'in görünmesi için
+    pointerEvents: 'box-none', // Heart'ın tıklanabilir olması için
   },
-  webVideoInfo: {
-    flex: 1,
-    marginRight: 16,
+  videoOverlayTitle: {
+    // Eski style - artık kullanılmıyor
+    fontSize: Platform.OS === 'web' ? 32 : 14,
+    fontWeight: 'bold',
+    color: 'white',
+    lineHeight: Platform.OS === 'web' ? 36 : 18,
   },
-  webVideoTitle: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: Platform.OS === 'web' ? 'Funnel Display, sans-serif' : undefined,
+  videoOverlayArtist: {
+    fontSize: Platform.OS === 'web' ? 28 : 13, // Sanatçı adı - mobilde 13px
+    fontWeight: 'bold',
+    color: 'white',
+    lineHeight: Platform.OS === 'web' ? 32 : 16,
   },
-  webVideoActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  webActionButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  videoOverlaySong: {
+    fontSize: Platform.OS === 'web' ? 20 : 8, // Şarkı adı - mobilde 8px
+    fontWeight: '400', // Normal weight
+    color: 'rgba(255,255,255,0.9)', // Biraz daha soluk
+    lineHeight: Platform.OS === 'web' ? 24 : 10,
   },
 });
