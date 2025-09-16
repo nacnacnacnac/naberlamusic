@@ -90,6 +90,13 @@ export default function HomeScreen() {
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [isPlaylistExpanded, setIsPlaylistExpanded] = useState(true);
   const playlistAnimation = useRef(new Animated.Value(1)).current;
+  
+  // Page fade-in animation
+  const pageOpacity = useRef(new Animated.Value(0)).current;
+  
+  // ten.png animation
+  const tenPngOpacity = useRef(new Animated.Value(0)).current;
+  const tenPngTranslateY = useRef(new Animated.Value(-50)).current;
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showMainPlaylistModal, setShowMainPlaylistModal] = useState(false);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
@@ -138,6 +145,32 @@ export default function HomeScreen() {
   // Removed auto-play: Let user choose which video to play
   // Videos will be available in playlist, but no auto-selection
   // This way select.mp4 will show until user clicks a video
+
+  // Page animations on mount
+  useEffect(() => {
+    // Page fade-in animation
+    Animated.timing(pageOpacity, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+
+    // ten.png animation with delay
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(tenPngOpacity, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(tenPngTranslateY, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }, 500); // 500ms delay after page fade-in
+  }, []);
 
   // Log background audio configuration status
   useEffect(() => {
@@ -1123,7 +1156,12 @@ export default function HomeScreen() {
   }
 
   return (
-    <ThemedView style={[styles.container, styles.darkContainer, Platform.OS === 'web' ? { justifyContent: 'flex-end', paddingBottom: 34 } : {}]}>
+    <Animated.View style={[
+      styles.container, 
+      styles.darkContainer, 
+      Platform.OS === 'web' ? { justifyContent: 'flex-end', paddingBottom: 34 } : {},
+      { opacity: pageOpacity }
+    ]}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" />
       
       {/* Safe Area for Camera Notch */}
@@ -1442,40 +1480,53 @@ export default function HomeScreen() {
               />
             )}
             
-            {/* ten.png Overlay - Görünür video başlamadan önce, video oynadığında kaybolur */}
+            {/* ten.png Overlay - Animated entrance from top */}
             {Platform.OS === 'web' ? (
-              <div style={{
+              <Animated.View style={{
                 position: 'absolute',
                 top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
+                left: '52%',
+                transform: [
+                  { translateX: '-50%' },
+                  { translateY: '-50%' },
+                  { translateY: tenPngTranslateY }
+                ],
                 zIndex: 10,
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                opacity: tenPngOpacity
               }}>
                 <img 
                   src="/ten.png" 
                   alt="Overlay"
                   style={{
-                    maxWidth: typeof window !== 'undefined' && window.innerWidth <= 768 ? '95%' : '80%',
-                    maxHeight: typeof window !== 'undefined' && window.innerWidth <= 768 ? '95%' : '80%',
-                    width: typeof window !== 'undefined' && window.innerWidth <= 768 ? '300px' : 'auto',
-                    height: typeof window !== 'undefined' && window.innerWidth <= 768 ? '300px' : 'auto',
+                    maxWidth: typeof window !== 'undefined' && window.innerWidth <= 768 ? '90%' : '70%',
+                    maxHeight: typeof window !== 'undefined' && window.innerWidth <= 768 ? '90%' : '70%',
+                    width: typeof window !== 'undefined' && window.innerWidth <= 768 ? '350px' : '500px',
+                    height: 'auto',
                     objectFit: 'contain'
                   }}
                 />
-              </div>
+              </Animated.View>
             ) : (
-              <Image
-                source={overlayImage}
-                style={[
-                  styles.overlayImageStyle,
-                  Platform.OS !== 'web' && {
-                    width: 300,
-                    height: 300,
-                  }
-                ]}
-                resizeMode="contain"
-              />
+              <Animated.View style={[
+                styles.overlayImageStyle,
+                {
+                  opacity: tenPngOpacity,
+                  transform: [
+                    { translateX: -160 },
+                    { translateY: Animated.add(tenPngTranslateY, -31) }
+                  ]
+                }
+              ]}>
+                <Image
+                  source={overlayImage}
+                  style={{
+                    width: 350,
+                    height: 62, // 350 * (172/971) = ~62
+                  }}
+                  resizeMode="contain"
+                />
+              </Animated.View>
             )}
             
             {/* Dark overlay for better text readability */}
@@ -1784,7 +1835,7 @@ export default function HomeScreen() {
         </CustomModal>
       )}
 
-    </ThemedView>
+    </Animated.View>
   );
 }
 
@@ -1925,7 +1976,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -150 }, { translateY: -150 }], // 300px/2 = 150px offset
     zIndex: 10,
   },
   selectVideo: {

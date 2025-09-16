@@ -34,6 +34,15 @@ export default function LoginScreen() {
   
   // UI state
   const [showAuthButtons, setShowAuthButtons] = useState(false);
+  
+  // Page fade-in animations
+  const pageOpacity = useRef(new Animated.Value(0)).current;
+  const mainButtonOpacity = useRef(new Animated.Value(0)).current;
+  const mainButtonTranslateY = useRef(new Animated.Value(30)).current;
+  const storeLogosOpacity = useRef(new Animated.Value(0)).current;
+  const storeLogosTranslateY = useRef(new Animated.Value(20)).current;
+  const supportLinksOpacity = useRef(new Animated.Value(0)).current;
+  const supportLinksTranslateY = useRef(new Animated.Value(15)).current;
 
   // Logo Animation Values
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -49,10 +58,10 @@ export default function LoginScreen() {
 
   // Ripple animation values
   const ripple1Scale = useRef(new Animated.Value(1)).current;
-  const ripple1Opacity = useRef(new Animated.Value(0)).current;
+  const ripple1Opacity = useRef(new Animated.Value(0)).current; // Başlangıçta görünmez
   
-  // Button entrance animation - Start visible for better UX
-  const buttonOpacity = useRef(new Animated.Value(1)).current; // Always visible
+  // Button entrance animation - Start hidden for better UX
+  const buttonOpacity = useRef(new Animated.Value(0)).current; // Start hidden
   const buttonY = useRef(new Animated.Value(0)).current; // Start in position
   
   // Hover animation for web
@@ -76,13 +85,84 @@ export default function LoginScreen() {
     }
   }, [isAuthenticated]);
 
-  // Start logo animation on component mount
+  // Start logo animation and page fade-in on component mount
   useEffect(() => {
+    // Page fade-in
+    Animated.timing(pageOpacity, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+
+    // Start logo animation
     startLogoAnimation();
-    // Start ripple animation immediately since button is always visible
+    
+    // Staggered animations for UI elements
     setTimeout(() => {
-      startRippleAnimation();
-    }, 2000); // Start after logo animation
+      // Main button animation - Opacity + kayma
+      Animated.parallel([
+        Animated.timing(mainButtonOpacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonOpacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(mainButtonTranslateY, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }, 1800); // 1 saniye daha geç: 800ms -> 1800ms
+
+    setTimeout(() => {
+      // Store logos animation - Naber LA ile birlikte erken gelsin
+      Animated.parallel([
+        Animated.timing(storeLogosOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(storeLogosTranslateY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }, 1000); // Naber LA ile birlikte: 1000ms
+
+    setTimeout(() => {
+      // Support links animation - Naber LA ile birlikte erken gelsin
+      Animated.parallel([
+        Animated.timing(supportLinksOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(supportLinksTranslateY, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }, 1200); // Store logos sonrası: 1000 + 200 = 1200ms
+    
+    // Start ripple animation - Ana buton animasyonu bittikten sonra (2.6s + 1.3s = 3.9s)
+    setTimeout(() => {
+      // Önce ripple'ı görünür yap (opacity 0 -> 0.3)
+      Animated.timing(ripple1Opacity, {
+        toValue: 0.3,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        // Opacity animasyonu bitince ripple efektini başlat
+        startRippleAnimation();
+      });
+    }, 3500); // Ana buton bitimi + 0.9s: 3500ms
   }, []);
 
   // Force hide home indicator for development
@@ -300,10 +380,8 @@ export default function LoginScreen() {
         easing: Easing.out(Easing.back(1.2)),
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      // Start ripple after button appears
-      startRippleAnimation();
-    });
+    ]).start();
+    // Ripple artık sadece setTimeout ile başlatılacak
   };
 
   const handleMainButtonPress = () => {
@@ -466,7 +544,7 @@ export default function LoginScreen() {
   const isReady = !isLoading && videos.length > 0;
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: pageOpacity }]}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Background Video */}
@@ -612,9 +690,11 @@ export default function LoginScreen() {
           
           {/* Main Action Button */}
           <Animated.View style={[styles.mainButtonContainer, { 
+            opacity: mainButtonOpacity,
             transform: [
               { scale: authScaleAnim },
-              { scale: buttonScale }
+              { scale: buttonScale },
+              { translateY: mainButtonTranslateY }
             ] 
           }]}>
             <TouchableOpacity
@@ -821,17 +901,21 @@ export default function LoginScreen() {
       {Platform.OS === 'web' && (
         <>
           {/* App Store Logos - Responsive positioning */}
-          <div style={{
+          <Animated.View style={{
             position: 'fixed',
             // Mobile web: center horizontally, move up from bottom
             bottom: isMobileWebPortrait ? '60px' : (window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px'),
             left: isMobileWebPortrait ? 'calc(50% - 10px)' : (window.innerWidth <= 480 ? '10px' : window.innerWidth <= 768 ? '15px' : '20px'),
-            transform: isMobileWebPortrait ? 'translateX(-50%)' : 'none',
+            transform: [
+              { translateX: isMobileWebPortrait ? '-50%' : 0 },
+              { translateY: storeLogosTranslateY }
+            ],
             display: 'flex',
             flexDirection: 'row', // Her zaman yan yana
             alignItems: 'center',
             gap: isMobileWebPortrait ? '10px' : '10px',
             zIndex: 10,
+            opacity: storeLogosOpacity,
           }}>
             <img 
               src={appStoreImage}
@@ -914,16 +998,20 @@ export default function LoginScreen() {
               }}
               onClick={() => window.open('https://open.spotify.com/artist/5RBJnpmTFmrarwjb1y4qVn?si=NNCU37YQSeuMLSoOsBsrZA', '_blank')}
             />
-          </div>
+          </Animated.View>
 
           {/* Support and Privacy Links - Responsive positioning */}
-          <div style={{
+          <Animated.View style={{
             position: 'fixed',
             // Mobile web: center horizontally, move up from bottom
             bottom: isMobileWebPortrait ? '20px' : '20px',
             right: isMobileWebPortrait ? 'auto' : '20px',
             left: isMobileWebPortrait ? '50%' : 'auto',
-            transform: isMobileWebPortrait ? 'translateX(-50%)' : 'none',
+            transform: [
+              { translateX: isMobileWebPortrait ? '-50%' : 0 },
+              { translateY: supportLinksTranslateY }
+            ],
+            opacity: supportLinksOpacity,
             display: 'flex',
             flexDirection: 'row', // Her zaman yan yana
             alignItems: 'center',
@@ -994,7 +1082,7 @@ export default function LoginScreen() {
             >
               Privacy Policy
             </a>
-          </div>
+          </Animated.View>
         </>
       )}
 
@@ -1808,7 +1896,7 @@ export default function LoginScreen() {
           }
         ]} />
       )}
-    </View>
+    </Animated.View>
   );
 }
 
