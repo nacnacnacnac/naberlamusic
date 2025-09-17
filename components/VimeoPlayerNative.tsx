@@ -291,45 +291,26 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     }
   }, [isLoading]);
 
-  // Web video ready handling
+  // Web video ready handling - NO AUTOPLAY
   useEffect(() => {
-    if (Platform.OS === 'web' && videoUri && shouldPlay) {
-      console.log('🌐 HTML5 video ready, checking shouldPlay:', shouldPlay);
+    if (Platform.OS === 'web' && videoUri) {
+      console.log('🌐 HTML5 video ready, waiting for user interaction');
       
       setTimeout(() => {
         const videoElement = (globalThis as any).webVideoElement;
         if (videoElement) {
-          console.log('🎬 Auto-playing HTML5 video with sound');
+          // Just prepare the video, don't autoplay
+          videoElement.muted = false;
+          videoElement.volume = 1.0;
           
-          try {
-            videoElement.muted = false;
-            videoElement.volume = 1.0;
-            
-            const playPromise = videoElement.play();
-            
-            // Update state immediately
-            setIsPlaying(true);
-            
-            if (playPromise && typeof playPromise.then === 'function') {
-              playPromise.then(() => {
-                console.log('🔊 HTML5 video auto-play successful');
-                // Don't call onPlayStateChange to avoid loops
-              }).catch((error) => {
-                console.error('❌ HTML5 video auto-play failed:', error);
-                // Revert state on error
-                setIsPlaying(false);
-              });
-            } else {
-              console.log('🔊 HTML5 video auto-play called (sync)');
-              // Don't call onPlayStateChange to avoid loops
-            }
-          } catch (error: any) {
-            console.error('❌ HTML5 video auto-play error:', error);
-          }
+          // Set initial state as paused
+          setIsPlaying(false);
+          
+          console.log('🎬 HTML5 video prepared, ready for user interaction');
         }
-      }, 500); // Small delay to ensure video is fully loaded
+      }, 100);
     }
-  }, [shouldPlay, videoUri]);
+  }, [videoUri]);
 
   // Listen for global stop music events
   useEffect(() => {

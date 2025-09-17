@@ -85,6 +85,7 @@ export default function HomeScreen() {
   // Query params for shared videos
   const params = useLocalSearchParams();
   const [sharedVideoId, setSharedVideoId] = useState<string | null>(null);
+  const [isSharedVideoLoading, setIsSharedVideoLoading] = useState(false);
   
   // Also try to get from URL directly on web
   useEffect(() => {
@@ -93,12 +94,14 @@ export default function HomeScreen() {
       const vParam = urlParams.get('v');
       if (vParam) {
         setSharedVideoId(vParam);
+        setIsSharedVideoLoading(true); // Start loading when shared video detected
       }
     }
     
     // Also check Expo Router params
     if (params.v) {
       setSharedVideoId(params.v as string);
+      setIsSharedVideoLoading(true); // Start loading when shared video detected
     }
   }, [params.v]);
   
@@ -255,7 +258,9 @@ export default function HomeScreen() {
       
       if (sharedVideo) {
         console.log('🔗 Found shared video:', sharedVideo.name);
-        playVideo(sharedVideo);
+        playVideo(sharedVideo, undefined, true); // Pass true for isSharedVideo
+        // Stop loading when video is found and loaded
+        setIsSharedVideoLoading(false);
         // Clear the URL param after playing
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           const url = new URL(window.location.href);
@@ -431,7 +436,7 @@ export default function HomeScreen() {
 
   // Sign out functionality removed - no auth system
 
-  const playVideo = (video: SimplifiedVimeoVideo, playlistContext?: {playlistId: string, playlistName: string}) => {
+  const playVideo = (video: SimplifiedVimeoVideo, playlistContext?: {playlistId: string, playlistName: string}, isSharedVideo: boolean = false) => {
     const videoIndex = videos.findIndex(v => v.id === video.id);
     
     debugLog.main('PLAYING NEW VIDEO:', `${video.title || video.name || 'Unknown'} at index: ${videoIndex}`);
@@ -463,7 +468,7 @@ export default function HomeScreen() {
     // Direct video switching with proper state management
     setCurrentVideo(video);
     setCurrentVideoIndex(videoIndex);
-    setIsPaused(false); // Set to play immediately
+    setIsPaused(isSharedVideo); // Shared video: paused, normal video: play immediately
     
     // Close playlist smoothly when video starts playing
     Animated.parallel([
@@ -481,31 +486,28 @@ export default function HomeScreen() {
       setIsPlaylistExpanded(false);
     });
     
-    // Set pending autoplay flag - will trigger when video is ready
-    setPendingAutoPlay(true);
-    debugLog.main('🎬 Pending autoplay set for new video');
+    // Video ready, but no autoplay - wait for user interaction
+    setPendingAutoPlay(false);
+    debugLog.main('🎬 Video ready, waiting for user interaction');
   };
 
   const handleVideoReady = () => {
     debugLog.main('🎬 Video ready callback triggered');
     
-    // If we have pending autoplay, trigger it now
-    if (pendingAutoPlay) {
-      debugLog.main('🎬 Executing pending autoplay');
-      setPendingAutoPlay(false);
-      
+    // If video should play (not paused), start it
+    if (!isPaused && vimeoPlayerRef.current) {
+      debugLog.main('🎬 Auto-playing video after ready (not paused)');
       setTimeout(() => {
-        if (vimeoPlayerRef.current) {
-          debugLog.main('🎬 Auto-playing video after ready');
-          vimeoPlayerRef.current.play().catch(error => {
-            debugLog.error('❌ Auto-play failed:', error);
-          });
-          
-          // Show video overlay immediately when song changes
-          showVideoOverlayWithTimer();
-        }
-      }, 100); // Short delay to ensure video is fully ready
+        vimeoPlayerRef.current?.play().catch(error => {
+          debugLog.error('❌ Auto-play failed:', error);
+        });
+      }, 100);
+    } else {
+      debugLog.main('🎬 Video ready, waiting for user interaction (paused)');
     }
+    
+    // Show video overlay immediately when song changes
+    showVideoOverlayWithTimer();
   };
 
   // Video Overlay Functions
@@ -560,14 +562,11 @@ export default function HomeScreen() {
     if (currentVideo) {
       // Always show overlay on tap, regardless of current state
       showVideoOverlayWithTimer();
-    } else {
-      console.log('🎬 No current video, cannot show overlay');
     }
   };
 
   // Test function to show overlay immediately
   const testShowOverlay = () => {
-    console.log('🎬 TEST: Showing overlay immediately');
     showVideoOverlayWithTimer();
   };
 
@@ -1365,6 +1364,23 @@ export default function HomeScreen() {
     );
   }
 
+  // Show loading overlay for shared videos
+  if (isSharedVideoLoading) {
+    return (
+      <ThemedView style={[styles.container, styles.darkContainer]}>
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        <View style={styles.sharedVideoLoadingContainer}>
+          <Image 
+            source={require('@/assets/images/loading.gif')} 
+            style={styles.sharedVideoLoadingGif}
+            resizeMode="contain"
+          />
+          <ThemedText style={styles.sharedVideoLoadingText}>Loading video...</ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
+
   return (
     <Animated.View style={[
       styles.container, 
@@ -1492,13 +1508,8 @@ export default function HomeScreen() {
                   zIndex: 9999,
                 }}
                 onPress={() => {
-                  console.log('🎬 UNIVERSAL TAP DETECTED!');
-                  console.log('🎬 Platform:', Platform.OS);
-                  console.log('🎬 Current video:', currentVideo?.name);
-                  
                   // Smooth overlay animation
                   if (currentVideo) {
-                    console.log('🎬 Showing overlay with animation...');
                     setShowVideoOverlay(true);
                     
                     // Animate in
@@ -1510,7 +1521,6 @@ export default function HomeScreen() {
                     
                     // Hide after 4 seconds with animation
                     setTimeout(() => {
-                      console.log('🎬 Hiding overlay with animation...');
                       Animated.timing(overlayOpacity, {
                         toValue: 0,
                         duration: 300,
@@ -2172,7 +2182,6 @@ export default function HomeScreen() {
       />
 
       {/* Music Player Footer */}
-      {console.log('🔍 TabBar Debug:', { currentVideo: !!currentVideo, platform: Platform.OS, isFullscreen })}
       {(Platform.OS === 'web' ? !isFullscreen : true) && (
         <MusicPlayerTabBar
           currentVideo={currentVideo}
@@ -2327,6 +2336,24 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     marginBottom: 20,
+  },
+  
+  // Shared Video Loading
+  sharedVideoLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  sharedVideoLoadingGif: {
+    width: 80,
+    height: 80,
+    marginBottom: 20,
+  },
+  sharedVideoLoadingText: {
+    fontSize: 18,
+    color: 'white',
+    fontWeight: '500',
   },
   playlistLoadingContainer: {
     alignItems: 'center',

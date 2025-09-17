@@ -1,12 +1,33 @@
 import React, { useEffect, useState } from 'react';
-import { router } from 'expo-router';
-import { View, StyleSheet, Image } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { View, StyleSheet, Image, Platform } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Index() {
   console.log('Index: Component rendering');
   const [isMounted, setIsMounted] = useState(false);
   const { isAuthenticated, isLoading } = useAuth();
+  
+  // Check for shared video parameter
+  const params = useLocalSearchParams();
+  const [sharedVideoId, setSharedVideoId] = useState<string | null>(null);
+  
+  // Get shared video ID from URL params
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const vParam = urlParams.get('v');
+      if (vParam) {
+        console.log('🔗 Shared video detected in index:', vParam);
+        setSharedVideoId(vParam);
+      }
+    }
+    
+    if (params.v) {
+      console.log('🔗 Shared video from params:', params.v);
+      setSharedVideoId(params.v as string);
+    }
+  }, [params.v]);
 
   // Wait for component to mount properly
   useEffect(() => {
@@ -17,10 +38,14 @@ export default function Index() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Navigate based on authentication status
+  // Navigate based on authentication status and shared video
   useEffect(() => {
     if (isMounted && !isLoading) {
-      if (isAuthenticated) {
+      // If there's a shared video, always go to main app (even if not authenticated)
+      if (sharedVideoId) {
+        console.log('🔗 Shared video detected, navigating to main app for guest viewing');
+        router.replace('/(tabs)');
+      } else if (isAuthenticated) {
         console.log('Index: User is authenticated, navigating to main app');
         router.replace('/(tabs)');
       } else {
@@ -28,7 +53,7 @@ export default function Index() {
         router.replace('/login');
       }
     }
-  }, [isMounted, isAuthenticated, isLoading]);
+  }, [isMounted, isAuthenticated, isLoading, sharedVideoId]);
 
   // Show loading with animated gif while determining state
   return (
