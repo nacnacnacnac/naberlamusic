@@ -265,7 +265,7 @@ export default function LoginScreen() {
       Animated.parallel([
         // Logo wrapper movement - sola başlayıp sağa kayma
         Animated.timing(logoWrapperX, {
-          toValue: Platform.OS === 'web' ? (isMobileWebPortrait ? 0 : 35) : 0, // Mobil web: 0 (merkez), Desktop: 35px sağa, Native: 0
+          toValue: Platform.OS === 'web' ? (isMobileWebPortrait ? 3 : 35) : 0, // Mobil web: 3px sağa, Desktop: 35px sağa, Native: 0
           duration: 800,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
@@ -969,8 +969,8 @@ export default function LoginScreen() {
         </View>
       )}
 
-      {/* Web-only Store Logos and Links */}
-      {Platform.OS === 'web' && (
+      {/* Web-only Store Logos and Links - TEMPORARILY HIDDEN */}
+      {Platform.OS === 'web' && false && (
         <>
           {/* App Store Logos - Responsive positioning */}
           <Animated.View style={{
@@ -1025,7 +1025,7 @@ export default function LoginScreen() {
                 opacity: 0.6,
                 transition: 'all 0.3s ease',
                 cursor: 'default', // Changed from 'pointer' - temporarily disabled
-                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segre UI", Roboto, sans-serif',
                 filter: 'drop-shadow(0 0 10px rgba(224, 175, 146, 0.2))',
                 objectFit: 'contain',
               }}
@@ -2116,7 +2116,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     // Mobile web adjustments
     ...(isMobileWebPortrait && {
-      marginTop: height * 0.08 - 135, // 15px daha aşağı indi (150-15=135)
+      marginTop: height * 0.08 - 95, // 40px daha aşağı indi (135-40=95)
       marginBottom: 20,
       marginRight: -40, // 5px sola (45-5=40)
     }),
@@ -2215,7 +2215,7 @@ const styles = StyleSheet.create({
     }),
     // Mobile web adjustments - ripple ana butonun arkasında olmalı
     ...(isMobileWebPortrait && {
-      bottom: 145, // Ana buton ile aynı pozisyon (10px daha yukarı)
+      bottom: 55, // 90px aşağı indi (145-90=55)
       left: 'calc(50% - 47px)', // Ana buton ile aynı pozisyon (3px sağa)
       transform: 'translateX(-50%)', // Transform korunuyor
       zIndex: 1, // Ana butonun arkasında
@@ -2295,7 +2295,7 @@ const styles = StyleSheet.create({
     }),
     // Mobile web adjustments
     ...(isMobileWebPortrait && {
-      bottom: 145, // 10px daha yukarı çıktı (135+10=145)
+      bottom: 55, // 90px aşağı indi (145-90=55)
       left: 'calc(50% - 47px)', // 3px sağa (50-3=47px)
       transform: 'translateX(-50%)', // Transform korunuyor
     }),
