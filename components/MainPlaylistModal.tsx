@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Platform, Animated } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -43,6 +43,8 @@ export default function MainPlaylistModal({
   const [userPlaylistsForSelection, setUserPlaylistsForSelection] = React.useState<any[]>([]);
   const [deletedPlaylistIds, setDeletedPlaylistIds] = React.useState<Set<string>>(new Set());
   const [deletingPlaylistId, setDeletingPlaylistId] = React.useState<string | null>(null);
+  const [fadingVideos, setFadingVideos] = React.useState<Set<string>>(new Set());
+  const fadeAnimations = useRef<{[key: string]: Animated.Value}>({});
 
   // refreshTrigger değiştiğinde playlist'leri yenile
   React.useEffect(() => {
@@ -405,19 +407,30 @@ export default function MainPlaylistModal({
               >
                 {playlist.videos && playlist.videos.length > 0 ? (
                   <>
-                    {playlist.videos.map((playlistVideo: any, index: number) => (
-                      <View
-                        key={`${playlist.id}-${playlistVideo.id}`}
-                        style={[
-                          styles.playlistItem,
-                          ((currentVideo?.id && playlistVideo.id && currentVideo.id === playlistVideo.id) || 
-                           (currentVideo?.id && playlistVideo.vimeo_id && currentVideo.id === playlistVideo.vimeo_id) ||
-                           (currentVideo?.vimeo_id && playlistVideo.id && currentVideo.vimeo_id === playlistVideo.id) ||
-                           (currentVideo?.vimeo_id && playlistVideo.vimeo_id && currentVideo.vimeo_id === playlistVideo.vimeo_id)) && styles.currentPlaylistItem
-                        ]}
-                        onMouseEnter={() => Platform.OS === 'web' && setHoveredVideo(`${playlist.id}-${playlistVideo.id}`)}
-                        onMouseLeave={() => Platform.OS === 'web' && setHoveredVideo(null)}
-                      >
+                    {playlist.videos.map((playlistVideo: any, index: number) => {
+                      const videoKey = `${playlist.id}-${playlistVideo.vimeo_id || playlistVideo.id}`;
+                      
+                      // Initialize fade animation if not exists
+                      if (!fadeAnimations.current[videoKey]) {
+                        fadeAnimations.current[videoKey] = new Animated.Value(1);
+                      }
+                      
+                      return (
+                        <Animated.View
+                          key={`${playlist.id}-${playlistVideo.id}`}
+                          style={[
+                            styles.playlistItem,
+                            ((currentVideo?.id && playlistVideo.id && currentVideo.id === playlistVideo.id) || 
+                             (currentVideo?.id && playlistVideo.vimeo_id && currentVideo.id === playlistVideo.vimeo_id) ||
+                             (currentVideo?.vimeo_id && playlistVideo.id && currentVideo.vimeo_id === playlistVideo.id) ||
+                             (currentVideo?.vimeo_id && playlistVideo.vimeo_id && currentVideo.vimeo_id === playlistVideo.vimeo_id)) && styles.currentPlaylistItem,
+                            {
+                              opacity: fadeAnimations.current[videoKey]
+                            }
+                          ]}
+                          onMouseEnter={() => Platform.OS === 'web' && setHoveredVideo(`${playlist.id}-${playlistVideo.id}`)}
+                          onMouseLeave={() => Platform.OS === 'web' && setHoveredVideo(null)}
+                        >
                         <TouchableOpacity
                           style={styles.videoTouchable}
                           onPress={() => {
@@ -503,16 +516,45 @@ export default function MainPlaylistModal({
                                 
                                 setCurrentView('selectPlaylist');
                               } else {
-                                // User playlist: Remove from playlist
-                                try {
-                                  await hybridPlaylistService.removeVideoFromPlaylist(playlist.id, vimeoIdToUse);
-                                  onRefresh(); // Refresh to show updated playlist
-                                } catch (error) {
-                                  console.error('❌ Error removing video from playlist:', error);
-                                  if (Platform.OS === 'web') {
-                                    window.alert('Failed to remove video from playlist');
-                                  }
+                                // User playlist: Remove from playlist with fade animation
+                                const videoKey = `${playlist.id}-${vimeoIdToUse}`;
+                                
+                                // Initialize fade animation if not exists
+                                if (!fadeAnimations.current[videoKey]) {
+                                  fadeAnimations.current[videoKey] = new Animated.Value(1);
                                 }
+                                
+                                // Add to fading videos set
+                                setFadingVideos(prev => new Set([...prev, videoKey]));
+                                
+                                // Start fade out animation
+                                Animated.timing(fadeAnimations.current[videoKey], {
+                                  toValue: 0,
+                                  duration: 300,
+                                  useNativeDriver: true,
+                                }).start(async () => {
+                                  // After animation, remove from backend
+                                  try {
+                                    await hybridPlaylistService.removeVideoFromPlaylist(playlist.id, vimeoIdToUse);
+                                    onRefresh(); // Refresh to show updated playlist
+                                  } catch (error) {
+                                    console.error('❌ Error removing video from playlist:', error);
+                                    // If error, fade back in
+                                    Animated.timing(fadeAnimations.current[videoKey], {
+                                      toValue: 1,
+                                      duration: 200,
+                                      useNativeDriver: true,
+                                    }).start();
+                                    setFadingVideos(prev => {
+                                      const newSet = new Set(prev);
+                                      newSet.delete(videoKey);
+                                      return newSet;
+                                    });
+                                    if (Platform.OS === 'web') {
+                                      window.alert('Failed to remove video from playlist');
+                                    }
+                                  }
+                                });
                               }
                             }}
                             activeOpacity={0.8}
@@ -536,8 +578,9 @@ export default function MainPlaylistModal({
                             )}
                           </TouchableOpacity>
                         )}
-                      </View>
-                    ))}
+                        </Animated.View>
+                      );
+                    })}
                     
                     {/* Spacer for last playlist */}
                     {isLastPlaylist && <View style={styles.lastPlaylistSpacer} />}
