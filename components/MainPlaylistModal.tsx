@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Platform, Animated } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Platform, Animated, Image } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -120,7 +120,11 @@ export default function MainPlaylistModal({
             onPress={() => setCurrentView('main')}
             activeOpacity={0.7}
           >
-            <CustomIcon name="chevron-left" size={20} color="#e0af92" />
+            <Image 
+              source={require('@/assets/images/ok_left.png')}
+              style={{ width: 20, height: 20, tintColor: '#e0af92' }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
           <ThemedText style={styles.headerTitle}>Add to Playlist</ThemedText>
           <View style={styles.headerRight} />
@@ -157,7 +161,11 @@ export default function MainPlaylistModal({
               <ThemedText style={styles.createPlaylistTitle}>Create New Playlist</ThemedText>
               <ThemedText style={styles.createPlaylistSubtitle}>Create a new playlist for this video</ThemedText>
             </View>
-            <CustomIcon name="chevron-right" size={16} color="#666666" />
+            <Image 
+              source={require('@/assets/images/ok_right.png')}
+              style={{ width: 16, height: 16, tintColor: '#666666' }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
 
           {/* User Playlists */}
@@ -249,7 +257,11 @@ export default function MainPlaylistModal({
           onPress={onClose}
           activeOpacity={0.7}
         >
-          <CustomIcon name="chevron-left" size={20} color="#e0af92" />
+          <Image 
+            source={require('@/assets/images/ok_left.png')}
+            style={{ width: 20, height: 20, tintColor: '#e0af92' }}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Playlists</ThemedText>
         <TouchableOpacity 
@@ -391,13 +403,18 @@ export default function MainPlaylistModal({
                     </TouchableOpacity>
                   )}
                   
-                  <View style={styles.expandButtonCircle}>
-                    <CustomIcon 
-                      name={expandedPlaylists.has(playlist.id) ? "keyboard-arrow-down" : "chevron-right"} 
-                      size={14} 
-                      color={expandedPlaylists.has(playlist.id) ? "#e0af92" : "#666666"} 
-                    />
-                  </View>
+                  <Image 
+                    source={expandedPlaylists.has(playlist.id) 
+                      ? require('@/assets/images/ok_down.png')
+                      : require('@/assets/images/ok_right.png')
+                    }
+                    style={{ 
+                      width: 22, // 18'den 22'ye büyüttük
+                      height: 22, 
+                      tintColor: expandedPlaylists.has(playlist.id) ? "#e0af92" : "#666666" 
+                    }}
+                    resizeMode="contain"
+                  />
                 </View>
               </TouchableOpacity>
             </View>
@@ -687,7 +704,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: '#0a0a0a', // Gerçekten koyu gri çizgi
   },
   headerTitle: {
     fontSize: 20,
@@ -727,7 +744,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#000000',
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: '#0a0a0a', // Gerçekten koyu gri çizgi
   },
   playlistHeader: {
     flexDirection: 'row',
@@ -824,7 +841,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: '#0a0a0a', // Gerçekten koyu gri çizgi
     backgroundColor: '#000000',
     position: 'relative',
   },
@@ -920,7 +937,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: '#0a0a0a', // Gerçekten koyu gri çizgi
   },
   selectedVideoThumbnail: {
     width: 60,
@@ -948,7 +965,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: '#0a0a0a', // Gerçekten koyu gri çizgi
     backgroundColor: '#1a1a1a',
     borderRadius: 12,
     marginBottom: 10,
@@ -983,7 +1000,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: '#0a0a0a', // Gerçekten koyu gri çizgi
   },
   selectPlaylistIcon: {
     width: 40,

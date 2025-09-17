@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { Image as RNImage } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { CustomIcon } from '@/components/ui/CustomIcon';
@@ -156,7 +157,11 @@ export default function CreatePlaylistModal({
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onClose}>
-          <CustomIcon name="chevron-left" size={24} color="#e0af92" />
+          <RNImage 
+            source={require('@/assets/images/ok_left.png')}
+            style={{ width: 24, height: 24, tintColor: '#e0af92' }}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>New Playlist</ThemedText>
         <View style={styles.headerSpacer} />
@@ -332,7 +337,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   createButtonDisabled: {
-    backgroundColor: '#666666',
+    backgroundColor: '#333333', // Daha koyu gri
   },
   buttonText: {
     fontSize: 16,

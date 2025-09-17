@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Platform, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform, Alert, Image } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
@@ -92,7 +92,11 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
           onPress={onClose}
           activeOpacity={0.7}
         >
-          <CustomIcon name="chevron-left" size={20} color="#e0af92" />
+          <Image 
+            source={require('@/assets/images/ok_right.png')}
+            style={{ width: 22, height: 22, tintColor: '#e0af92' }}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
         <ThemedText style={styles.headerTitle}>Profile</ThemedText>
         <View style={styles.headerRight} />
