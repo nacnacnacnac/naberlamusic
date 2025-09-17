@@ -3,7 +3,7 @@ import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, 
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Video } from 'expo-av';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
@@ -82,6 +82,26 @@ export default function HomeScreen() {
   // Check if user is logged in with Google (not guest/developer)
   const isGoogleUser = isAuthenticated && user && user.email && !user.email.includes('developer@') && !user.email.includes('guest@');
   
+  // Query params for shared videos
+  const params = useLocalSearchParams();
+  const [sharedVideoId, setSharedVideoId] = useState<string | null>(null);
+  
+  // Also try to get from URL directly on web
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const vParam = urlParams.get('v');
+      if (vParam) {
+        setSharedVideoId(vParam);
+      }
+    }
+    
+    // Also check Expo Router params
+    if (params.v) {
+      setSharedVideoId(params.v as string);
+    }
+  }, [params.v]);
+  
   const [currentVideo, setCurrentVideo] = useState<SimplifiedVimeoVideo | null>(null);
   const [currentPlaylistContext, setCurrentPlaylistContext] = useState<{playlistId: string, playlistName: string} | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -89,6 +109,8 @@ export default function HomeScreen() {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
+  const [shareToastVisible, setShareToastVisible] = useState(false);
+  const shareToastOpacity = useRef(new Animated.Value(0)).current;
   const [isPaused, setIsPaused] = useState(false);
   const [currentPlaylist, setCurrentPlaylist] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -220,6 +242,44 @@ export default function HomeScreen() {
     }, 500); // 500ms delay after page fade-in
   }, []);
 
+
+  // Handle shared video from URL params
+  useEffect(() => {
+    
+    if (sharedVideoId && videos.length > 0) {
+      console.log('🔗 Playing shared video:', sharedVideoId);
+      
+      const sharedVideo = videos.find(video => 
+        video.id === sharedVideoId || video.id === String(sharedVideoId)
+      );
+      
+      if (sharedVideo) {
+        console.log('🔗 Found shared video:', sharedVideo.name);
+        playVideo(sharedVideo);
+        // Clear the URL param after playing
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('v');
+          window.history.replaceState({}, '', url.toString());
+        }
+      } else {
+        console.log('🔗 Shared video not found in current videos');
+        console.log('🔗 Available video IDs:', videos.map(v => `${v.id} (${v.name})`));
+        console.log('🔗 Searching for exact matches...');
+        
+        // Try different matching strategies
+        const exactMatch = videos.find(v => v.id === sharedVideoId);
+        const stringMatch = videos.find(v => String(v.id) === String(sharedVideoId));
+        const containsMatch = videos.find(v => v.id.includes(sharedVideoId) || sharedVideoId.includes(v.id));
+        
+        console.log('🔗 Exact match:', exactMatch?.name || 'None');
+        console.log('🔗 String match:', stringMatch?.name || 'None');
+        console.log('🔗 Contains match:', containsMatch?.name || 'None');
+      }
+    } else if (sharedVideoId && videos.length === 0) {
+      console.log('🔗 Shared video ID present but videos not loaded yet');
+    }
+  }, [sharedVideoId, videos]);
 
   // Listen for global stop music events
   useEffect(() => {
@@ -519,6 +579,80 @@ export default function HomeScreen() {
     } catch (error) {
       console.error('Error checking if video is liked:', error);
       setIsHeartFavorited(false);
+    }
+  };
+
+  // Handle share video functionality
+  const handleShareVideo = async () => {
+    if (!currentVideo) return;
+    
+    console.log('🔗 Sharing video:', {
+      id: currentVideo.id,
+      name: currentVideo.name,
+      title: currentVideo.title
+    });
+    
+    try {
+      const shareUrl = Platform.OS === 'web' && typeof window !== 'undefined' 
+        ? `${window.location.origin}/?v=${currentVideo.id}`
+        : `naberla.music/?v=${currentVideo.id}`;
+      
+      console.log('🔗 Generated share URL:', shareUrl);
+      
+      if (Platform.OS === 'web' && navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl);
+        console.log('🔗 Link copied to clipboard:', shareUrl);
+        
+        // Show inline toast next to share button with animation
+        setShareToastVisible(true);
+        Animated.timing(shareToastOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+        
+        // Hide toast after 2 seconds with fade out
+        setTimeout(() => {
+          Animated.timing(shareToastOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            setShareToastVisible(false);
+          });
+        }, 2000);
+      } else {
+        // Mobile: Show inline toast like web
+        console.log('🔗 Share URL:', shareUrl);
+        
+        // Show inline toast next to share button with animation
+        setShareToastVisible(true);
+        Animated.timing(shareToastOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+        
+        // Hide toast after 2 seconds with fade out
+        setTimeout(() => {
+          Animated.timing(shareToastOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            setShareToastVisible(false);
+          });
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('Error sharing video:', error);
+      setToastMessage('Failed to copy link');
+      setToastType('error');
+      setToastVisible(true);
+      
+      setTimeout(() => {
+        setToastVisible(false);
+      }, 2000);
     }
   };
 
@@ -1451,55 +1585,213 @@ export default function HomeScreen() {
               </Animated.View>
             )}
 
-            {/* Heart Icon - OUTSIDE overlay */}
+            {/* Share and Heart Icons - OUTSIDE overlay */}
             {currentVideo && !isFullscreen && (
               <Animated.View 
                 style={[
                   {
                     position: 'absolute',
-                    top: Platform.OS === 'web' ? 25 : 20,
-                    right: 25,
+                    ...(Platform.OS === 'web' && width > 768 
+                      ? { top: 25, right: 25 } // Desktop web'de üstte
+                      : { bottom: 150, right: 25 } // Mobile'da altta (profile icon üstünde)
+                    ),
                     opacity: overlayOpacity,
                     zIndex: 10001, // En yüksek z-index
+                    flexDirection: (Platform.OS === 'web' && width > 768) ? 'row' : 'column', // Desktop web'de yan yana, mobil web'de alt alta
+                    alignItems: 'center',
+                    gap: (Platform.OS === 'web' && width > 768) ? 15 : 10, // Desktop web'de 15px, mobil web'de 10px
                   }
                 ]}
                 pointerEvents="box-none"
               >
-                <TouchableOpacity
-                  onPress={() => {
-                    console.log('❤️ HEART BUTTON PRESSED!');
-                    handleHeartPress();
-                  }}
-                  activeOpacity={0.7}
-                  style={{ 
-                    padding: 8,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'transparent', // Debug kaldırıldı
-                  }}
-                >
-                  {Platform.OS === 'web' ? (
-                    <div style={{
-                      width: '36px', // Web'de daha büyük (28px → 36px)
-                      height: '36px',
-                      backgroundColor: isHeartFavorited ? '#e0af92' : 'white',
-                      mask: 'url(/hearto.png) no-repeat center',
-                      maskSize: 'contain',
-                      WebkitMask: 'url(/hearto.png) no-repeat center',
-                      WebkitMaskSize: 'contain',
-                    }} />
-                  ) : (
-                    <Image
-                      source={heartImage}
-                      style={{
-                        width: 20, // Mobile'da küçük
-                        height: 20,
-                        tintColor: isHeartFavorited ? "#e0af92" : "white",
+                {/* Web'de: Share solda, Heart sağda | Mobilde: Heart üstte, Share altta */}
+                {(Platform.OS === 'web' && width > 768) ? (
+                  <>
+                    {/* Share Button with Inline Toast - Web'de solda */}
+                    <View style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {/* Inline Toast - Sol tarafta */}
+                      {shareToastVisible && (
+                        <Animated.View
+                          style={{
+                            marginRight: 8,
+                            backgroundColor: 'white',
+                            borderRadius: 12,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            shadowColor: '#000',
+                            shadowOffset: {
+                              width: 0,
+                              height: 2,
+                            },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 3.84,
+                            elevation: 5,
+                            opacity: shareToastOpacity,
+                          }}
+                        >
+                          <Text style={{
+                            color: 'black',
+                            fontSize: 12,
+                            fontWeight: '500',
+                          }}>
+                            Link copied!
+                          </Text>
+                        </Animated.View>
+                      )}
+                      
+                      <TouchableOpacity
+                        onPress={() => {
+                          console.log('🔗 SHARE BUTTON PRESSED!');
+                          handleShareVideo();
+                        }}
+                        activeOpacity={0.7}
+                        style={{ 
+                          padding: 8,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: 'transparent',
+                        }}
+                      >
+                        <Image 
+                          source={require('../../assets/images/link2.png')}
+                          style={{ 
+                            width: Platform.OS === 'web' ? 24 : 20, 
+                            height: Platform.OS === 'web' ? 24 : 20, 
+                            tintColor: 'white' 
+                          }}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Heart Button - Web'de sağda */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        console.log('❤️ HEART BUTTON PRESSED!');
+                        handleHeartPress();
                       }}
-                      resizeMode="contain"
-                    />
-                  )}
-                </TouchableOpacity>
+                      activeOpacity={0.7}
+                      style={{ 
+                        padding: 8,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'transparent',
+                      }}
+                    >
+                      <div style={{
+                        width: '36px',
+                        height: '36px',
+                        backgroundColor: isHeartFavorited ? '#e0af92' : 'white',
+                        mask: 'url(/hearto.png) no-repeat center',
+                        maskSize: 'contain',
+                        WebkitMask: 'url(/hearto.png) no-repeat center',
+                        WebkitMaskSize: 'contain',
+                      }} />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    {/* Mobilde: Heart üstte, Share altta */}
+                    {/* Heart Button - Mobilde üstte */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        console.log('❤️ HEART BUTTON PRESSED!');
+                        handleHeartPress();
+                      }}
+                      activeOpacity={0.7}
+                      style={{ 
+                        padding: 8,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'transparent',
+                      }}
+                    >
+                      <Image
+                        source={heartImage}
+                        style={{
+                          width: 35, // 25 * 1.4 = 35 (daha büyük)
+                          height: 35,
+                          tintColor: isHeartFavorited ? "#e0af92" : "white",
+                        }}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
+
+                    {/* Share Button with Inline Toast - Mobilde altta */}
+                    <View style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative', // Toast için relative positioning
+                    }}>
+                      {/* Inline Toast - Sol tarafta */}
+                      {shareToastVisible && (
+                        <Animated.View
+                          style={{
+                            position: 'absolute',
+                            right: 50, // Share butonunun solunda
+                            backgroundColor: 'white',
+                            borderRadius: 12,
+                            paddingHorizontal: 16, // Daha geniş padding
+                            paddingVertical: 6,
+                            minWidth: 100, // Minimum genişlik
+                            shadowColor: '#000',
+                            shadowOffset: {
+                              width: 0,
+                              height: 2,
+                            },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 3.84,
+                            elevation: 5,
+                            zIndex: 10002, // Toast için yüksek z-index
+                            opacity: shareToastOpacity,
+                          }}
+                        >
+                          <Text 
+                            numberOfLines={1}
+                            style={{
+                              color: 'black',
+                              fontSize: 12,
+                              fontWeight: '500',
+                              textAlign: 'center',
+                              whiteSpace: 'nowrap', // Web için tek satır
+                            }}
+                          >
+                            Link copied!
+                          </Text>
+                        </Animated.View>
+                      )}
+                      
+                      <TouchableOpacity
+                        onPress={() => {
+                          console.log('🔗 SHARE BUTTON PRESSED!');
+                          handleShareVideo();
+                        }}
+                        activeOpacity={0.7}
+                        style={{ 
+                          padding: 8,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: 'transparent',
+                        }}
+                      >
+                        <Image 
+                          source={require('../../assets/images/link2.png')}
+                          style={{ 
+                            width: 35, // Mobile: 25 * 1.4 = 35 (daha büyük)
+                            height: 35, 
+                            tintColor: 'white' 
+                          }}
+                          resizeMode="contain"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </Animated.View>
             )}
             

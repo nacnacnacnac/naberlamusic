@@ -332,6 +332,13 @@ export default function MainPlaylistModal({
             console.log('🔍 Filtering out deleted playlist:', playlist.id, playlist.name);
           }
           return !isDeleted;
+        }).sort((a, b) => {
+          // "NABER LA AI" playlist always comes first in admin playlists
+          if (a.name === 'NABER LA AI' && b.name !== 'NABER LA AI') return -1;
+          if (b.name === 'NABER LA AI' && a.name !== 'NABER LA AI') return 1;
+          
+          // Keep original order for other playlists
+          return 0;
         }).map((playlist, playlistIndex) => {
           const isLastPlaylist = playlistIndex === userPlaylists.length - 1;
           return (

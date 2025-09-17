@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#000000',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: {
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     borderColor: '#e0af92',
   },
   message: {
-    color: 'white',
+    color: 'black',
     fontSize: 14,
     fontWeight: '500',
     marginLeft: 10,
