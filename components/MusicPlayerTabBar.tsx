@@ -556,7 +556,7 @@ export default function MusicPlayerTabBar({
           }}
         >
           <Image
-            source={require('@/assets/images/profile1.png')}
+            source={require('@/assets/images/profile2.png')}
             style={styles.profileImage}
             contentFit="contain"
           />
