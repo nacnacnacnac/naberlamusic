@@ -469,21 +469,48 @@ export default function MainPlaylistModal({
                           contentFit="cover"
                         />
                         <View style={styles.videoInfo}>
-                          <ThemedText 
-                            style={[
-                              styles.videoTitle,
-                              ((currentVideo?.id && playlistVideo.id && currentVideo.id === playlistVideo.id) || 
-                               (currentVideo?.id && playlistVideo.vimeo_id && currentVideo.id === playlistVideo.vimeo_id) ||
-                               (currentVideo?.vimeo_id && playlistVideo.id && currentVideo.vimeo_id === playlistVideo.id) ||
-                               (currentVideo?.vimeo_id && playlistVideo.vimeo_id && currentVideo.vimeo_id === playlistVideo.vimeo_id)) && styles.currentVideoTitle
-                            ]} 
-                            numberOfLines={2}
-                          >
-                            {playlistVideo.title}
-                          </ThemedText>
-                          <ThemedText style={styles.videoDuration}>
-                            {playlistVideo.duration ? `${Math.floor(playlistVideo.duration / 60)}:${(playlistVideo.duration % 60).toString().padStart(2, '0')}` : '0:00'}
-                          </ThemedText>
+                          {/* Artist Name - Extract from title (before " - ") */}
+                          {playlistVideo.title.includes(' - ') ? (
+                            <>
+                              <ThemedText 
+                                style={[
+                                  styles.videoArtist,
+                                  ((currentVideo?.id && playlistVideo.id && currentVideo.id === playlistVideo.id) || 
+                                   (currentVideo?.id && playlistVideo.vimeo_id && currentVideo.id === playlistVideo.vimeo_id) ||
+                                   (currentVideo?.vimeo_id && playlistVideo.id && currentVideo.vimeo_id === playlistVideo.id) ||
+                                   (currentVideo?.vimeo_id && playlistVideo.vimeo_id && currentVideo.vimeo_id === playlistVideo.vimeo_id)) && styles.currentVideoArtist
+                                ]} 
+                                numberOfLines={1}
+                              >
+                                {playlistVideo.title.split(' - ')[0]}
+                              </ThemedText>
+                              <ThemedText 
+                                style={[
+                                  styles.videoSongName,
+                                  ((currentVideo?.id && playlistVideo.id && currentVideo.id === playlistVideo.id) || 
+                                   (currentVideo?.id && playlistVideo.vimeo_id && currentVideo.id === playlistVideo.vimeo_id) ||
+                                   (currentVideo?.vimeo_id && playlistVideo.id && currentVideo.vimeo_id === playlistVideo.id) ||
+                                   (currentVideo?.vimeo_id && playlistVideo.vimeo_id && currentVideo.vimeo_id === playlistVideo.vimeo_id)) && styles.currentVideoSongName
+                                ]} 
+                                numberOfLines={1}
+                              >
+                                {playlistVideo.title.split(' - ').slice(1).join(' - ')}
+                              </ThemedText>
+                            </>
+                          ) : (
+                            <ThemedText 
+                              style={[
+                                styles.videoTitle,
+                                ((currentVideo?.id && playlistVideo.id && currentVideo.id === playlistVideo.id) || 
+                                 (currentVideo?.id && playlistVideo.vimeo_id && currentVideo.id === playlistVideo.vimeo_id) ||
+                                 (currentVideo?.vimeo_id && playlistVideo.id && currentVideo.vimeo_id === playlistVideo.id) ||
+                                 (currentVideo?.vimeo_id && playlistVideo.vimeo_id && currentVideo.vimeo_id === playlistVideo.vimeo_id)) && styles.currentVideoTitle
+                              ]} 
+                              numberOfLines={2}
+                            >
+                              {playlistVideo.title}
+                            </ThemedText>
+                          )}
                         </View>
                         </TouchableOpacity>
                         
@@ -839,6 +866,25 @@ const styles = StyleSheet.create({
   },
   currentVideoTitle: {
     color: '#e0af92',
+  },
+  videoArtist: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'white',
+    marginBottom: 2,
+    lineHeight: 16,
+  },
+  currentVideoArtist: {
+    color: '#e0af92',
+  },
+  videoSongName: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#666666', // Koyu gri
+    lineHeight: 14,
+  },
+  currentVideoSongName: {
+    color: '#999999', // Current şarkı için biraz daha açık gri
   },
   videoDuration: {
     fontSize: 12,
