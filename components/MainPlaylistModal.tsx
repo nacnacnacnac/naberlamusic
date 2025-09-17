@@ -288,8 +288,7 @@ export default function MainPlaylistModal({
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
-                zIndex: 1,
-                marginTop: '200px'
+                zIndex: 1
               }}>
                 <img 
                   src="/loading.gif" 
