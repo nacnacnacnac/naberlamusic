@@ -77,6 +77,197 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     } : null
   );
 
+  // Web Media Session API for lock screen controls
+  useEffect(() => {
+    if (Platform.OS === 'web' && video && 'mediaSession' in navigator) {
+      try {
+        // Set metadata for lock screen
+        (navigator as any).mediaSession.metadata = new (window as any).MediaMetadata({
+          title: video.name || 'Naber LA Music',
+          artist: 'Naber LA',
+          album: 'Naber LA',
+          artwork: [
+            { src: '/naber-la-128.png', sizes: '128x128', type: 'image/png' },
+            { src: '/naber-la-256.png', sizes: '256x256', type: 'image/png' },
+            { src: '/naber-la-512.png', sizes: '512x512', type: 'image/png' }
+          ]
+        });
+
+        // Set action handlers for lock screen controls
+        (navigator as any).mediaSession.setActionHandler('play', () => {
+          console.log('🎵 Media Session: Play requested');
+          playVideo();
+        });
+
+        (navigator as any).mediaSession.setActionHandler('pause', () => {
+          console.log('🎵 Media Session: Pause requested');
+          pauseVideo();
+        });
+
+        (navigator as any).mediaSession.setActionHandler('previoustrack', () => {
+          console.log('🎵 Media Session: Previous track requested');
+          // You can add previous track functionality here if needed
+        });
+
+        (navigator as any).mediaSession.setActionHandler('nexttrack', () => {
+          console.log('🎵 Media Session: Next track requested');
+          if (onNext) onNext();
+        });
+
+        console.log('🎵 Web Media Session configured for:', video.name);
+      } catch (error) {
+        console.warn('🎵 Media Session setup failed:', error);
+      }
+    }
+  }, [video?.name, video?.id]);
+
+  // Page Visibility API - prevent pause on screen lock (web only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleVisibilityChange = () => {
+        // Only try to resume if we were playing and video is ready
+        if (document.hidden && isPlaying && (globalThis as any).webVideoElement) {
+          console.log('🎵 Screen locked, attempting to keep audio playing');
+          
+          // Small delay to let the system settle
+          setTimeout(() => {
+            const videoElement = (globalThis as any).webVideoElement;
+            if (videoElement && videoElement.paused && isPlaying) {
+              videoElement.play().catch((error) => {
+                console.log('🎵 Background play attempt failed (expected on iOS):', error.message);
+              });
+            }
+          }, 100);
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, [isPlaying]);
+
+  // Define play/pause functions for both ref and media session
+  const playVideo = async () => {
+    try {
+      console.log('🎬 VimeoPlayerNative.play() called');
+      
+      if (Platform.OS === 'web') {
+        // Web: HTML5 video player
+        console.log('🌐 Playing HTML5 video with sound');
+        
+        const videoElement = (globalThis as any).webVideoElement;
+        if (videoElement) {
+          try {
+            videoElement.muted = false;
+            videoElement.volume = 1.0;
+            
+            console.log('🎬 HTML5 video state:', {
+              muted: videoElement.muted,
+              volume: videoElement.volume,
+              paused: videoElement.paused,
+              readyState: videoElement.readyState
+            });
+            
+            const playPromise = videoElement.play();
+            
+            // Update state immediately
+            setIsPlaying(true);
+            setShouldPlay(true);
+            
+            // Update web media session playback state
+            if (Platform.OS === 'web' && 'mediaSession' in navigator) {
+              (navigator as any).mediaSession.playbackState = 'playing';
+            }
+            
+            if (playPromise && typeof playPromise.then === 'function') {
+              playPromise.then(() => {
+                console.log('🔊 HTML5 video play successful');
+                // Don't call onPlayStateChange to avoid loops
+              }).catch((error) => {
+                console.error('❌ HTML5 video play failed:', error);
+                // Revert state on error
+                setIsPlaying(false);
+                setShouldPlay(false);
+                onError?.(error.message);
+              });
+            } else {
+              console.log('🔊 HTML5 video play called (sync)');
+              // Don't call onPlayStateChange to avoid loops
+            }
+          } catch (error: any) {
+            console.error('❌ HTML5 video play error:', error);
+            setIsPlaying(false);
+            setShouldPlay(false);
+            onError?.(error.message);
+          }
+        }
+      } else {
+        // Native: expo-video player
+        if (player) {
+          player.play();
+          setIsPlaying(true);
+          setShouldPlay(true);
+          
+          // Update native media session
+          updatePlaybackState(true);
+        }
+      }
+      
+      onPlayStateChange?.(true);
+    } catch (error: any) {
+      console.error('❌ Play error:', error);
+      onError?.(error.message);
+    }
+  };
+
+  const pauseVideo = async () => {
+    try {
+      console.log('🎬 VimeoPlayerNative.pause() called');
+      
+      if (Platform.OS === 'web') {
+        // Web: HTML5 video player
+        console.log('🌐 Pausing HTML5 video');
+        
+        const videoElement = (globalThis as any).webVideoElement;
+        if (videoElement) {
+          try {
+            videoElement.pause();
+            // Update state immediately
+            setIsPlaying(false);
+            setShouldPlay(false);
+            
+            // Update web media session playback state
+            if (Platform.OS === 'web' && 'mediaSession' in navigator) {
+              (navigator as any).mediaSession.playbackState = 'paused';
+            }
+            // Don't call onPlayStateChange to avoid loops
+            console.log('🔊 HTML5 video paused successfully');
+          } catch (error: any) {
+            console.error('❌ HTML5 video pause error:', error);
+            onError?.(error.message);
+          }
+        }
+      } else {
+        // Native: expo-video player
+        if (player) {
+          player.pause();
+          setIsPlaying(false);
+          setShouldPlay(false);
+          
+          // Update native media session
+          updatePlaybackState(false);
+        }
+      }
+      
+      onPlayStateChange?.(false);
+    } catch (error: any) {
+      console.error('❌ Pause error:', error);
+      onError?.(error.message);
+    }
+  };
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -106,6 +297,11 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
               // Update state immediately
               setIsPlaying(true);
               setShouldPlay(true);
+              
+              // Update web media session playback state
+              if (Platform.OS === 'web' && 'mediaSession' in navigator) {
+                (navigator as any).mediaSession.playbackState = 'playing';
+              }
               
               if (playPromise && typeof playPromise.then === 'function') {
                 playPromise.then(() => {
@@ -207,6 +403,11 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
               // Update state immediately
               setIsPlaying(false);
               setShouldPlay(false);
+              
+              // Update web media session playback state
+              if (Platform.OS === 'web' && 'mediaSession' in navigator) {
+                (navigator as any).mediaSession.playbackState = 'paused';
+              }
               // Don't call onPlayStateChange to avoid loops
               console.log('🔊 HTML5 video paused successfully');
             } catch (error: any) {
