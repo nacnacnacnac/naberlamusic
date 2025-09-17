@@ -254,7 +254,7 @@ export default function MainPlaylistModal({
         <ThemedText style={styles.headerTitle}>Playlists</ThemedText>
         <TouchableOpacity 
           style={styles.headerRight}
-          onPress={() => setCurrentView('createPlaylist')}
+          onPress={onPlusButtonPress || (() => setCurrentView('createPlaylist'))}
           activeOpacity={0.7}
         >
           <CustomIcon name="plus" size={20} color="#e0af92" />

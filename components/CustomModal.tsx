@@ -99,19 +99,35 @@ export default function CustomModal({
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
+    ...(Platform.OS === 'web' ? {
+      position: 'fixed', // Web'de fixed
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    } : {
+      position: 'absolute', // Mobile'da absolute
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    }),
+    zIndex: 2000, // MusicPlayerTabBar'dan çok yüksek
   },
   background: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...(Platform.OS === 'web' ? {
+      position: 'fixed', // Web'de fixed
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    } : {
+      position: 'absolute', // Mobile'da absolute
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    }),
   },
   backgroundOverlay: {
     flex: 1,

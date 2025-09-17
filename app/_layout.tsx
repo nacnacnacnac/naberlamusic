@@ -66,6 +66,9 @@ export default function RootLayout() {
         
         body, html {
           font-family: 'Funnel Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+          background-color: #000000 !important;
+          margin: 0;
+          padding: 0;
         }
         
         /* React Native Text elementleri için */
@@ -74,6 +77,20 @@ export default function RootLayout() {
         span, p, h1, h2, h3, h4, h5, h6,
         input, textarea, button {
           font-family: 'Funnel Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        }
+        
+        /* Root container */
+        #root, #__next, 
+        .expo-web-container,
+        .css-view-175oi2r,
+        [data-reactroot] {
+          background-color: #000000 !important;
+          min-height: 100vh;
+        }
+        
+        /* Expo Web specific containers */
+        .css-view-175oi2r {
+          background-color: #000000 !important;
         }
         
       `;
@@ -153,10 +170,18 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#000000' }}>
       <AuthProvider>
         <VimeoProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <ThemeProvider value={{
+            ...DarkTheme,
+            colors: {
+              ...DarkTheme.colors,
+              background: '#000000',
+              card: '#000000',
+              primary: '#ffffff'
+            }
+          }}>
             <Stack
               screenOptions={{
                 headerShown: false, // Tüm header'ları gizle

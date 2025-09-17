@@ -99,6 +99,9 @@ export default function HomeScreen() {
   // Page fade-in animation
   const pageOpacity = useRef(new Animated.Value(0)).current;
   
+  // Landscape detection
+  const [isLandscape, setIsLandscape] = useState(false);
+  
   // ten.png animation
   const tenPngOpacity = useRef(new Animated.Value(0)).current;
   const tenPngTranslateY = useRef(new Animated.Value(-50)).current;
@@ -151,6 +154,45 @@ export default function HomeScreen() {
   // Removed auto-play: Let user choose which video to play
   // Videos will be available in playlist, but no auto-selection
   // This way select.mp4 will show until user clicks a video
+
+  // Orientation detection
+  useEffect(() => {
+    const checkOrientation = () => {
+      const { width, height } = Dimensions.get('window');
+      setIsLandscape(width > height);
+    };
+
+    checkOrientation();
+    const subscription = Dimensions.addEventListener('change', checkOrientation);
+    return () => subscription?.remove();
+  }, []);
+
+  // Set web body background to black
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      document.body.style.backgroundColor = '#000000';
+      document.documentElement.style.backgroundColor = '#000000';
+      
+      return () => {
+        // Cleanup on unmount
+        document.body.style.backgroundColor = '';
+        document.documentElement.style.backgroundColor = '';
+      };
+    }
+  }, []);
+
+  // Set web body background to black
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      document.body.style.backgroundColor = '#000000';
+      document.documentElement.style.backgroundColor = '#000000';
+      
+      return () => {
+        document.body.style.backgroundColor = '';
+        document.documentElement.style.backgroundColor = '';
+      };
+    }
+  }, []);
 
   // Page animations on mount
   useEffect(() => {
@@ -732,6 +774,13 @@ export default function HomeScreen() {
     }
   };
 
+  // Handle plus button inside MainPlaylistModal for logout users
+  const handleMainPlaylistPlusButton = () => {
+    // This function is only called for logout users
+    setShowMainPlaylistModal(false);
+    setShowProfileModal(true);
+  };
+
   // Handle profile button press
   const handleProfilePress = () => {
     setShowProfileModal(true);
@@ -1198,8 +1247,9 @@ export default function HomeScreen() {
       <Animated.View style={[
         styles.playerArea, 
         isFullscreen && styles.fullscreenPlayer,
+        isLandscape && styles.landscapePlayerArea, // New style for landscape
         Platform.OS === 'web' && {
-          height: videoHeightAnimation.interpolate({
+          height: isLandscape ? '100vh' : videoHeightAnimation.interpolate({
             inputRange: [0.7, 1],
             outputRange: ['70vh', '100vh']
           })
@@ -1565,8 +1615,36 @@ export default function HomeScreen() {
         )}
       </Animated.View>
 
-      {/* Video Info Area - Hidden on web for cleaner look */}
-      {currentVideo && !isFullscreen && Platform.OS !== 'web' && (
+      {/* Header Gradient - Only over video - Portrait Mode - Hidden when song is playing */}
+      {!isLandscape && !currentVideo && (
+        <LinearGradient
+          colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']}
+          style={styles.headerGradient}
+        />
+      )}
+
+      {/* Side Gradients - Only in Landscape Mode - Hidden when song is playing */}
+      {isLandscape && !currentVideo && (
+        <>
+          {/* Left Gradient */}
+          <LinearGradient
+            colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.leftSideGradient}
+          />
+          {/* Right Gradient */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.rightSideGradient}
+          />
+        </>
+      )}
+
+      {/* Video Info Area - Hidden on web and landscape for cleaner look */}
+      {currentVideo && !isFullscreen && !isLandscape && Platform.OS !== 'web' && (
         <ThemedView style={styles.videoInfoArea}>
           <ThemedView style={styles.titleContainer}>
             <ThemedView style={styles.titleTextContainer}>
@@ -1590,8 +1668,8 @@ export default function HomeScreen() {
         </ThemedView>
       )}
 
-      {/* Playlist Area - Show only when expanded with smooth animation - Hidden on Web */}
-      {!isFullscreen && Platform.OS !== 'web' && (
+      {/* Playlist Area - Show only when expanded with smooth animation - Hidden on Web and Landscape */}
+      {!isFullscreen && !isLandscape && Platform.OS !== 'web' && (
         <Animated.View
           style={{
             opacity: playlistAnimation,
@@ -1802,7 +1880,8 @@ export default function HomeScreen() {
       />
 
       {/* Music Player Footer */}
-      {(currentVideo || Platform.OS === 'web') && !isFullscreen && (
+      {console.log('🔍 TabBar Debug:', { currentVideo: !!currentVideo, platform: Platform.OS, isFullscreen })}
+      {(Platform.OS === 'web' ? !isFullscreen : true) && (
         <MusicPlayerTabBar
           currentVideo={currentVideo}
           isPaused={isPaused}
@@ -1836,7 +1915,7 @@ export default function HomeScreen() {
             onRefresh={onRefresh}
             refreshing={refreshing}
             refreshTrigger={playlistRefreshTrigger}
-            onPlusButtonPress={handlePlaylistPlusButton}
+            onPlusButtonPress={isGoogleUser ? undefined : handleMainPlaylistPlusButton}
           />
         </LeftModal>
       )}
@@ -2476,5 +2555,41 @@ const styles = StyleSheet.create({
     fontWeight: '400', // Normal weight
     color: 'rgba(255,255,255,0.9)', // Biraz daha soluk
     lineHeight: Platform.OS === 'web' ? 24 : 10,
+  },
+  // Landscape Player Area
+  landscapePlayerArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '100vh',
+    width: '100vw',
+    zIndex: 1000, // En üstte olsun
+  },
+  // Gradient Overlays
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 150, // Header'dan aşağı gradient
+    zIndex: 2, // Overlay'in üzerinde ama content'in altında
+  },
+  leftSideGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 150, // Soldan sağa gradient
+    zIndex: 2, // Overlay'in üzerinde ama content'in altında
+  },
+  rightSideGradient: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 150, // Sağdan sola gradient
+    zIndex: 2, // Overlay'in üzerinde ama content'in altında
   },
 });

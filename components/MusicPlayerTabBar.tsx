@@ -65,8 +65,8 @@ export default function MusicPlayerTabBar({
   testState,
   onTestStateChange
 }: MusicPlayerTabBarProps) {
-  // Web'de currentVideo yokken de göster, mobile'da sadece currentVideo varken göster
-  if (!currentVideo && Platform.OS !== 'web') return null;
+  // Her zaman göster - currentVideo durumuna bakmadan
+  // if (!currentVideo && Platform.OS !== 'web') return null;
   
 
   // Footer testing state
@@ -424,7 +424,7 @@ export default function MusicPlayerTabBar({
     <>
       {/* Simple black gradient for icons */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
+        colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
         style={styles.iconGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -569,26 +569,40 @@ export default function MusicPlayerTabBar({
 
 const styles = StyleSheet.create({
   iconGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 250, // Yukarı doğru uzat (190 → 250)
-    zIndex: 1,
+    ...(Platform.OS === 'web' ? {
+      position: 'fixed', // Web'de fixed
+      bottom: 0,
+      left: 0,
+      right: 0,
+    } : {
+      position: 'absolute', // Mobile'da absolute
+      bottom: 0,
+      left: 0,
+      right: 0,
+    }),
+    height: 300, // Daha yukarı doğru uzat (250 → 300)
+    zIndex: 1001, // Container'dan (1000) yüksek
   },
   container: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    ...(Platform.OS === 'web' ? {
+      position: 'fixed', // Web'de fixed
+      bottom: 0,
+      left: 0,
+      right: 0,
+    } : {
+      position: 'absolute', // Mobile'da absolute
+      bottom: 0,
+      left: 0,
+      right: 0,
+    }),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 20,
-    paddingBottom: 30, // İconları çok az daha yukarı
-    height: 100, // Daha küçük container
-    zIndex: 100, // Daha yüksek z-index
+    paddingBottom: Platform.OS === 'web' ? 30 : 50, // Mobilde daha fazla padding
+    height: Platform.OS === 'web' ? 100 : 120, // Mobilde daha yüksek container
+    zIndex: 1002, // Gradient'den (1001) yüksek
   },
   leftLogo: {
     width: 100, // Sabit genişlik

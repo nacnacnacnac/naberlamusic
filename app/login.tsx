@@ -34,6 +34,7 @@ export default function LoginScreen() {
   
   // UI state
   const [showAuthButtons, setShowAuthButtons] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
   
   // Page fade-in animations
   const pageOpacity = useRef(new Animated.Value(0)).current;
@@ -84,6 +85,36 @@ export default function LoginScreen() {
       // User can manually navigate using buttons
     }
   }, [isAuthenticated]);
+
+  // Orientation detection
+  useEffect(() => {
+    const checkOrientation = () => {
+      const { width, height } = Dimensions.get('window');
+      setIsLandscape(width > height);
+    };
+
+    // Initial check
+    checkOrientation();
+
+    // Listen for orientation changes
+    const subscription = Dimensions.addEventListener('change', checkOrientation);
+
+    return () => subscription?.remove();
+  }, []);
+
+  // Set web body background to black
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      document.body.style.backgroundColor = '#000000';
+      document.documentElement.style.backgroundColor = '#000000';
+      
+      return () => {
+        // Cleanup on unmount
+        document.body.style.backgroundColor = '';
+        document.documentElement.style.backgroundColor = '';
+      };
+    }
+  }, []);
 
   // Start logo animation and page fade-in on component mount
   useEffect(() => {
@@ -527,7 +558,7 @@ export default function LoginScreen() {
           left: 0,
           width: '100vw',
           height: '100vh',
-          zIndex: -1,
+          zIndex: -1, // Always behind content
           overflow: 'hidden'
         }}>
           <video
@@ -551,10 +582,10 @@ export default function LoginScreen() {
           </video>
         </div>
       ) : (
-        <View style={styles.videoContainer}>
+        <View style={[styles.videoContainer, isLandscape && styles.videoContainerLandscape]}>
           <Video
             source={backgroundVideo}
-            style={styles.backgroundVideo}
+            style={[styles.backgroundVideo, isLandscape && styles.backgroundVideoLandscape]}
             shouldPlay
             isLooping
             isMuted
@@ -568,6 +599,75 @@ export default function LoginScreen() {
         colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']}
         style={styles.overlay}
       />
+
+      {/* Header Gradient - Only over video - Portrait Mode */}
+      {!isLandscape && (
+        <LinearGradient
+          colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']}
+          style={styles.headerGradient}
+        />
+      )}
+
+      {/* Side Gradients - Only in Landscape Mode */}
+      {isLandscape && (
+        <>
+          {/* Left Gradient */}
+          <LinearGradient
+            colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.leftSideGradient}
+          />
+          {/* Right Gradient */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.rightSideGradient}
+          />
+        </>
+      )}
+
+      {/* Mobile Gradient Overlays - Hide white edges */}
+      {Platform.OS !== 'web' && (
+        <>
+          {/* Portrait Mode - Vertical Gradients (Top/Bottom) */}
+          {!isLandscape && (
+            <>
+              {/* Top Gradient */}
+              <LinearGradient
+                colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0)']}
+                style={styles.topGradient}
+              />
+              {/* Bottom Gradient */}
+              <LinearGradient
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
+                style={styles.bottomGradient}
+              />
+            </>
+          )}
+
+          {/* Landscape Mode - Horizontal Gradients (Left/Right) */}
+          {isLandscape && (
+            <>
+              {/* Left Gradient */}
+              <LinearGradient
+                colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.leftGradient}
+              />
+              {/* Right Gradient */}
+              <LinearGradient
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.rightGradient}
+              />
+            </>
+          )}
+        </>
+      )}
       
       {/* Content */}
       <View style={styles.content}>
@@ -1906,6 +2006,50 @@ const styles = StyleSheet.create({
     ],
     objectFit: 'cover',
   },
+  videoContainerLandscape: {
+    zIndex: -1, // Always behind content
+  },
+  backgroundVideoLandscape: {
+    zIndex: -1, // Always behind content
+    transform: [
+      { translateX: '-50%' },
+      { translateY: '-50%' },
+      { scale: 1.0 } // No scale in landscape for better quality
+    ],
+  },
+  // Mobile Gradient Overlays
+  topGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    zIndex: 10,
+  },
+  bottomGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    zIndex: 10,
+  },
+  leftGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 100,
+    zIndex: 10,
+  },
+  rightGradient: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 100,
+    zIndex: 10,
+  },
   backgroundPlaceholder: {
     position: 'absolute',
     top: 0,
@@ -1928,6 +2072,30 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+  },
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 150, // Header'dan aşağı gradient
+    zIndex: 2, // Overlay'in üzerinde ama content'in altında
+  },
+  leftSideGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 150, // Soldan sağa gradient
+    zIndex: 2, // Overlay'in üzerinde ama content'in altında
+  },
+  rightSideGradient: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 150, // Sağdan sola gradient
+    zIndex: 2, // Overlay'in üzerinde ama content'in altında
   },
   content: {
     flex: 1,
