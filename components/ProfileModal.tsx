@@ -238,7 +238,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                     style={{
                       width: '20px',
                       height: '20px',
-                      backgroundColor: 'white',
+                      backgroundColor: '#000000',
                       mask: 'url(/images/google.svg) no-repeat center',
                       maskSize: 'contain',
                       WebkitMask: 'url(/images/google.svg) no-repeat center',
