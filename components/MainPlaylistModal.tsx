@@ -265,6 +265,7 @@ export default function MainPlaylistModal({
       <ScrollView 
         ref={playlistScrollRef}
         style={styles.playlistArea}
+        contentContainerStyle={styles.playlistScrollContainer}
         showsVerticalScrollIndicator={false}
         scrollEnabled={true}
         nestedScrollEnabled={true}
@@ -707,6 +708,10 @@ const styles = StyleSheet.create({
   playlistArea: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  playlistScrollContainer: {
+    paddingBottom: 300, // Tüm platformlarda çok fazla padding
+    minHeight: '100%', // Minimum yükseklik garanti et
   },
   userPlaylistContainer: {
     marginTop: 0,

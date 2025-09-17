@@ -424,9 +424,9 @@ export default function MusicPlayerTabBar({
     <>
       {/* Simple black gradient for icons */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
+        colors={['transparent', 'transparent', 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
         style={styles.iconGradient}
-        start={{ x: 0, y: 0 }}
+        start={{ x: 0, y: 0.5 }}
         end={{ x: 0, y: 1 }}
         pointerEvents="none"
       />
@@ -556,7 +556,7 @@ export default function MusicPlayerTabBar({
           }}
         >
           <Image
-            source={require('@/assets/images/profile.png')}
+            source={require('@/assets/images/profile1.png')}
             style={styles.profileImage}
             contentFit="contain"
           />
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
     height: 55,
     borderRadius: 27.5,
     backgroundColor: 'transparent', // İçi boş
-    borderWidth: 2,
+    borderWidth: 1, // Daha ince border
     borderColor: '#333333', // Gri border
     justifyContent: 'center',
     alignItems: 'center',
@@ -718,8 +718,8 @@ const styles = StyleSheet.create({
   },
   profileButton: {
     backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#444444',
+    borderWidth: 1, // Daha ince border
+    borderColor: '#333333', // Gri border
     width: 44,
     height: 44,
     marginRight: 10, // Sola kaydır
