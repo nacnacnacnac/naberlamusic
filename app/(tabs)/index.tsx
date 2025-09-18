@@ -132,6 +132,8 @@ export default function HomeScreen() {
   const tenPngTranslateY = useRef(new Animated.Value(-50)).current;
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showMainPlaylistModal, setShowMainPlaylistModal] = useState(false);
+  const [mainPlaylistInitialView, setMainPlaylistInitialView] = useState<'main' | 'selectPlaylist' | 'createPlaylist' | 'profile'>('main');
+  const mainPlaylistModalRef = useRef<any>(null);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [createPlaylistVideoId, setCreatePlaylistVideoId] = useState<string>('');
@@ -662,11 +664,22 @@ export default function HomeScreen() {
     
     // Check if user is logged in with Google
     if (!isGoogleUser) {
-      console.log('❌ Not Google user - opening ProfileModal for sign in');
-      setShowProfileModal(true);
+      console.log('❌ Not Google user - opening MainPlaylistModal with profile view for sign in');
+      // Eğer modal zaten açıksa, önce kapat sonra profile view ile aç
+      if (showMainPlaylistModal) {
+        setShowMainPlaylistModal(false);
+        setTimeout(() => {
+          setMainPlaylistInitialView('profile');
+          setShowMainPlaylistModal(true);
+        }, 100);
+      } else {
+        setMainPlaylistInitialView('profile');
+        setShowMainPlaylistModal(true);
+      }
       return;
     }
     
+    // User is logged in - proceed with like functionality
     try {
       console.log('❤️ Heart pressed for video:', currentVideo.name);
       const newLikedState = await hybridPlaylistService.toggleLikedSong(currentVideo);
@@ -898,7 +911,9 @@ export default function HomeScreen() {
   // Handle heart icon press - create playlist for mobile, show main playlist modal for web
   const handleHeartIconPress = () => {
     if (Platform.OS === 'web') {
-      // Web'de main playlist modal'ını aç
+      // Web'de main playlist modal'ını main view ile aç (her zaman playlist göster)
+      console.log('🎵 Heart icon pressed - opening MainPlaylistModal with main view');
+      setMainPlaylistInitialView('main');
       setShowMainPlaylistModal(true);
     } else {
       // Mobile'da playlist oluşturma
@@ -918,27 +933,25 @@ export default function HomeScreen() {
     }
   };
 
-  // Handle playlist plus button - opens CreatePlaylist for Google users, ProfileModal for others
+  // Handle playlist plus button - always opens MainPlaylistModal
   const handlePlaylistPlusButton = () => {
-    if (isGoogleUser) {
-      setShowMainPlaylistModal(true);
-    } else {
-      // Close MainPlaylistModal and open ProfileModal for sign in
-      setShowMainPlaylistModal(false);
-      setShowProfileModal(true);
-    }
+    setShowMainPlaylistModal(true);
   };
 
-  // Handle plus button inside MainPlaylistModal for logout users
-  const handleMainPlaylistPlusButton = () => {
-    // This function is only called for logout users
-    setShowMainPlaylistModal(false);
-    setShowProfileModal(true);
-  };
 
-  // Handle profile button press
+  // Handle profile button press - opens MainPlaylistModal with profile view
   const handleProfilePress = () => {
-    setShowProfileModal(true);
+    // Eğer modal zaten açıksa, önce kapat sonra profile view ile aç
+    if (showMainPlaylistModal) {
+      setShowMainPlaylistModal(false);
+      setTimeout(() => {
+        setMainPlaylistInitialView('profile');
+        setShowMainPlaylistModal(true);
+      }, 100);
+    } else {
+      setMainPlaylistInitialView('profile');
+      setShowMainPlaylistModal(true);
+    }
   };
 
   const toggleFullscreen = () => {
@@ -2217,7 +2230,6 @@ export default function HomeScreen() {
           }}
           onMuteToggle={handleMuteToggle}
           onPlaylistToggle={handleHeartIconPress}
-          onProfilePress={handleProfilePress}
           testState={testState}
           onTestStateChange={setTestState}
         />
@@ -2227,11 +2239,23 @@ export default function HomeScreen() {
       {Platform.OS === 'web' && (
         <LeftModal
           visible={showMainPlaylistModal}
-          onClose={() => setShowMainPlaylistModal(false)}
+          onClose={() => {
+            console.log('🔄 LeftModal onClose - resetting states');
+            setShowMainPlaylistModal(false);
+            setMainPlaylistInitialView('main'); // Reset to main when modal closes
+            // Reset MainPlaylistModal internal state if ref exists
+            if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
+              mainPlaylistModalRef.current.resetToMain();
+            }
+          }}
           height={600}
         >
           <MainPlaylistModal 
-            onClose={() => setShowMainPlaylistModal(false)}
+            ref={mainPlaylistModalRef}
+            onClose={() => {
+              setShowMainPlaylistModal(false);
+              setMainPlaylistInitialView('main'); // Reset to main view when closing
+            }}
             userPlaylists={userPlaylists}
             expandedPlaylists={expandedPlaylists}
             onTogglePlaylistExpansion={togglePlaylistExpansion}
@@ -2240,7 +2264,7 @@ export default function HomeScreen() {
             onRefresh={onRefresh}
             refreshing={refreshing}
             refreshTrigger={playlistRefreshTrigger}
-            onPlusButtonPress={isGoogleUser ? undefined : handleMainPlaylistPlusButton}
+            initialView={mainPlaylistInitialView}
           />
         </LeftModal>
       )}

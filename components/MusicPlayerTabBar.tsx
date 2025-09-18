@@ -49,7 +49,6 @@ interface MusicPlayerTabBarProps {
   onAddToPlaylist: () => void;
   onMuteToggle?: () => void;
   onPlaylistToggle?: () => void;
-  onProfilePress?: () => void;
   testState?: any;
   onTestStateChange?: (state: any) => void;
 }
@@ -64,7 +63,6 @@ export default function MusicPlayerTabBar({
   onAddToPlaylist,
   onMuteToggle,
   onPlaylistToggle,
-  onProfilePress,
   testState,
   onTestStateChange
 }: MusicPlayerTabBarProps) {
@@ -402,26 +400,6 @@ export default function MusicPlayerTabBar({
             />
           </TouchableOpacity>
         )}
-        
-        <TouchableOpacity 
-          style={[
-            styles.actionButton, 
-            styles.profileButton,
-            isMobileDevice && styles.profileButtonMobile
-          ]} 
-          onPress={() => {
-            onProfilePress?.();
-          }}
-        >
-          <Image
-            source={require('@/assets/images/profile2.png')}
-            style={[
-              styles.profileImage,
-              isMobileDevice && styles.profileImageMobile
-            ]}
-            contentFit="contain"
-          />
-        </TouchableOpacity>
       </View>
       </View>
     </>
@@ -516,8 +494,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8, // Sol/sağ okları play/pause'a yaklaştır
-    marginLeft: 10, // Play kontrollerini çok az sağa kaydır
+    gap: 4, // Sol/sağ okları play/pause'a daha da yaklaştır
+    marginLeft: 18, // Çok az sağa kaydır (15 → 18)
   },
   controlsMobile: {
     gap: 2, // Mobilde çok daha az gap - play butonuna yakın
@@ -608,25 +586,25 @@ const styles = StyleSheet.create({
   },
   muteButton: {
     backgroundColor: 'transparent',
-    width: 44, // Profile button ile aynı boyut
-    height: 44, // Profile button ile aynı boyut
-    marginRight: 8, // Profile button'dan biraz uzak
+    width: 56, // Daha da büyütüldü (50 → 56)
+    height: 56, // Daha da büyütüldü (50 → 56)
+    marginRight: 25, // Daha da sola kaydırıldı (15 → 25)
   },
   muteButtonMobile: {
-    width: 40, // Mobilde büyütüldü (36 → 40)
-    height: 40, // Mobilde büyütüldü (36 → 40)
-    marginRight: -5, // Negatif margin ile üst üste getir
+    width: 48, // Mobilde daha da büyütüldü (44 → 48)
+    height: 48, // Mobilde daha da büyütüldü (44 → 48)
+    marginRight: 15, // Daha da sola kaydırıldı (5 → 15)
   },
   soundIcon: {
-    width: 20,
-    height: 20,
+    width: 28, // Daha da büyütüldü (24 → 28)
+    height: 28, // Daha da büyütüldü (24 → 28)
   },
   soundIconWeb: {
-    width: 26, // Web'de daha büyük
-    height: 26, // Web'de daha büyük
+    width: 34, // Web'de daha da büyük (30 → 34)
+    height: 34, // Web'de daha da büyük (30 → 34)
   },
   soundIconMobile: {
-    width: 22, // Mobilde büyütüldü (18 → 22)
-    height: 22, // Mobilde büyütüldü (18 → 22)
+    width: 30, // Mobilde daha da büyütüldü (26 → 30)
+    height: 30, // Mobilde daha da büyütüldü (26 → 30)
   },
 });

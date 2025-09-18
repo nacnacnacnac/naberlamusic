@@ -1,21 +1,20 @@
+import { ThemedText } from '@/components/ThemedText';
+import { CustomIcon } from '@/components/ui/CustomIcon';
+import { useVimeo } from '@/contexts/VimeoContext';
+import { hybridPlaylistService } from '@/services/hybridPlaylistService';
+import { Image } from 'expo-image';
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Image as RNImage,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { Image } from 'expo-image';
-import { Image as RNImage } from 'react-native';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { CustomIcon } from '@/components/ui/CustomIcon';
-import { hybridPlaylistService } from '@/services/hybridPlaylistService';
-import { useVimeo } from '@/contexts/VimeoContext';
 
 interface CreatePlaylistModalProps {
   onClose: () => void;
@@ -156,15 +155,25 @@ export default function CreatePlaylistModal({
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onClose}>
-          <RNImage 
-            source={require('@/assets/images/ok_left.png')}
-            style={{ width: 24, height: 24, tintColor: '#e0af92' }}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>New Playlist</ThemedText>
-        <View style={styles.headerSpacer} />
+        <View style={styles.headerLeft}>
+          <View style={styles.headerIconContainer}>
+            <CustomIcon
+              name="plus"
+              size={20}
+              color="#e0af92"
+            />
+          </View>
+          <ThemedText style={styles.headerTitle}>New Playlist</ThemedText>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.backButton} onPress={onClose}>
+            <RNImage 
+              source={require('@/assets/images/ok_left.png')}
+              style={{ width: 20, height: 20, tintColor: '#e0af92' }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Content */}
@@ -243,25 +252,47 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
-    backgroundColor: '#000000',
+    borderBottomColor: '#0a0a0a', // Tutarlı koyu çizgi
+    backgroundColor: '#000000', // Siyah background
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
   },
   backButton: {
     padding: 8,
-    marginRight: 10,
+    borderRadius: 20,
+    backgroundColor: '#101010', // Daha koyu gri
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
-    flex: 1,
+    color: '#ffffff', // Beyaz renk
+    textAlign: 'left',
   },
-  headerSpacer: {
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
     width: 40,
+  },
+  headerIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#101010', // Daha koyu gri
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerIcon: {
+    width: 24,
+    height: 24,
   },
   content: {
     flex: 1,

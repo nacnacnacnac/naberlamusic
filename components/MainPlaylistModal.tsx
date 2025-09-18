@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Platform, Animated, Image } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { CustomIcon } from '@/components/ui/CustomIcon';
-import { hybridPlaylistService } from '@/services/hybridPlaylistService';
-import { firestoreService } from '@/services/firestoreService';
-import { authService } from '@/services/authService';
 import CreatePlaylistModal from '@/components/CreatePlaylistModal';
+import { ThemedText } from '@/components/ThemedText';
+import { CustomIcon } from '@/components/ui/CustomIcon';
+import { useAuth } from '@/contexts/AuthContext';
+import { authService } from '@/services/authService';
+import { firestoreService } from '@/services/firestoreService';
+import { hybridPlaylistService } from '@/services/hybridPlaylistService';
+import { Image as ExpoImage } from 'expo-image';
+import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import { Animated, Image, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+
+// CSS animasyonunu kaldırdık - React Animated kullanıyoruz
 
 interface MainPlaylistModalProps {
   onClose: () => void;
@@ -20,10 +22,10 @@ interface MainPlaylistModalProps {
   refreshing: boolean;
   refreshTrigger?: number;
   onCreatePlaylist?: (videoId?: string, videoTitle?: string) => void;
-  onPlusButtonPress?: () => void;
+  initialView?: 'main' | 'selectPlaylist' | 'createPlaylist' | 'profile';
 }
 
-export default function MainPlaylistModal({
+const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   onClose,
   userPlaylists,
   expandedPlaylists,
@@ -34,17 +36,163 @@ export default function MainPlaylistModal({
   refreshing,
   refreshTrigger,
   onCreatePlaylist,
-  onPlusButtonPress
-}: MainPlaylistModalProps) {
+  initialView = 'main'
+}, ref) => {
+  const { user, displayName, signOut, signIn, isAuthenticated } = useAuth();
   const playlistScrollRef = useRef<ScrollView>(null);
   const [hoveredVideo, setHoveredVideo] = React.useState<string | null>(null);
-  const [currentView, setCurrentView] = React.useState<'main' | 'selectPlaylist' | 'createPlaylist'>('main');
+  const [currentView, setCurrentView] = React.useState<'main' | 'selectPlaylist' | 'createPlaylist' | 'profile'>(initialView);
   const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = React.useState<any>(null);
   const [userPlaylistsForSelection, setUserPlaylistsForSelection] = React.useState<any[]>([]);
   const [deletedPlaylistIds, setDeletedPlaylistIds] = React.useState<Set<string>>(new Set());
   const [deletingPlaylistId, setDeletingPlaylistId] = React.useState<string | null>(null);
   const [fadingVideos, setFadingVideos] = React.useState<Set<string>>(new Set());
   const fadeAnimations = useRef<{[key: string]: Animated.Value}>({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  
+  // Shimmer animasyonu için
+  const shimmerAnimation = useRef(new Animated.Value(0)).current;
+
+  // Shimmer animasyonunu başlat - performans optimized
+  React.useEffect(() => {
+    const startShimmer = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerAnimation, {
+            toValue: 1,
+            duration: 3000,
+            useNativeDriver: false, // Web'de background için false gerekli
+          }),
+          Animated.delay(2000), // Daha uzun bekleme - daha az sıklık
+        ])
+      ).start();
+    };
+    startShimmer();
+    
+    // Component unmount olduğunda animasyonu durdur
+    return () => {
+      shimmerAnimation.stopAnimation();
+    };
+  }, [shimmerAnimation]);
+
+  // Auto-switch to main view when user signs in (only if they were in profile for sign-in)
+  const [hasAutoSwitched, setHasAutoSwitched] = React.useState(false);
+  const [isInitialized, setIsInitialized] = React.useState(false);
+  
+  // Expose resetToMain method to parent
+  useImperativeHandle(ref, () => ({
+    resetToMain: () => {
+      console.log('🔄 MainPlaylistModal resetToMain called');
+      setCurrentView('main');
+      setHasAutoSwitched(false);
+      setIsInitialized(false); // Reset initialization flag
+    }
+  }));
+  
+  // Update currentView when initialView changes (only if not manually navigated)
+  React.useEffect(() => {
+    if (!isInitialized) {
+      console.log('🔄 MainPlaylistModal initializing with view:', initialView);
+      setCurrentView(initialView);
+      setIsInitialized(true);
+    }
+  }, [initialView, isInitialized]);
+  
+  // Debug currentView changes
+  React.useEffect(() => {
+    console.log('🔄 currentView changed to:', currentView);
+  }, [currentView]);
+
+  // Track previous authentication state to detect sign-in
+  const [wasAuthenticated, setWasAuthenticated] = React.useState(isAuthenticated);
+  
+  React.useEffect(() => {
+    // Only auto-switch if user just signed in (was not authenticated, now is)
+    if (!wasAuthenticated && isAuthenticated && currentView === 'profile' && !hasAutoSwitched) {
+      console.log('✅ User just signed in, switching to main playlist view');
+      setCurrentView('main');
+      setHasAutoSwitched(true);
+    }
+    setWasAuthenticated(isAuthenticated);
+  }, [isAuthenticated, currentView, hasAutoSwitched, wasAuthenticated]);
+
+  // Reset modal state when it closes
+  const handleModalClose = () => {
+    console.log('🔄 Modal closing - resetting to main view');
+    setCurrentView('main');
+    setHasAutoSwitched(false);
+    onClose();
+  };
+
+  // Profile functions
+  const handleSignOut = async () => {
+    if (!signOut) {
+      console.error('❌ signOut function is not available');
+      return;
+    }
+
+    try {
+      await signOut();
+      setCurrentView('main');
+      setHasAutoSwitched(false); // Reset auto-switch flag for next sign-in
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      console.log('🔍 Google Sign-In from profile...');
+      await signIn('google');
+      // After successful sign in, automatically go to main playlist view
+      setCurrentView('main');
+    } catch (error: any) {
+      console.error('❌ Google sign-in error:', error);
+      if (Platform.OS === 'web') {
+        window.alert(error.message || 'Failed to sign in with Google');
+      } else {
+        // Alert.alert('Google Sign In Failed', error.message || 'Failed to sign in with Google');
+      }
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      console.log('🍎 Apple Sign-In from profile...');
+      await signIn('apple');
+      // After successful sign in, automatically go to main playlist view
+      setCurrentView('main');
+    } catch (error: any) {
+      console.error('❌ Apple sign-in error:', error);
+      if (Platform.OS === 'web') {
+        window.alert(error.message || 'Failed to sign in with Apple');
+      } else {
+        // Alert.alert('Apple Sign In Failed', error.message || 'Failed to sign in with Apple');
+      }
+    }
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!signOut) {
+      console.error('❌ signOut function is not available');
+      return;
+    }
+
+    try {
+      await signOut(); // For now, just sign out - implement actual deletion later
+      setCurrentView('main');
+    } catch (error) {
+      console.error('❌ Account deletion failed:', error);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+  };
 
   // refreshTrigger değiştiğinde playlist'leri yenile
   React.useEffect(() => {
@@ -93,6 +241,215 @@ export default function MainPlaylistModal({
       }
     }
   };
+
+  // Profile View
+  if (currentView === 'profile') {
+    return (
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.profileHeader}>
+          <View style={styles.profileHeaderLeft}>
+            <View style={styles.profileHeaderIconContainer}>
+              <Image
+                source={require('@/assets/images/profile2.png')}
+                style={styles.profileHeaderIcon}
+                resizeMode="contain"
+              />
+            </View>
+            <ThemedText style={styles.profileHeaderTitle}>Profile</ThemedText>
+          </View>
+          <View style={styles.profileHeaderRight}>
+            <TouchableOpacity 
+              style={styles.profileBackButton}
+              onPress={() => setCurrentView('main')}
+              activeOpacity={0.7}
+            >
+              <Image 
+                source={require('@/assets/images/ok_left.png')}
+                style={{ width: 20, height: 20, tintColor: '#e0af92' }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Content */}
+        <View style={styles.profileMainContent}>
+          {isAuthenticated && user ? (
+            <>
+              {/* Welcome Section */}
+              <View style={styles.welcomeSection}>
+                <ExpoImage
+                  source={require('@/assets/images/animation/heart.png')}
+                  style={styles.heartIcon}
+                  contentFit="contain"
+                />
+                <ThemedText style={styles.welcomeTitle}>Welcome back!</ThemedText>
+                <ThemedText style={styles.welcomeUserText}>
+                  {(() => {
+                    // Önce displayName'i kontrol et
+                    if (user.displayName && user.displayName.trim()) {
+                      return user.displayName.split(' ')[0];
+                    }
+                    
+                    // displayName yoksa email'den isim çıkar
+                    if (user.email) {
+                      const emailName = user.email.split('@')[0];
+                      // Nokta ve alt çizgi gibi karakterleri temizle
+                      const cleanName = emailName.replace(/[._-]/g, '');
+                      // İlk harfi büyük yap
+                      return cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                    }
+                    
+                    return 'User';
+                  })()}
+                </ThemedText>
+              </View>
+
+              {/* Menu Items - Alt alta butonlar */}
+              <View style={styles.menuSection}>
+                {!showDeleteConfirm ? (
+                  <View style={styles.buttonColumn}>
+                    <TouchableOpacity 
+                      style={[styles.menuButton, styles.signOutButton, styles.fullWidthButton]}
+                      onPress={handleSignOut}
+                      activeOpacity={0.7}
+                    >
+                      <CustomIcon name="logout" size={20} color="#000000" />
+                      <ThemedText style={[styles.menuButtonText, { color: '#000000' }]}>
+                        Sign Out
+                      </ThemedText>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={[styles.menuButton, styles.deleteAccountButton, styles.fullWidthButton]}
+                      onPress={handleDeleteClick}
+                      activeOpacity={0.7}
+                    >
+                      <CustomIcon name="trash" size={20} color="#666666" />
+                      <ThemedText style={[styles.menuButtonText, { color: '#666666' }]}>
+                        Delete
+                      </ThemedText>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.deleteConfirmContainer}>
+                    <View style={styles.deleteMessageContainer}>
+                      <TouchableOpacity 
+                        style={[styles.menuButton, styles.deleteAccountButton, styles.deleteSlideButton]}
+                        disabled
+                      >
+                        <CustomIcon name="trash" size={20} color="#666666" />
+                        <ThemedText style={[styles.menuButtonText, { color: '#666666' }]}>
+                          Delete
+                        </ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                    
+                    <View style={styles.confirmButtonsContainer}>
+                      <TouchableOpacity 
+                        style={[styles.menuButton, styles.confirmButton, styles.yesButton]}
+                        onPress={handleDeleteConfirm}
+                        activeOpacity={0.7}
+                      >
+                        <ThemedText style={[styles.menuButtonText, styles.confirmButtonText, { color: '#666666' }]}>
+                          Yes
+                        </ThemedText>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={[styles.menuButton, styles.confirmButton, styles.noButton]}
+                        onPress={handleDeleteCancel}
+                        activeOpacity={0.7}
+                      >
+                        <ThemedText style={[styles.menuButtonText, styles.confirmButtonText, { color: '#e0af92' }]}>
+                          No
+                        </ThemedText>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* App Info */}
+              <View style={styles.appInfo}>
+                <ThemedText style={styles.appInfoText}>Naber LA v1.6.0</ThemedText>
+                <View style={styles.madeWithContainer}>
+                  <ThemedText style={styles.madeWithText}>Made with </ThemedText>
+                  <ExpoImage
+                    source={require('@/assets/images/animation/heart.png')}
+                    style={styles.heartIconSmall}
+                    contentFit="contain"
+                  />
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Guest Mode */}
+              <View style={styles.guestSection}>
+                <ExpoImage
+                  source={require('@/assets/images/animation/heart.png')}
+                  style={styles.heartIcon}
+                  contentFit="contain"
+                />
+                <View style={styles.guestTitleContainer}>
+                  <ThemedText style={styles.guestTitleWhite}>Welcome to</ThemedText>
+                  <ThemedText style={styles.guestTitle}>Naber LA</ThemedText>
+                </View>
+                <ThemedText style={styles.guestText}>
+                  Sign in to create playlists and access personalized features
+                </ThemedText>
+                
+                {/* Google Sign-In Button */}
+                <TouchableOpacity
+                  style={[styles.signInButton, styles.googleSignInButton]}
+                  onPress={handleGoogleSignIn}
+                  activeOpacity={0.7}
+                >
+                  {Platform.OS === 'web' ? (
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        backgroundColor: '#000000',
+                        mask: 'url(/images/google.svg) no-repeat center',
+                        maskSize: 'contain',
+                        WebkitMask: 'url(/images/google.svg) no-repeat center',
+                        WebkitMaskSize: 'contain',
+                        marginRight: '8px',
+                      }}
+                    />
+                  ) : (
+                    <ExpoImage
+                      source={require('@/assets/images/google.svg')}
+                      style={styles.signInIcon}
+                      contentFit="contain"
+                    />
+                  )}
+                  <ThemedText style={[styles.signInButtonText, { color: '#000000' }]}>Sign in with Google</ThemedText>
+                </TouchableOpacity>
+
+                {/* Apple Sign-In Button - Only on iOS */}
+                {Platform.OS === 'ios' && (
+                  <TouchableOpacity
+                    style={[styles.signInButton, styles.appleSignInButton]}
+                    onPress={handleAppleSignIn}
+                    activeOpacity={0.7}
+                  >
+                    <CustomIcon name="apple" size={20} color="#ffffff" />
+                    <ThemedText style={[styles.signInButtonText, { color: '#ffffff' }]}>
+                      Sign in with Apple
+                    </ThemedText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   // Create Playlist View
   if (currentView === 'createPlaylist') {
@@ -250,23 +607,96 @@ export default function MainPlaylistModal({
 
   return (
     <View style={styles.container}>
+      {/* Profile Section - Always show, content changes based on auth status */}
+      <TouchableOpacity 
+        onPress={() => {
+          console.log('👤 Profile section clicked, current view:', currentView);
+          setCurrentView('profile');
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={styles.profileSection}>
+          {/* Shimmer overlay */}
+          <Animated.View
+            style={[
+              styles.shimmerOverlay,
+              {
+                transform: [{
+                  translateX: shimmerAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-400, 400], // Soldan sağa kayma
+                  })
+                }],
+                opacity: shimmerAnimation.interpolate({
+                  inputRange: [0, 0.3, 0.7, 1],
+                  outputRange: [0, 1, 1, 0], // Yumuşak fade in/out
+                })
+              }
+            ]}
+          />
+        <View style={styles.profileLeft}>
+          <View style={styles.profileIconContainer}>
+            <Image
+              source={require('@/assets/images/profile2.png')}
+              style={styles.profileAvatarRound}
+              resizeMode="contain"
+            />
+          </View>
+          <ThemedText style={[
+            styles.welcomeText, 
+            { color: '#666666' } // Hem Guest hem de kullanıcı adı için koyu gri
+          ]}>
+            {isAuthenticated && user ? (
+              (() => {
+                // Önce displayName'i kontrol et
+                if (user.displayName && user.displayName.trim()) {
+                  return user.displayName.split(' ')[0];
+                }
+                
+                // displayName yoksa email'den isim çıkar
+                if (user.email) {
+                  const emailName = user.email.split('@')[0];
+                  // Nokta ve alt çizgi gibi karakterleri temizle
+                  const cleanName = emailName.replace(/[._-]/g, '');
+                  // İlk harfi büyük yap
+                  return cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+                }
+                
+                return 'User';
+              })()
+            ) : 'Guest'}
+          </ThemedText>
+        </View>
+        <View style={styles.profileRight}>
+          <TouchableOpacity 
+            style={styles.closeButtonInProfile}
+            onPress={handleModalClose}
+            activeOpacity={0.7}
+          >
+            <Image 
+              source={require('@/assets/images/ok_left.png')}
+              style={{ width: 20, height: 20, tintColor: '#e0af92' }}
+              resizeMode="contain"
+            />
+           </TouchableOpacity>
+         </View>
+        </View>
+      </TouchableOpacity>
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.closeButton}
-          onPress={onClose}
-          activeOpacity={0.7}
-        >
-          <Image 
-            source={require('@/assets/images/ok_left.png')}
-            style={{ width: 20, height: 20, tintColor: '#e0af92' }}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
+        <View style={styles.headerLeft} />
         <ThemedText style={styles.headerTitle}>Playlists</ThemedText>
         <TouchableOpacity 
           style={styles.headerRight}
-          onPress={onPlusButtonPress || (() => setCurrentView('createPlaylist'))}
+          onPress={() => {
+            console.log('➕ Plus button pressed - isAuthenticated:', isAuthenticated);
+            if (isAuthenticated) {
+              setCurrentView('createPlaylist');
+            } else {
+              setCurrentView('profile');
+            }
+          }}
           activeOpacity={0.7}
         >
           <CustomIcon name="plus" size={20} color="#e0af92" />
@@ -649,12 +1079,296 @@ export default function MainPlaylistModal({
       </ScrollView>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
+  },
+  profileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#0a0a0a', // Base background
+    borderBottomWidth: 1,
+    borderBottomColor: '#0a0a0a', // Diğer playlist'ler kadar koyu çizgi
+    position: 'relative', // Overlay için
+    overflow: 'hidden', // Shimmer'ın dışarı taşmasını engelle
+  },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: 800, // Çok çok geniş gradient
+    ...(Platform.OS === 'web' ? {
+      backgroundImage: 'linear-gradient(90deg, transparent 0%, transparent 20%, rgba(32,32,32,0.1) 35%, rgba(32,32,32,0.3) 50%, rgba(32,32,32,0.1) 65%, transparent 80%, transparent 100%)',
+    } : {
+      backgroundColor: 'rgba(32, 32, 32, 0.1)', // Native fallback - neredeyse siyah gri
+    }),
+  },
+  profileLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+    minWidth: 200, // Sabit minimum genişlik - büyüyüp küçülme efektini önler
+  },
+  closeButtonInProfile: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#101010', // Daha koyu gri
+  },
+  profileAvatar: {
+    width: 32,
+    height: 32,
+  },
+  profileIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#101010', // Daha koyu gri
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileAvatarRound: {
+    width: 24,
+    height: 24,
+  },
+  profileRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 40,
+  },
+  welcomeText: {
+    fontSize: 16,
+    color: '#e0af92',
+    fontWeight: '500',
+  },
+  profileMainContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  welcomeSection: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  guestSection: {
+    alignItems: 'center',
+    paddingTop: 40,
+  },
+  heartIcon: {
+    width: 60,
+    height: 60,
+    marginBottom: 15,
+  },
+  heartIconSmall: {
+    width: 16,
+    height: 16,
+    marginLeft: 4,
+  },
+  welcomeTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#e0af92',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  welcomeUserText: {
+    fontSize: 20,
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  guestTitleContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  guestTitleWhite: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  guestTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#e0af92',
+    textAlign: 'center',
+  },
+  guestText: {
+    fontSize: 16,
+    color: '#cccccc',
+    textAlign: 'center',
+    marginBottom: 40,
+    lineHeight: 22,
+    paddingHorizontal: 20,
+  },
+  menuSection: {
+    marginBottom: 40,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 15,
+  },
+  buttonColumn: {
+    flexDirection: 'column',
+    gap: 15,
+  },
+  menuButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    minHeight: 50,
+  },
+  halfWidthButton: {
+    flex: 1,
+  },
+  fullWidthButton: {
+    width: '100%',
+  },
+  signOutButton: {
+    backgroundColor: '#e0af92',
+  },
+  deleteAccountButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  menuButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  deleteConfirmContainer: {
+    gap: 15,
+  },
+  deleteMessageContainer: {
+    alignItems: 'center',
+  },
+  deleteSlideButton: {
+    width: '100%',
+    opacity: 0.6,
+  },
+  confirmButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 15,
+  },
+  confirmButton: {
+    flex: 1,
+    borderWidth: 1,
+    backgroundColor: 'transparent',
+  },
+  yesButton: {
+    borderColor: '#666666',
+  },
+  noButton: {
+    borderColor: '#e0af92',
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  signInButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 15,
+    minHeight: 50,
+  },
+  googleSignInButton: {
+    backgroundColor: '#e0af92',
+  },
+  appleSignInButton: {
+    backgroundColor: '#000000',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  signInIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 8,
+  },
+  signInButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  appInfo: {
+    alignItems: 'center',
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  appInfoText: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 8,
+  },
+  madeWithContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  madeWithText: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#0a0a0a', // Tutarlı koyu çizgi
+    backgroundColor: '#000000', // Siyah background
+  },
+  profileHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  profileBackButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#101010', // Daha koyu gri
+  },
+  profileHeaderTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff', // Beyaz renk
+    textAlign: 'left',
+  },
+  profileHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 40,
+  },
+  profileHeaderIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#101010', // Daha koyu gri
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileHeaderIcon: {
+    width: 24,
+    height: 24,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -704,14 +1418,15 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#0a0a0a', // Gerçekten koyu gri çizgi
+    borderBottomColor: '#0a0a0a', // Diğer playlist'ler kadar koyu çizgi
+    backgroundColor: '#000000', // Siyah background
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#e0af92',
     flex: 1,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   closeButton: {
     padding: 8,
@@ -719,12 +1434,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(224, 175, 146, 0.1)',
   },
   headerRight: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#333333', // Daha koyu gri border
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#101010', // Daha koyu gri - closeButtonInProfile ile aynı
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1029,3 +1741,5 @@ const styles = StyleSheet.create({
     borderColor: '#333333',
   },
 });
+
+export default MainPlaylistModal;
