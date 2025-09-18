@@ -1636,9 +1636,9 @@ export default function HomeScreen() {
                 style={[
                   {
                     position: 'absolute',
-                    ...(Platform.OS === 'web' && width > 768 
-                      ? { top: 25, right: 25 } // Desktop web'de üstte
-                      : { bottom: 150, right: 25 } // Mobile'da altta (profile icon üstünde)
+                    ...(Platform.OS === 'web'
+                      ? { top: 25, right: 25 } // Hem desktop hem mobile web'de üstte
+                      : { bottom: 150, right: 25 } // Sadece native mobile'da altta
                     ),
                     opacity: overlayOpacity,
                     zIndex: 10001, // En yüksek z-index

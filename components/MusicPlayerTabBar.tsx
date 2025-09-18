@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     width: 80, // Daha küçük genişlik (100 → 80)
     alignItems: 'center', // Ortalanmış hizalama
     justifyContent: 'center',
-    marginLeft: -5, // Daha da sağa kaydır (-10 → -5)
+    marginLeft: 0, // Çok az sağa kaydır (-5 → 0)
   },
   logoContainer: {
     position: 'relative',
