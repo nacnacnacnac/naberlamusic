@@ -1,18 +1,17 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
+import * as NavigationBar from 'expo-navigation-bar';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, AppState, TouchableOpacity } from 'react-native';
-import * as NavigationBar from 'expo-navigation-bar';
-import { IconSymbol } from '@/components/ui/IconSymbol';
+import { useEffect } from 'react';
+import { AppState, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { VimeoProvider } from '@/contexts/VimeoContext';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { VimeoProvider } from '@/contexts/VimeoContext';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 
 export default function RootLayout() {

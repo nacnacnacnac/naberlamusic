@@ -1,14 +1,13 @@
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { StyleSheet, View, TouchableOpacity, Image, ActivityIndicator, Animated, DeviceEventEmitter, Platform } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { IconSymbol } from '@/components/ui/IconSymbol';
-import { SimplifiedVimeoVideo } from '@/types/vimeo';
-import { Video, Audio } from 'expo-av';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { hybridVimeoService } from '@/services/hybridVimeoService';
-import { vimeoService } from '@/services/vimeoService';
 import { useMediaSession } from '@/hooks/useMediaSession';
+import { hybridVimeoService } from '@/services/hybridVimeoService';
+import { SimplifiedVimeoVideo } from '@/types/vimeo';
+import { Video } from 'expo-av';
+import { useVideoPlayer } from 'expo-video';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { Animated, DeviceEventEmitter, Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 export interface VimeoPlayerRef {
   play(): Promise<void>;
@@ -18,6 +17,8 @@ export interface VimeoPlayerRef {
   setCurrentTime(seconds: number): Promise<void>;
   destroy(): Promise<void>;
   isReady(): boolean;
+  setMuted?(muted: boolean): Promise<void>;
+  isMuted?(): boolean;
 }
 
 interface VimeoPlayerProps {
@@ -467,6 +468,130 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
 
     isReady() {
       return isReady;
+    },
+
+    async setMuted(muted: boolean) {
+      try {
+        console.log('🔇 VimeoPlayerNative.setMuted() called with:', muted);
+        
+        if (Platform.OS === 'web') {
+          // Web: HTML5 video player - try multiple methods
+          let videoElement = (globalThis as any).webVideoElement;
+          
+          // Fallback: try to find video element in DOM
+          if (!videoElement) {
+            videoElement = document.querySelector('video');
+            console.log('🔍 Fallback: Found video via DOM query:', !!videoElement);
+          }
+          
+          console.log('🔍 Video element check:', {
+            exists: !!videoElement,
+            currentMuted: videoElement?.muted,
+            currentVolume: videoElement?.volume,
+            paused: videoElement?.paused,
+            readyState: videoElement?.readyState,
+            src: videoElement?.src?.substring(0, 50) + '...'
+          });
+          
+          if (videoElement) {
+            const oldMuted = videoElement.muted;
+            const oldVolume = videoElement.volume;
+            
+            // Set muted property multiple times to ensure it sticks
+            videoElement.muted = muted;
+            
+            // Also set volume as backup (this seems to be working)
+            if (muted) {
+              videoElement.volume = 0;
+            } else {
+              videoElement.volume = 1.0;
+            }
+            
+            // Force the muted property again after volume change
+            videoElement.muted = muted;
+            
+            // Store the intended mute state globally for persistence
+            (globalThis as any).intendedMuteState = muted;
+            
+            // Set up a watcher to maintain mute state
+            if (!(globalThis as any).muteWatcher) {
+              (globalThis as any).muteWatcher = setInterval(() => {
+                const currentVideo = (globalThis as any).webVideoElement;
+                const intendedMute = (globalThis as any).intendedMuteState;
+                
+                if (currentVideo && typeof intendedMute === 'boolean') {
+                  // Force mute state if it's been overridden
+                  if (currentVideo.muted !== intendedMute) {
+                    console.log('🔧 Correcting mute state:', currentVideo.muted, '→', intendedMute);
+                    currentVideo.muted = intendedMute;
+                  }
+                  
+                  // Also maintain volume
+                  const expectedVolume = intendedMute ? 0 : 1.0;
+                  if (Math.abs(currentVideo.volume - expectedVolume) > 0.1) {
+                    console.log('🔧 Correcting volume:', currentVideo.volume, '→', expectedVolume);
+                    currentVideo.volume = expectedVolume;
+                  }
+                }
+              }, 100); // Check every 100ms
+            }
+            
+            // Wait a bit and verify the change stuck
+            setTimeout(() => {
+              console.log('🌐 HTML5 video mute change (final check):', {
+                from: oldMuted,
+                to: muted,
+                actualMuted: videoElement.muted,
+                fromVolume: oldVolume,
+                toVolume: videoElement.volume,
+                success: (muted ? videoElement.volume === 0 : videoElement.volume === 1)
+              });
+            }, 50);
+            
+            // Try to trigger events to ensure browser recognizes the change
+            videoElement.dispatchEvent(new Event('volumechange'));
+            
+          } else {
+            console.error('❌ HTML5 video element not found for mute - trying all videos');
+            // Last resort: try all video elements
+            const allVideos = document.querySelectorAll('video');
+            console.log('🔍 Found', allVideos.length, 'video elements in DOM');
+            allVideos.forEach((video, index) => {
+              console.log(`🎬 Video ${index}:`, {
+                muted: video.muted,
+                volume: video.volume,
+                src: video.src?.substring(0, 30) + '...'
+              });
+              video.muted = muted;
+              if (muted) {
+                video.volume = 0;
+              } else {
+                video.volume = 1.0;
+              }
+            });
+          }
+          return;
+        }
+        
+        // Native: expo-av player
+        if (videoRef.current) {
+          await videoRef.current.setIsMutedAsync(muted);
+          console.log('📱 Native video muted set to:', muted);
+        }
+      } catch (error: any) {
+        console.error('❌ setMuted error:', error);
+        onError?.(error.message);
+      }
+    },
+
+    isMuted() {
+      if (Platform.OS === 'web') {
+        const videoElement = (globalThis as any).webVideoElement;
+        return videoElement ? videoElement.muted : false;
+      }
+      // Native: expo-av doesn't have a direct way to check mute status
+      // We'll track this in the parent component
+      return false;
     }
   }));
 

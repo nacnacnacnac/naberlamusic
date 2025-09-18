@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, Text, Animated, Easing, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { IconSymbol } from '@/components/ui/IconSymbol';
 import { CustomIcon } from '@/components/ui/CustomIcon';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Dimensions, Easing, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Footer Testing Infrastructure
 interface FooterTestState {
@@ -43,10 +42,12 @@ const footerDebugLog = {
 interface MusicPlayerTabBarProps {
   currentVideo: any;
   isPaused: boolean;
+  isMuted?: boolean;
   onPlayPause: () => void;
   onPrevious: () => void;
   onNext: () => void;
   onAddToPlaylist: () => void;
+  onMuteToggle?: () => void;
   onPlaylistToggle?: () => void;
   onProfilePress?: () => void;
   testState?: any;
@@ -56,10 +57,12 @@ interface MusicPlayerTabBarProps {
 export default function MusicPlayerTabBar({
   currentVideo,
   isPaused,
+  isMuted = false,
   onPlayPause,
   onPrevious,
   onNext,
   onAddToPlaylist,
+  onMuteToggle,
   onPlaylistToggle,
   onProfilePress,
   testState,
@@ -68,6 +71,12 @@ export default function MusicPlayerTabBar({
   // Her zaman göster - currentVideo durumuna bakmadan
   // if (!currentVideo && Platform.OS !== 'web') return null;
   
+  // Gerçek mobil cihaz detection (sadece telefon/tablet)
+  const { width } = Dimensions.get('window');
+  const isMobileDevice = Platform.OS === 'web' && 
+    width <= 768 && 
+    typeof navigator !== 'undefined' && 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   // Footer testing state
   const footerTestRef = useRef<FooterTestState>({
@@ -85,160 +94,8 @@ export default function MusicPlayerTabBar({
   const logoScale = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(1)).current;
   
-  // Slap animation values
-  const handPosition = useRef(new Animated.Value(-50)).current;
-  const handOpacity = useRef(new Animated.Value(0)).current;
-  const handRotation = useRef(new Animated.Value(20)).current;
-  const handScale = useRef(new Animated.Value(1)).current;
-  const textScale = useRef(new Animated.Value(0)).current; // Başlangıçta görünmez
-  const textRotation = useRef(new Animated.Value(0)).current;
 
 
-  // Slap animation
-  const startSlapAnimation = () => {
-    // Reset values
-    handPosition.setValue(-50);
-    handOpacity.setValue(0);
-    handRotation.setValue(20);
-    handScale.setValue(1);
-    textScale.setValue(0); // Yazıyı da reset et
-    textRotation.setValue(0);
-
-    Animated.parallel([
-      // Hand animation
-      Animated.sequence([
-        // Hand appears and moves to slap position
-        Animated.timing(handOpacity, {
-          toValue: 1,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(handPosition, {
-          toValue: 55, // Biraz daha sağa
-          duration: 275,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        // Slap impact - vurma anı
-        Animated.timing(handRotation, {
-          toValue: -5,
-          duration: 50,
-          useNativeDriver: true,
-        }),
-        Animated.timing(handScale, {
-          toValue: 1.4, // Büyük el
-          duration: 50,
-          useNativeDriver: true,
-        }),
-        // Geri sekme
-        Animated.timing(handPosition, {
-          toValue: 50, // Geri sekme de biraz daha sağa
-          duration: 75,
-          useNativeDriver: true,
-        }),
-        Animated.timing(handRotation, {
-          toValue: 5,
-          duration: 75,
-          useNativeDriver: true,
-        }),
-        Animated.timing(handScale, {
-          toValue: 1,
-          duration: 75,
-          useNativeDriver: true,
-        }),
-        // Hand exits - başladığı yere geri dön (opacity olmadan)
-        Animated.parallel([
-          Animated.timing(handPosition, {
-            toValue: -50, // Başladığı yere geri dön
-            duration: 400,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.timing(handRotation, {
-            toValue: 0, // Normal pozisyona dön
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ]),
-      ]),
-      // Text animation - opacity ile gelsin, el vurduktan sonra gitsin
-      Animated.sequence([
-        // Yazı gidiş animasyonunun tersi - güzel geliş
-        Animated.timing(textScale, {
-          toValue: 1,
-          duration: 300,
-          easing: Easing.out(Easing.back(1.7)), // Gidiş animasyonunun tersi
-          useNativeDriver: true,
-        }),
-        // Wait for slap impact (375ms'de vurma oluyor)
-        Animated.delay(75), // Toplam 375ms olacak şekilde ayarlandı (300+75=375)
-        // Text wobble on impact
-        Animated.parallel([
-          Animated.timing(textScale, {
-            toValue: 1.15,
-            duration: 50,
-            useNativeDriver: true,
-          }),
-          Animated.timing(textRotation, {
-            toValue: 8,
-            duration: 50,
-            useNativeDriver: true,
-          }),
-        ]),
-        // Bounce back
-        Animated.parallel([
-          Animated.timing(textScale, {
-            toValue: 0.9,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-          Animated.timing(textRotation, {
-            toValue: -8,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-        ]),
-        // Secondary bounce
-        Animated.parallel([
-          Animated.timing(textScale, {
-            toValue: 1.05,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-          Animated.timing(textRotation, {
-            toValue: 4,
-            duration: 100,
-            useNativeDriver: true,
-          }),
-        ]),
-        // Return to normal
-        Animated.parallel([
-          Animated.timing(textScale, {
-            toValue: 1,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-          Animated.timing(textRotation, {
-            toValue: 0,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-        ]),
-        // El vurduktan sonra yazı gitsin
-        Animated.delay(200),
-        Animated.timing(textScale, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start(() => {
-      // Repeat animation every 4 seconds
-      setTimeout(() => {
-        startSlapAnimation();
-      }, 4000);
-    });
-  };
 
   // Logo heartbeat animation (keep existing)
   const startLogoHeartbeat = () => {
@@ -283,13 +140,8 @@ export default function MusicPlayerTabBar({
       startLogoHeartbeat();
     }, 2000); // Start heartbeat after 2 seconds
 
-    const slapTimer = setTimeout(() => {
-      startSlapAnimation();
-    }, 3000); // Start slap animation after 3 seconds
-
     return () => {
       clearTimeout(heartbeatTimer);
-      clearTimeout(slapTimer);
     };
   }, []); // Only run on mount
 
@@ -455,58 +307,25 @@ export default function MusicPlayerTabBar({
               />
             </Animated.View>
             
-            {/* Slap Me Text Overlay */}
-            <Animated.View
-              style={[
-                styles.slapTextContainer,
-                {
-                  transform: [
-                    { scale: textScale },
-                    { rotate: textRotation.interpolate({
-                        inputRange: [-180, 180],
-                        outputRange: ['-180deg', '180deg']
-                      })
-                    }
-                  ],
-                }
-              ]}
-            >
-              <Text style={styles.slapText}>sLAP{'\n'}mE!</Text>
-            </Animated.View>
-            
-            {/* Hand Animation */}
-            <Animated.View
-              style={[
-                styles.handContainer,
-                {
-                  opacity: handOpacity,
-                  transform: [
-                    { translateX: handPosition },
-                    { rotate: handRotation.interpolate({
-                        inputRange: [-180, 180],
-                        outputRange: ['-180deg', '180deg']
-                      })
-                    },
-                    { scale: handScale }
-                  ],
-                }
-              ]}
-            >
-              <Text style={styles.handEmoji}>👋🏽</Text>
-            </Animated.View>
           </View>
         </TouchableOpacity>
       </View>
 
       {/* Music Controls - Centered */}
-      <View style={styles.controls}>
+      <View style={[
+        styles.controls,
+        isMobileDevice && styles.controlsMobile
+      ]}>
         <TouchableOpacity 
-          style={styles.controlButton} 
+          style={[
+            styles.controlButton,
+            isMobileDevice && styles.controlButtonMobile
+          ]} 
           onPress={() => {
             onPrevious();
           }}
         >
-          <CustomIcon name="skip-previous" size={20} color={currentVideo ? "#ffffff" : "#666666"} />
+          <CustomIcon name="skip-previous" size={28} color={currentVideo ? "#ffffff" : "#666666"} />
           {__DEV__ && Platform.OS !== 'web' && (
             <Text style={{position: 'absolute', top: -15, fontSize: 8, color: 'yellow', backgroundColor: 'black'}}>
               PREV: {currentVideo ? 'ON' : 'OFF'}
@@ -533,31 +352,73 @@ export default function MusicPlayerTabBar({
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.controlButton} 
+          style={[
+            styles.controlButton,
+            isMobileDevice && styles.controlButtonMobile
+          ]} 
           onPress={() => {
             onNext();
           }}
         >
-          <CustomIcon name="skip-next" size={20} color={currentVideo ? "#ffffff" : "#666666"} />
+          <CustomIcon name="skip-next" size={28} color={currentVideo ? "#ffffff" : "#666666"} />
           {__DEV__ && Platform.OS !== 'web' && (
             <Text style={{position: 'absolute', top: -15, fontSize: 8, color: 'yellow', backgroundColor: 'black'}}>
               NEXT: {currentVideo ? 'ON' : 'OFF'}
             </Text>
           )}
         </TouchableOpacity>
+
       </View>
 
-      {/* Right Actions - Profile Icon */}
-      <View style={styles.rightActions}>
+      {/* Right Actions - Mute Button + Profile Icon */}
+      <View style={[
+        styles.rightActions,
+        isMobileDevice && styles.rightActionsMobile
+      ]}>
+        {/* Mute/Unmute Button - Only show on web for HTML5 video */}
+        {Platform.OS === 'web' && onMuteToggle && (
+          <TouchableOpacity 
+            style={[
+              styles.actionButton, 
+              styles.muteButton,
+              isMobileDevice && styles.muteButtonMobile
+            ]} 
+            onPress={() => {
+              onMuteToggle();
+            }}
+          >
+            <Image
+              source={!currentVideo || isMuted ? 
+                require('@/assets/images/sound_off.png') : 
+                require('@/assets/images/sound_on.png')
+              }
+              style={[
+                styles.soundIcon,
+                Platform.OS === 'web' && !isMobileDevice && styles.soundIconWeb,
+                isMobileDevice && styles.soundIconMobile,
+                { opacity: currentVideo ? 1 : 0.4 }
+              ]}
+              contentFit="contain"
+            />
+          </TouchableOpacity>
+        )}
+        
         <TouchableOpacity 
-          style={[styles.actionButton, styles.profileButton]} 
+          style={[
+            styles.actionButton, 
+            styles.profileButton,
+            isMobileDevice && styles.profileButtonMobile
+          ]} 
           onPress={() => {
             onProfilePress?.();
           }}
         >
           <Image
             source={require('@/assets/images/profile2.png')}
-            style={styles.profileImage}
+            style={[
+              styles.profileImage,
+              isMobileDevice && styles.profileImageMobile
+            ]}
             contentFit="contain"
           />
         </TouchableOpacity>
@@ -605,21 +466,22 @@ const styles = StyleSheet.create({
     zIndex: 1002, // Gradient'den (1001) yüksek
   },
   leftLogo: {
-    width: 100, // Sabit genişlik
-    alignItems: 'flex-start',
+    width: 80, // Daha küçük genişlik (100 → 80)
+    alignItems: 'center', // Ortalanmış hizalama
     justifyContent: 'center',
+    marginLeft: -5, // Daha da sağa kaydır (-10 → -5)
   },
   logoContainer: {
     position: 'relative',
-    width: 100,
-    height: 40,
+    width: 80, // Daha küçük container (100 → 80)
+    height: 32, // Daha küçük yükseklik (40 → 32)
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center', // Ortalanmış hizalama
   },
   logoImage: {
-    width: 100, // 80'den 100'e çıkarıldı (%25 büyük)
-    height: 40, // 32'den 40'a çıkarıldı (%25 büyük)
-    marginLeft: -10, // Logo'yu daha sola taşı
+    width: 80, // Daha küçük logo (100 → 80)
+    height: 32, // Daha küçük yükseklik (40 → 32)
+    marginLeft: 0, // Margin kaldırıldı, ortalanmış
   },
   slapTextContainer: {
     position: 'absolute',
@@ -654,21 +516,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 15,
+    gap: 8, // Sol/sağ okları play/pause'a yaklaştır
+    marginLeft: 10, // Play kontrollerini çok az sağa kaydır
+  },
+  controlsMobile: {
+    gap: 2, // Mobilde çok daha az gap - play butonuna yakın
   },
   controlButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 50, // Büyütüldü (40 → 50)
+    height: 50, // Büyütüldü (40 → 50)
+    borderRadius: 25, // Yarısı (50/2 = 25)
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: 8,
   },
+  controlButtonMobile: {
+    marginHorizontal: 2, // Mobilde çok daha az margin - play butonuna yakın
+  },
   playPauseButton: {
-    width: 55,
-    height: 55,
-    borderRadius: 27.5,
+    width: 65, // Büyütüldü (55 → 65)
+    height: 65, // Büyütüldü (55 → 65)
+    borderRadius: 32.5, // Yarısı (65/2 = 32.5)
     backgroundColor: 'transparent', // İçi boş
     borderWidth: 1, // Daha ince border
     borderColor: '#333333', // Gri border
@@ -682,10 +551,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
+  rightActionsMobile: {
+    gap: 0, // Mobilde hiç gap yok
+  },
   actionButton: {
     width: 36,
     height: 36,
-    borderRadius: 18,
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
@@ -718,14 +589,44 @@ const styles = StyleSheet.create({
   },
   profileButton: {
     backgroundColor: 'transparent',
-    borderWidth: 1, // Daha ince border
-    borderColor: '#333333', // Gri border
     width: 44,
     height: 44,
     marginRight: 10, // Sola kaydır
   },
+  profileButtonMobile: {
+    width: 40, // Mobilde büyütüldü (36 → 40)
+    height: 40, // Mobilde büyütüldü (36 → 40)
+    marginRight: 2, // Mobilde çok az margin
+  },
   profileImage: {
     width: 28,
     height: 28,
+  },
+  profileImageMobile: {
+    width: 26, // Mobilde büyütüldü (22 → 26)
+    height: 26, // Mobilde büyütüldü (22 → 26)
+  },
+  muteButton: {
+    backgroundColor: 'transparent',
+    width: 44, // Profile button ile aynı boyut
+    height: 44, // Profile button ile aynı boyut
+    marginRight: 8, // Profile button'dan biraz uzak
+  },
+  muteButtonMobile: {
+    width: 40, // Mobilde büyütüldü (36 → 40)
+    height: 40, // Mobilde büyütüldü (36 → 40)
+    marginRight: -5, // Negatif margin ile üst üste getir
+  },
+  soundIcon: {
+    width: 20,
+    height: 20,
+  },
+  soundIconWeb: {
+    width: 26, // Web'de daha büyük
+    height: 26, // Web'de daha büyük
+  },
+  soundIconMobile: {
+    width: 22, // Mobilde büyütüldü (18 → 22)
+    height: 22, // Mobilde büyütüldü (18 → 22)
   },
 });

@@ -1,30 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, ScrollView, TouchableOpacity, Dimensions, StatusBar, Text, View, Image, DeviceEventEmitter, Alert, RefreshControl, Platform, Animated } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Video } from 'expo-av';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import { CustomIcon } from '@/components/ui/CustomIcon';
-import { useVimeo } from '@/contexts/VimeoContext';
-import { vimeoService } from '@/services/vimeoService';
-import { SimplifiedVimeoVideo } from '@/types/vimeo';
-import { VimeoPlayerNative } from '@/components/VimeoPlayerNative';
-import { hybridPlaylistService } from '@/services/hybridPlaylistService';
-import { autoSyncService } from '@/services/autoSyncService';
-import Toast from '@/components/Toast';
-import MusicPlayerTabBar from '@/components/MusicPlayerTabBar';
-import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
-import { useAuth } from '@/contexts/AuthContext';
-import { logger } from '@/utils/logger';
+import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import CustomModal from '@/components/CustomModal';
 import LeftModal from '@/components/LeftModal';
-import PlaylistModal from '@/components/PlaylistModal';
-import CreatePlaylistModal from '@/components/CreatePlaylistModal';
 import MainPlaylistModal from '@/components/MainPlaylistModal';
+import MusicPlayerTabBar from '@/components/MusicPlayerTabBar';
+import PlaylistModal from '@/components/PlaylistModal';
 import ProfileModal from '@/components/ProfileModal';
+import { ThemedText } from '@/components/ThemedText';
+import { ThemedView } from '@/components/ThemedView';
+import Toast from '@/components/Toast';
+import { CustomIcon } from '@/components/ui/CustomIcon';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { VimeoPlayerNative } from '@/components/VimeoPlayerNative';
+import { useAuth } from '@/contexts/AuthContext';
+import { useVimeo } from '@/contexts/VimeoContext';
+import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
+import { autoSyncService } from '@/services/autoSyncService';
+import { hybridPlaylistService } from '@/services/hybridPlaylistService';
+import { SimplifiedVimeoVideo } from '@/types/vimeo';
+import { logger } from '@/utils/logger';
+import { Video } from 'expo-av';
+import { Image as ExpoImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, DeviceEventEmitter, Dimensions, Image, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Background video import
 const backgroundVideo = require('@/assets/videos/NLA2.mp4');
@@ -115,6 +114,7 @@ export default function HomeScreen() {
   const [shareToastVisible, setShareToastVisible] = useState(false);
   const shareToastOpacity = useRef(new Animated.Value(0)).current;
   const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const [currentPlaylist, setCurrentPlaylist] = useState<any>(null);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [videoDuration, setVideoDuration] = useState<number>(0);
@@ -822,6 +822,28 @@ export default function HomeScreen() {
     
     debugLog.main(`State updated successfully - New isPaused: ${newPausedState}`);
     debugLog.performance(`Command processing time: ${Date.now() - commandStartTime}ms`);
+  };
+
+  const handleMuteToggle = async () => {
+    try {
+      const newMutedState = !isMuted;
+      console.log('🔇 Mute toggle - State change:', isMuted, '→', newMutedState);
+      
+      // Update state immediately for UI responsiveness
+      setIsMuted(newMutedState);
+      
+      // Apply mute to video player
+      if (vimeoPlayerRef.current && vimeoPlayerRef.current.setMuted) {
+        await vimeoPlayerRef.current.setMuted(newMutedState);
+        console.log('🔇 Video player muted set to:', newMutedState);
+      } else {
+        console.warn('⚠️ Video player ref or setMuted method not available');
+      }
+    } catch (error) {
+      console.error('❌ Mute toggle error:', error);
+      // Revert state on error
+      setIsMuted(!isMuted);
+    }
   };
 
   const scrollToPlaylist = () => {
@@ -2186,12 +2208,14 @@ export default function HomeScreen() {
         <MusicPlayerTabBar
           currentVideo={currentVideo}
           isPaused={isPaused}
+          isMuted={isMuted}
           onPlayPause={handlePlayPause}
           onPrevious={playPreviousVideo}
           onNext={playNextVideo}
           onAddToPlaylist={() => {
             handleAddToPlaylist(currentVideo);
           }}
+          onMuteToggle={handleMuteToggle}
           onPlaylistToggle={handleHeartIconPress}
           onProfilePress={handleProfilePress}
           testState={testState}
