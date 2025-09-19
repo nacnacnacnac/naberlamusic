@@ -365,7 +365,8 @@ class FirestoreService {
         // Get current liked songs (force refresh for consistency)
         const likedSongs = await this.getUserLikedSongs(userId, true);
         
-        console.log('🎵 Liked Songs playlist found - returning fresh data with', likedSongs.length, 'songs');
+        console.log('🎵🎵🎵 LIKED SONGS PLAYLIST FOUND - RETURNING FRESH DATA WITH', likedSongs.length, 'SONGS 🎵🎵🎵');
+        console.log('🔥🔥🔥 THIS IS THE NEW CODE - IF YOU SEE THIS, THE FIX IS ACTIVE! 🔥🔥🔥');
         
         // Return playlist with fresh liked songs data (don't update Firestore playlist)
         return {

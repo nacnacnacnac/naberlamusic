@@ -206,6 +206,15 @@ class HybridPlaylistService {
           // Get playlists from Firestore (force fresh data)
           const firestorePlaylists = await firestoreService.getUserPlaylists(currentUser.uid);
           
+          console.log('🔄🔄🔄 FORCING FRESH LIKED SONGS PLAYLIST UPDATE 🔄🔄🔄');
+          // Force fresh Liked Songs playlist to prevent deleted songs from reappearing
+          const freshLikedSongsPlaylist = await firestoreService.getLikedSongsPlaylist(currentUser.uid);
+          
+          // Replace any existing Liked Songs playlist with fresh data
+          const filteredPlaylists = firestorePlaylists.filter(p => !p.isLikedSongs && p.name !== 'Liked Songs');
+          const updatedPlaylists = [freshLikedSongsPlaylist, ...filteredPlaylists];
+          console.log('✅✅✅ FRESH LIKED SONGS INTEGRATED - DELETED SONGS SHOULD NOT REAPPEAR ✅✅✅');
+          
           // Also get local playlists for migration/backup
           const localPlaylists = await this.getLocalPlaylists();
           
@@ -216,8 +225,8 @@ class HybridPlaylistService {
             return localPlaylists;
           }
           
-          // Return Firestore playlists (they're already sorted)
-          return firestorePlaylists;
+          // Return updated playlists with fresh Liked Songs (they're already sorted)
+          return updatedPlaylists;
         } catch (firestoreError) {
           console.error('❌ Firestore error, falling back to local:', firestoreError);
           return await this.getLocalPlaylists();
@@ -426,7 +435,10 @@ class HybridPlaylistService {
         
         try {
           // Get or create "Liked Songs" playlist in Firestore
-          return await firestoreService.getLikedSongsPlaylist(currentUser.uid);
+          console.log('🎵🎵🎵 HYBRID SERVICE - CALLING FIRESTORE GET LIKED SONGS 🎵🎵🎵');
+          const result = await firestoreService.getLikedSongsPlaylist(currentUser.uid);
+          console.log('🔥🔥🔥 HYBRID SERVICE - FIRESTORE RESULT RECEIVED 🔥🔥🔥');
+          return result;
         } catch (firestoreError) {
           console.error('❌ Firestore error, falling back to local:', firestoreError);
           // Fall through to local implementation
