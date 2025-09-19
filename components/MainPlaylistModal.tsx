@@ -84,7 +84,6 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   // Expose resetToMain method to parent
   useImperativeHandle(ref, () => ({
     resetToMain: () => {
-      console.log('🔄 MainPlaylistModal resetToMain called');
       setCurrentView('main');
       setHasAutoSwitched(false);
       setIsInitialized(false); // Reset initialization flag
@@ -93,15 +92,10 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   
   // Update currentView when initialView changes
   React.useEffect(() => {
-    console.log('🔄 MainPlaylistModal initialView changed to:', initialView);
     setCurrentView(initialView);
     setIsInitialized(true);
   }, [initialView]);
   
-  // Debug currentView changes
-  React.useEffect(() => {
-    console.log('🔄 currentView changed to:', currentView);
-  }, [currentView]);
 
   // Track previous authentication state to detect sign-in
   const [wasAuthenticated, setWasAuthenticated] = React.useState(isAuthenticated);
@@ -118,7 +112,6 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
 
   // Reset modal state when it closes
   const handleModalClose = () => {
-    console.log('🔄 Modal closing - resetting to main view');
     setCurrentView('main');
     setHasAutoSwitched(false);
     onClose();
@@ -197,7 +190,6 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   // refreshTrigger değiştiğinde playlist'leri yenile
   React.useEffect(() => {
     if (refreshTrigger !== undefined && refreshTrigger > 0) {
-      console.log('🔄 Refresh trigger activated, clearing deleted playlist IDs');
       // Clear deleted playlist IDs when refreshing
       setDeletedPlaylistIds(new Set());
       onRefresh();
@@ -571,26 +563,20 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
       setDeletingPlaylistId(null);
       
       // Force refresh with cache bypass
-      console.log('🔄 Scheduling refresh after deletion...');
       setTimeout(async () => {
-        console.log('🔄 Executing scheduled refresh...');
         try {
           // Force a complete refresh by calling the service directly
           const currentUser = authService.getCurrentUser();
           if (currentUser?.uid) {
-            console.log('🔄 Force refreshing playlists from Firestore...');
-            const freshPlaylists = await firestoreService.getUserPlaylists(currentUser.uid);
-            console.log('🔄 Fresh playlists count:', freshPlaylists.length);
+            await firestoreService.getUserPlaylists(currentUser.uid);
           }
         } catch (error) {
           console.error('❌ Error in forced refresh:', error);
         }
         // Clear deleted IDs before refresh to show fresh data
-        console.log('🔍 Clearing deletedPlaylistIds before refresh');
         setDeletedPlaylistIds(new Set());
         
         // Force clear any cached data that might contain the deleted playlist
-        console.log('🔄 Forcing complete cache clear...');
         await hybridPlaylistService.clearAllCaches();
         
         onRefresh();

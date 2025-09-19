@@ -206,14 +206,12 @@ class HybridPlaylistService {
           // Get playlists from Firestore (force fresh data)
           const firestorePlaylists = await firestoreService.getUserPlaylists(currentUser.uid);
           
-          console.log('🔄🔄🔄 FORCING FRESH LIKED SONGS PLAYLIST UPDATE 🔄🔄🔄');
           // Force fresh Liked Songs playlist to prevent deleted songs from reappearing
           const freshLikedSongsPlaylist = await firestoreService.getLikedSongsPlaylist(currentUser.uid);
           
           // Replace any existing Liked Songs playlist with fresh data
           const filteredPlaylists = firestorePlaylists.filter(p => !p.isLikedSongs && p.name !== 'Liked Songs');
           const updatedPlaylists = [freshLikedSongsPlaylist, ...filteredPlaylists];
-          console.log('✅✅✅ FRESH LIKED SONGS INTEGRATED - DELETED SONGS SHOULD NOT REAPPEAR ✅✅✅');
           
           // Also get local playlists for migration/backup
           const localPlaylists = await this.getLocalPlaylists();
@@ -394,7 +392,6 @@ class HybridPlaylistService {
       const currentUser = authService.getCurrentUser();
       
       if (currentUser && currentUser.uid) {
-        console.log('🔥 Creating playlist in Firestore:', name);
         
         try {
           // Create in Firestore
@@ -431,13 +428,10 @@ class HybridPlaylistService {
       const currentUser = authService.getCurrentUser();
       
       if (currentUser && currentUser.uid) {
-        console.log('🔥 Getting Liked Songs playlist from Firestore');
         
         try {
           // Get or create "Liked Songs" playlist in Firestore
-          console.log('🎵🎵🎵 HYBRID SERVICE - CALLING FIRESTORE GET LIKED SONGS 🎵🎵🎵');
-          const result = await firestoreService.getLikedSongsPlaylist(currentUser.uid);
-          console.log('🔥🔥🔥 HYBRID SERVICE - FIRESTORE RESULT RECEIVED 🔥🔥🔥');
+        const result = await firestoreService.getLikedSongsPlaylist(currentUser.uid);
           return result;
         } catch (firestoreError) {
           console.error('❌ Firestore error, falling back to local:', firestoreError);
@@ -489,15 +483,8 @@ class HybridPlaylistService {
       // Check if user is authenticated
       const currentUser = authService.getCurrentUser();
       console.log('🔍 Current user in toggleLikedSong:', currentUser ? `${currentUser.email} (${currentUser.uid})` : 'null');
-      console.log('🎵 Video being toggled:', {
-        id: video.id,
-        vimeo_id: video.vimeo_id,
-        name: video.name,
-        title: video.title
-      });
       
       if (currentUser && currentUser.uid) {
-        console.log('🔥 Toggling liked song in Firestore:', video.name);
         
         try {
           // Check if video is already liked in Firestore
@@ -587,7 +574,6 @@ class HybridPlaylistService {
   async clearPlaylistCache(): Promise<void> {
     try {
       await AsyncStorage.removeItem('playlists_last_refresh');
-      console.log('🗑️ Playlist cache cleared');
     } catch (error) {
       console.error('❌ Error clearing playlist cache:', error);
     }
@@ -719,7 +705,6 @@ class HybridPlaylistService {
       
       if (currentUser && currentUser.uid) {
         // Use Firestore for authenticated users
-        console.log('🔥 Adding video to Firestore playlist:', playlistId);
         try {
           await firestoreService.addVideoToPlaylist(playlistId, video);
           console.log('✅ Video added to Firestore playlist successfully');
@@ -745,7 +730,6 @@ class HybridPlaylistService {
       
       if (currentUser && currentUser.uid) {
         // This is likely a Firestore playlist, try Firestore first
-        console.log('🔥 Trying Firestore for playlist without prefix:', playlistId);
         try {
           await firestoreService.addVideoToPlaylist(playlistId, video);
           console.log('✅ Video added to Firestore playlist successfully');
@@ -840,7 +824,6 @@ class HybridPlaylistService {
       const currentUser = authService.getCurrentUser();
       
       if (currentUser && currentUser.uid) {
-        console.log('🔥 Removing video from Firestore playlist:', playlistId, 'videoId:', videoId);
         
         try {
           // Check if this is Liked Songs playlist by checking Firestore directly
@@ -856,12 +839,10 @@ class HybridPlaylistService {
           
           if (isLikedSongsPlaylist) {
             // Remove from Firestore Liked Songs collection
-            console.log('🔥 Removing from Firestore Liked Songs collection:', videoId);
             await firestoreService.removeLikedSong(currentUser.uid, videoId);
             console.log('✅ Video removed from Firestore Liked Songs collection');
           } else {
             // Remove from regular Firestore playlist
-            console.log('🔥 Removing from regular Firestore playlist:', cleanPlaylistId);
             await firestoreService.removeVideoFromPlaylist(cleanPlaylistId, videoId);
             console.log('✅ Video removed from Firestore playlist');
           }
@@ -1030,7 +1011,6 @@ class HybridPlaylistService {
     
     if (currentUser && currentUser.uid) {
       // Use Firestore for authenticated users
-      console.log('🔥 Deleting playlist from Firestore:', playlistId);
       // Remove user_ prefix for Firestore deletion
       const firestoreId = playlistId.startsWith('user_') ? playlistId.replace('user_', '') : playlistId;
       try {

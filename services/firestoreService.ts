@@ -206,30 +206,22 @@ class FirestoreService {
    */
   async getUserLikedSongs(userId: string, forceRefresh: boolean = false): Promise<SimplifiedVimeoVideo[]> {
     try {
-      console.log('🔥 Getting liked songs for user:', userId, 'forceRefresh:', forceRefresh);
-      
       const likedSongsRef = collection(db, 'likedSongs');
       const q = query(
         likedSongsRef,
         where('userId', '==', userId)
       );
       
-      // Add a delay if force refresh to ensure Firestore consistency
       if (forceRefresh) {
-        console.log('⏳ Force refresh - waiting for Firestore consistency...');
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
       const querySnapshot = await getDocs(q);
       const likedSongs: SimplifiedVimeoVideo[] = [];
       
-      console.log('📊 Firestore query returned', querySnapshot.docs.length, 'documents');
-      
       querySnapshot.forEach((doc) => {
         const data = doc.data() as FirestoreLikedSong;
-        console.log('📋 Found liked song in Firestore:', data.videoData.name, 'ID:', data.videoId, 'DocID:', doc.id);
         
-        // Verify the document ID matches expected format
         const expectedDocId = `${userId}_${data.videoId}`;
         if (doc.id === expectedDocId) {
           likedSongs.push(data.videoData);
@@ -237,9 +229,6 @@ class FirestoreService {
           console.warn('⚠️ Mismatched document ID:', doc.id, 'expected:', expectedDocId);
         }
       });
-      
-      console.log('✅ Retrieved', likedSongs.length, 'liked songs from Firestore');
-      console.log('📋 Liked song IDs:', likedSongs.map(s => s.id));
       return likedSongs;
     } catch (error) {
       console.error('❌ Error getting liked songs:', error);
@@ -252,7 +241,6 @@ class FirestoreService {
    */
   async addLikedSong(userId: string, video: SimplifiedVimeoVideo): Promise<void> {
     try {
-      console.log('🔥 Adding liked song:', video.name);
       
       const likedSongId = `${userId}_${video.id}`;
       const likedSongRef = doc(db, 'likedSongs', likedSongId);
@@ -266,7 +254,6 @@ class FirestoreService {
       };
       
       await setDoc(likedSongRef, likedSong);
-      console.log('✅ Liked song added');
     } catch (error) {
       console.error('❌ Error adding liked song:', error);
       throw error;
@@ -278,10 +265,7 @@ class FirestoreService {
    */
   async removeLikedSong(userId: string, videoId: string): Promise<void> {
     try {
-      console.log('🔥 Removing liked song:', videoId, 'for user:', userId);
-      
       const likedSongId = `${userId}_${videoId}`;
-      console.log('🗑️ Deleting document with ID:', likedSongId);
       
       const likedSongRef = doc(db, 'likedSongs', likedSongId);
       
@@ -293,7 +277,6 @@ class FirestoreService {
       }
       
       await deleteDoc(likedSongRef);
-      console.log('✅ Liked song removed successfully:', likedSongId);
     } catch (error) {
       console.error('❌ Error removing liked song:', error);
       throw error;
