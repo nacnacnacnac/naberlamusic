@@ -1,22 +1,21 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  setDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot,
-  serverTimestamp,
-  Timestamp
-} from 'firebase/firestore';
-import { db } from './firebaseConfig';
 import { Playlist } from '@/types/playlist';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
+import {
+    addDoc,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    onSnapshot,
+    query,
+    serverTimestamp,
+    setDoc,
+    Timestamp,
+    updateDoc,
+    where
+} from 'firebase/firestore';
+import { db } from './firebaseConfig';
 
 export interface FirestorePlaylist extends Omit<Playlist, 'createdAt' | 'updatedAt'> {
   createdAt: Timestamp;
@@ -220,10 +219,19 @@ class FirestoreService {
       
       querySnapshot.forEach((doc) => {
         const data = doc.data() as FirestoreLikedSong;
-        likedSongs.push(data.videoData);
+        console.log('📋 Found liked song in Firestore:', data.videoData.name, 'ID:', data.videoId, 'DocID:', doc.id);
+        
+        // Verify the document ID matches expected format
+        const expectedDocId = `${userId}_${data.videoId}`;
+        if (doc.id === expectedDocId) {
+          likedSongs.push(data.videoData);
+        } else {
+          console.warn('⚠️ Mismatched document ID:', doc.id, 'expected:', expectedDocId);
+        }
       });
       
       console.log('✅ Retrieved', likedSongs.length, 'liked songs from Firestore');
+      console.log('📋 Liked song IDs:', likedSongs.map(s => s.id));
       return likedSongs;
     } catch (error) {
       console.error('❌ Error getting liked songs:', error);
@@ -262,13 +270,22 @@ class FirestoreService {
    */
   async removeLikedSong(userId: string, videoId: string): Promise<void> {
     try {
-      console.log('🔥 Removing liked song:', videoId);
+      console.log('🔥 Removing liked song:', videoId, 'for user:', userId);
       
       const likedSongId = `${userId}_${videoId}`;
+      console.log('🗑️ Deleting document with ID:', likedSongId);
+      
       const likedSongRef = doc(db, 'likedSongs', likedSongId);
       
+      // Check if document exists before deleting
+      const docSnap = await getDoc(likedSongRef);
+      if (!docSnap.exists()) {
+        console.log('⚠️ Liked song document does not exist:', likedSongId);
+        return;
+      }
+      
       await deleteDoc(likedSongRef);
-      console.log('✅ Liked song removed');
+      console.log('✅ Liked song removed successfully:', likedSongId);
     } catch (error) {
       console.error('❌ Error removing liked song:', error);
       throw error;
@@ -287,6 +304,32 @@ class FirestoreService {
       return docSnap.exists();
     } catch (error) {
       console.error('❌ Error checking if video is liked:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if a playlist is the "Liked Songs" playlist
+   */
+  async isLikedSongsPlaylist(playlistId: string): Promise<boolean> {
+    try {
+      console.log('🔍 Checking if playlist is Liked Songs:', playlistId);
+      
+      const playlistRef = doc(db, 'playlists', playlistId);
+      const docSnap = await getDoc(playlistRef);
+      
+      if (!docSnap.exists()) {
+        console.log('⚠️ Playlist document does not exist:', playlistId);
+        return false;
+      }
+      
+      const data = docSnap.data() as FirestorePlaylist;
+      const isLikedSongs = data.isLikedSongs === true;
+      
+      console.log('✅ Playlist isLikedSongs check result:', { playlistId, isLikedSongs, name: data.name });
+      return isLikedSongs;
+    } catch (error) {
+      console.error('❌ Error checking if playlist is Liked Songs:', error);
       return false;
     }
   }

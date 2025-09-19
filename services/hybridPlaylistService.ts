@@ -1,11 +1,11 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 import { Playlist, PlaylistVideo } from '@/types/playlist';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { adminApiService } from './adminApiService';
-import { webOnlyPlaylistService } from './webOnlyPlaylistService';
-import { firestoreService } from './firestoreService';
 import { authService } from './authService';
+import { firestoreService } from './firestoreService';
+import { webOnlyPlaylistService } from './webOnlyPlaylistService';
 
 class HybridPlaylistService {
   private readonly STORAGE_KEY = 'naber_la_user_playlists'; // Only user playlists
@@ -472,9 +472,17 @@ class HybridPlaylistService {
    */
   async toggleLikedSong(video: SimplifiedVimeoVideo): Promise<boolean> {
     try {
+      let result: boolean;
+      
       // Check if user is authenticated
       const currentUser = authService.getCurrentUser();
       console.log('🔍 Current user in toggleLikedSong:', currentUser ? `${currentUser.email} (${currentUser.uid})` : 'null');
+      console.log('🎵 Video being toggled:', {
+        id: video.id,
+        vimeo_id: video.vimeo_id,
+        name: video.name,
+        title: video.title
+      });
       
       if (currentUser && currentUser.uid) {
         console.log('🔥 Toggling liked song in Firestore:', video.name);
@@ -482,18 +490,25 @@ class HybridPlaylistService {
         try {
           // Check if video is already liked in Firestore
           const isLiked = await firestoreService.isVideoLiked(currentUser.uid, video.id);
+          console.log('🔍 Video like status check:', { videoId: video.id, isLiked, userId: currentUser.uid });
           
           if (isLiked) {
             // Remove from Firestore liked songs
+            console.log('💔 Removing from Firestore Liked Songs:', video.name, 'VideoID:', video.id, 'UserID:', currentUser.uid);
             await firestoreService.removeLikedSong(currentUser.uid, video.id);
             console.log('💔 Removed from Firestore Liked Songs:', video.name);
-            return false;
+            result = false;
           } else {
             // Add to Firestore liked songs
+            console.log('❤️ Adding to Firestore Liked Songs:', video.name, 'VideoID:', video.id, 'UserID:', currentUser.uid);
             await firestoreService.addLikedSong(currentUser.uid, video);
             console.log('❤️ Added to Firestore Liked Songs:', video.name);
-            return true;
+            result = true;
           }
+          
+          // Clear cache after Firestore operation to ensure fresh data
+          await this.clearPlaylistCache();
+          return result;
         } catch (firestoreError) {
           console.error('❌ Firestore error, falling back to local:', firestoreError);
           // Fall through to local implementation
@@ -544,10 +559,25 @@ class HybridPlaylistService {
       
       await this.cachePlaylistsLocally(playlists);
       
+      // Clear cache after local operation to ensure fresh data
+      await this.clearPlaylistCache();
+      
       return !isLiked; // Return new liked state
     } catch (error) {
       console.error('Error toggling liked song:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Clear playlist cache to force fresh data on next load
+   */
+  private async clearPlaylistCache(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem('playlists_last_refresh');
+      console.log('🗑️ Playlist cache cleared');
+    } catch (error) {
+      console.error('❌ Error clearing playlist cache:', error);
     }
   }
 
@@ -785,6 +815,9 @@ class HybridPlaylistService {
         } catch (localError) {
           console.log('ℹ️ Playlist not in local cache, skipping local update');
         }
+        
+        // Clear cache to ensure fresh data on next load
+        await this.clearPlaylistCache();
       } catch (error) {
         console.warn('⚠️ Admin API failed:', error);
         // For admin playlists, if API fails, we can't do much locally
@@ -798,18 +831,25 @@ class HybridPlaylistService {
         console.log('🔥 Removing video from Firestore playlist:', playlistId, 'videoId:', videoId);
         
         try {
-          // Check if this is Liked Songs playlist
+          // Check if this is Liked Songs playlist by checking Firestore directly
           const cleanPlaylistId = playlistId.replace('user_', '');
-          const localPlaylists = await this.getLocalPlaylists();
-          const playlist = localPlaylists.find(p => p.id === playlistId || p.id === cleanPlaylistId);
           
-          if (playlist && (playlist.isLikedSongs || playlist.name === 'Liked Songs')) {
-            // Remove from Firestore Liked Songs
-            console.log('🔥 Removing from Firestore Liked Songs:', videoId);
+          console.log('🔍 Checking if playlist is Liked Songs:', {
+            playlistId,
+            cleanPlaylistId
+          });
+          
+          // Check if this playlist is marked as Liked Songs in Firestore
+          const isLikedSongsPlaylist = await firestoreService.isLikedSongsPlaylist(cleanPlaylistId);
+          
+          if (isLikedSongsPlaylist) {
+            // Remove from Firestore Liked Songs collection
+            console.log('🔥 Removing from Firestore Liked Songs collection:', videoId);
             await firestoreService.removeLikedSong(currentUser.uid, videoId);
-            console.log('✅ Video removed from Firestore Liked Songs');
+            console.log('✅ Video removed from Firestore Liked Songs collection');
           } else {
             // Remove from regular Firestore playlist
+            console.log('🔥 Removing from regular Firestore playlist:', cleanPlaylistId);
             await firestoreService.removeVideoFromPlaylist(cleanPlaylistId, videoId);
             console.log('✅ Video removed from Firestore playlist');
           }
@@ -821,6 +861,9 @@ class HybridPlaylistService {
       
       // Also update local (for backup/cache)
       await this.removeVideoFromLocalPlaylist(playlistId, videoId);
+      
+      // Clear cache to ensure fresh data on next load
+      await this.clearPlaylistCache();
     }
   }
 

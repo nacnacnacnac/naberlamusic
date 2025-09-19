@@ -662,6 +662,12 @@ export default function HomeScreen() {
     if (!currentVideo) return;
     
     console.log('❤️ Heart pressed - isAuthenticated:', isAuthenticated, 'user:', user, 'isGoogleUser:', isGoogleUser);
+    console.log('🎵 Current video details:', {
+      id: currentVideo.id,
+      vimeo_id: currentVideo.vimeo_id,
+      name: currentVideo.name,
+      title: currentVideo.title
+    });
     
     // Check if user is logged in with Google
     if (!isGoogleUser) {
@@ -690,9 +696,9 @@ export default function HomeScreen() {
       const newLikedState = await hybridPlaylistService.toggleLikedSong(currentVideo);
       setIsHeartFavorited(newLikedState);
       
-      // Update playlists state immediately for better UX
+      // Update playlists state immediately for better UX - force refresh to avoid cache issues
       try {
-        const updatedPlaylists = await hybridPlaylistService.getPlaylists();
+        const updatedPlaylists = await hybridPlaylistService.getPlaylists(true); // Force refresh to clear cache
         const uniquePlaylists = updatedPlaylists.filter((playlist, index, self) => 
           index === self.findIndex(p => p.id === playlist.id)
         );
