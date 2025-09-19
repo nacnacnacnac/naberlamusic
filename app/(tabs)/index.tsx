@@ -133,6 +133,7 @@ export default function HomeScreen() {
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showMainPlaylistModal, setShowMainPlaylistModal] = useState(false);
   const [mainPlaylistInitialView, setMainPlaylistInitialView] = useState<'main' | 'selectPlaylist' | 'createPlaylist' | 'profile'>('main');
+  const [isFromLikeButton, setIsFromLikeButton] = useState(false); // Like butonundan gelip gelmediğini takip et
   const mainPlaylistModalRef = useRef<any>(null);
   const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -665,19 +666,23 @@ export default function HomeScreen() {
     // Check if user is logged in with Google
     if (!isGoogleUser) {
       console.log('❌ Not Google user - opening MainPlaylistModal with profile view for sign in');
-      // Eğer modal zaten açıksa, önce kapat sonra profile view ile aç
-      if (showMainPlaylistModal) {
-        setShowMainPlaylistModal(false);
-        setTimeout(() => {
-          setMainPlaylistInitialView('profile');
-          setShowMainPlaylistModal(true);
-        }, 100);
-      } else {
+      setIsFromLikeButton(true); // Like butonundan geldiğini işaretle
+      
+      // Modal'ı her zaman kapat ve yeniden aç - state reset için
+      setShowMainPlaylistModal(false);
+      // Reset MainPlaylistModal internal state
+      if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
+        mainPlaylistModalRef.current.resetToMain();
+      }
+      setTimeout(() => {
         setMainPlaylistInitialView('profile');
         setShowMainPlaylistModal(true);
-      }
+      }, 100);
       return;
     }
+    
+    // User is logged in - this is not from like button context anymore
+    setIsFromLikeButton(false);
     
     // User is logged in - proceed with like functionality
     try {
@@ -913,8 +918,18 @@ export default function HomeScreen() {
     if (Platform.OS === 'web') {
       // Web'de main playlist modal'ını main view ile aç (her zaman playlist göster)
       console.log('🎵 Heart icon pressed - opening MainPlaylistModal with main view');
-      setMainPlaylistInitialView('main');
-      setShowMainPlaylistModal(true);
+      setIsFromLikeButton(false); // Like butonundan gelmediğini işaretle
+      
+      // Modal'ı her zaman kapat ve yeniden aç - state reset için
+      setShowMainPlaylistModal(false);
+      // Reset MainPlaylistModal internal state
+      if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
+        mainPlaylistModalRef.current.resetToMain();
+      }
+      setTimeout(() => {
+        setMainPlaylistInitialView('main');
+        setShowMainPlaylistModal(true);
+      }, 100);
     } else {
       // Mobile'da playlist oluşturma
       if (!isAuthenticated) {
@@ -2240,13 +2255,18 @@ export default function HomeScreen() {
         <LeftModal
           visible={showMainPlaylistModal}
           onClose={() => {
-            console.log('🔄 LeftModal onClose - resetting states');
+            console.log('🔄 LeftModal onClose - resetting states, isFromLikeButton:', isFromLikeButton);
             setShowMainPlaylistModal(false);
-            setMainPlaylistInitialView('main'); // Reset to main when modal closes
-            // Reset MainPlaylistModal internal state if ref exists
-            if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
-              mainPlaylistModalRef.current.resetToMain();
+            // Sadece like butonundan gelmiyorsa main view'a reset et
+            if (!isFromLikeButton) {
+              setMainPlaylistInitialView('main'); // Reset to main when modal closes
+              // Reset MainPlaylistModal internal state if ref exists
+              if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
+                mainPlaylistModalRef.current.resetToMain();
+              }
             }
+            // Like button flag'ini her zaman reset et
+            setIsFromLikeButton(false);
           }}
           height={600}
         >
@@ -2265,6 +2285,7 @@ export default function HomeScreen() {
             refreshing={refreshing}
             refreshTrigger={playlistRefreshTrigger}
             initialView={mainPlaylistInitialView}
+            disableAutoSwitch={isFromLikeButton}
           />
         </LeftModal>
       )}

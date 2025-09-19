@@ -23,6 +23,7 @@ interface MainPlaylistModalProps {
   refreshTrigger?: number;
   onCreatePlaylist?: (videoId?: string, videoTitle?: string) => void;
   initialView?: 'main' | 'selectPlaylist' | 'createPlaylist' | 'profile';
+  disableAutoSwitch?: boolean;
 }
 
 const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
@@ -36,7 +37,8 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   refreshing,
   refreshTrigger,
   onCreatePlaylist,
-  initialView = 'main'
+  initialView = 'main',
+  disableAutoSwitch = false
 }, ref) => {
   const { user, displayName, signOut, signIn, isAuthenticated } = useAuth();
   const playlistScrollRef = useRef<ScrollView>(null);
@@ -89,14 +91,12 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
     }
   }));
   
-  // Update currentView when initialView changes (only if not manually navigated)
+  // Update currentView when initialView changes
   React.useEffect(() => {
-    if (!isInitialized) {
-      console.log('🔄 MainPlaylistModal initializing with view:', initialView);
-      setCurrentView(initialView);
-      setIsInitialized(true);
-    }
-  }, [initialView, isInitialized]);
+    console.log('🔄 MainPlaylistModal initialView changed to:', initialView);
+    setCurrentView(initialView);
+    setIsInitialized(true);
+  }, [initialView]);
   
   // Debug currentView changes
   React.useEffect(() => {
@@ -107,14 +107,14 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   const [wasAuthenticated, setWasAuthenticated] = React.useState(isAuthenticated);
   
   React.useEffect(() => {
-    // Only auto-switch if user just signed in (was not authenticated, now is)
-    if (!wasAuthenticated && isAuthenticated && currentView === 'profile' && !hasAutoSwitched) {
+    // Only auto-switch if user just signed in (was not authenticated, now is) AND auto-switch is not disabled
+    if (!wasAuthenticated && isAuthenticated && currentView === 'profile' && !hasAutoSwitched && !disableAutoSwitch) {
       console.log('✅ User just signed in, switching to main playlist view');
       setCurrentView('main');
       setHasAutoSwitched(true);
     }
     setWasAuthenticated(isAuthenticated);
-  }, [isAuthenticated, currentView, hasAutoSwitched, wasAuthenticated]);
+  }, [isAuthenticated, currentView, hasAutoSwitched, wasAuthenticated, disableAutoSwitch]);
 
   // Reset modal state when it closes
   const handleModalClose = () => {
