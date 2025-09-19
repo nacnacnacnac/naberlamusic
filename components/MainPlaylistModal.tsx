@@ -864,6 +864,11 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                     {playlist.videos.map((playlistVideo: any, index: number) => {
                       const videoKey = `${playlist.id}-${playlistVideo.vimeo_id || playlistVideo.id}`;
                       
+                      // Don't render videos that are being deleted
+                      if (fadingVideos.has(videoKey)) {
+                        return null;
+                      }
+                      
                       // Initialize fade animation if not exists
                       if (!fadeAnimations.current[videoKey]) {
                         fadeAnimations.current[videoKey] = new Animated.Value(1);
@@ -1017,7 +1022,24 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                                   // After animation, remove from backend
                                   try {
                                     await hybridPlaylistService.removeVideoFromPlaylist(playlist.id, vimeoIdToUse);
-                                    onRefresh(); // Refresh to show updated playlist
+                                    
+                                    // Remove from fading videos to hide the element immediately
+                                    setFadingVideos(prev => {
+                                      const newSet = new Set(prev);
+                                      newSet.delete(videoKey);
+                                      return newSet;
+                                    });
+                                    
+                                    // Force refresh with delay for Firestore consistency
+                                    setTimeout(() => {
+                                      // Clear fading videos and animations before refresh to prevent empty spaces
+                                      setFadingVideos(new Set());
+                                      // Reset fade animation for this video
+                                      if (fadeAnimations.current[videoKey]) {
+                                        fadeAnimations.current[videoKey].setValue(1);
+                                      }
+                                      onRefresh(); // Refresh to show updated playlist
+                                    }, 500);
                                   } catch (error) {
                                     console.error('❌ Error removing video from playlist:', error);
                                     // If error, fade back in

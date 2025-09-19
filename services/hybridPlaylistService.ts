@@ -572,7 +572,7 @@ class HybridPlaylistService {
   /**
    * Clear playlist cache to force fresh data on next load
    */
-  private async clearPlaylistCache(): Promise<void> {
+  async clearPlaylistCache(): Promise<void> {
     try {
       await AsyncStorage.removeItem('playlists_last_refresh');
       console.log('🗑️ Playlist cache cleared');

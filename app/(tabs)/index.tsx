@@ -698,11 +698,56 @@ export default function HomeScreen() {
       
       // Update playlists state immediately for better UX - force refresh to avoid cache issues
       try {
+        // Wait for Firestore to process the change
+        console.log('⏳ Waiting for Firestore to process the change...');
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Clear cache again to ensure fresh data
+        await hybridPlaylistService.clearPlaylistCache();
+        console.log('🗑️ Cache cleared again before refresh');
+        
         const updatedPlaylists = await hybridPlaylistService.getPlaylists(true); // Force refresh to clear cache
         const uniquePlaylists = updatedPlaylists.filter((playlist, index, self) => 
           index === self.findIndex(p => p.id === playlist.id)
         );
+        console.log('🔄 Updated playlists after heart toggle:', uniquePlaylists.length, 'playlists');
+        
+        // Log Liked Songs playlist specifically
+        const likedSongsPlaylist = uniquePlaylists.find(p => p.isLikedSongs || p.name === 'Liked Songs');
+        if (likedSongsPlaylist) {
+          console.log('❤️ Liked Songs playlist after update:', {
+            id: likedSongsPlaylist.id,
+            name: likedSongsPlaylist.name,
+            videoCount: likedSongsPlaylist.videos?.length || 0,
+            videos: likedSongsPlaylist.videos?.map(v => ({
+              id: v.id,
+              vimeo_id: v.vimeo_id,
+              title: v.title || v.name
+            })) || []
+          });
+          
+          // Check if the current video is in the list with detailed logging
+          const currentVideoInList = likedSongsPlaylist.videos?.some(v => 
+            v.id === currentVideo.id || v.vimeo_id === currentVideo.id
+          );
+          
+          // Don't use manual fallback - it can cause deleted songs to reappear
+          if (!currentVideoInList && newLikedState) {
+            console.log('⚠️ Video not found in playlist after Firestore update - this is expected due to eventual consistency');
+            console.log('🔄 The video will appear in the next refresh or page reload');
+          }
+          
+          console.log('🔍 Video ID matching check:', {
+            currentVideoId: currentVideo.id,
+            currentVideoVimeoId: currentVideo.vimeo_id,
+            playlistVideoIds: likedSongsPlaylist.videos?.map(v => v.id) || [],
+            playlistVimeoIds: likedSongsPlaylist.videos?.map(v => v.vimeo_id) || [],
+            found: currentVideoInList
+          });
+        }
+        
         setUserPlaylists(uniquePlaylists);
+        console.log('✅ Playlists state updated successfully');
       } catch (error) {
         console.error('Error updating playlists after heart toggle:', error);
       }

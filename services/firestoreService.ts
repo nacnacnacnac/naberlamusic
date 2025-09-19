@@ -204,9 +204,9 @@ class FirestoreService {
   /**
    * Get user's liked songs from Firestore
    */
-  async getUserLikedSongs(userId: string): Promise<SimplifiedVimeoVideo[]> {
+  async getUserLikedSongs(userId: string, forceRefresh: boolean = false): Promise<SimplifiedVimeoVideo[]> {
     try {
-      console.log('🔥 Getting liked songs for user:', userId);
+      console.log('🔥 Getting liked songs for user:', userId, 'forceRefresh:', forceRefresh);
       
       const likedSongsRef = collection(db, 'likedSongs');
       const q = query(
@@ -214,8 +214,16 @@ class FirestoreService {
         where('userId', '==', userId)
       );
       
+      // Add a delay if force refresh to ensure Firestore consistency
+      if (forceRefresh) {
+        console.log('⏳ Force refresh - waiting for Firestore consistency...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
       const querySnapshot = await getDocs(q);
       const likedSongs: SimplifiedVimeoVideo[] = [];
+      
+      console.log('📊 Firestore query returned', querySnapshot.docs.length, 'documents');
       
       querySnapshot.forEach((doc) => {
         const data = doc.data() as FirestoreLikedSong;
@@ -354,12 +362,12 @@ class FirestoreService {
         const doc = querySnapshot.docs[0];
         const data = doc.data() as FirestorePlaylist;
         
-        // Get current liked songs and update playlist
-        const likedSongs = await this.getUserLikedSongs(userId);
+        // Get current liked songs (force refresh for consistency)
+        const likedSongs = await this.getUserLikedSongs(userId, true);
         
-        // Update playlist with current liked songs
-        await this.updatePlaylist(doc.id, { videos: likedSongs });
+        console.log('🎵 Liked Songs playlist found - returning fresh data with', likedSongs.length, 'songs');
         
+        // Return playlist with fresh liked songs data (don't update Firestore playlist)
         return {
           ...data,
           id: doc.id,
@@ -369,7 +377,7 @@ class FirestoreService {
         };
       } else {
         // Create new "Liked Songs" playlist
-        const likedSongs = await this.getUserLikedSongs(userId);
+        const likedSongs = await this.getUserLikedSongs(userId, true);
         
         const likedPlaylist = await this.createPlaylist(userId, {
           name: 'Liked Songs',
