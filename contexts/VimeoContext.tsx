@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Alert, DeviceEventEmitter } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hybridVimeoService } from '@/services/hybridVimeoService';
-import { VimeoConfig, SimplifiedVimeoVideo, VimeoError } from '@/types/vimeo';
-import { remoteConfigService, RemoteConfig } from '@/services/remoteConfigService';
+import { RemoteConfig, remoteConfigService } from '@/services/remoteConfigService';
+import { SimplifiedVimeoVideo, VimeoConfig, VimeoError } from '@/types/vimeo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { Alert, DeviceEventEmitter } from 'react-native';
 
 interface VimeoContextType {
   // Configuration
@@ -86,18 +86,40 @@ export function VimeoProvider({ children }: VimeoProviderProps) {
       setConfig(dummyConfig);
       setIsConfigured(true);
       
-      // 🚀 OPTIMIZATION: Only load cached videos, no API calls
-      console.log('⚡ Loading cached videos only (optimized for performance)');
-      console.log('🔍 DEBUG: initializeFromStorage calling hybridVimeoService.getAllUserVideos()');
-      const cachedVideos = await hybridVimeoService.getAllUserVideos();
-      if (cachedVideos.length > 0) {
-        // Apply remote config filtering to cached videos
-        const filteredVideos = remoteConfigService.filterVideos(cachedVideos);
-        setVideos(filteredVideos);
-        console.log(`✅ Loaded ${filteredVideos.length} cached videos`);
-      } else {
-        console.log('📦 No cached videos found - videos will be available after first manual refresh');
-      }
+      // 🚀 PERFORMANCE OPTIMIZATION: Defer video loading to background
+      console.log('⚡ App ready - videos will load in background');
+      
+      // Load videos in background after a short delay
+      setTimeout(async () => {
+        try {
+          console.log('🔄 Background loading videos (first 50 for performance)...');
+          // Load only first 50 videos initially for better performance
+          const cachedVideos = await hybridVimeoService.getAllUserVideos(false, 50);
+          if (cachedVideos.length > 0) {
+            // Apply remote config filtering to cached videos
+            const filteredVideos = remoteConfigService.filterVideos(cachedVideos);
+            setVideos(filteredVideos);
+            console.log(`✅ Background loaded ${filteredVideos.length} videos (limited for performance)`);
+            
+            // Load remaining videos after another delay
+            setTimeout(async () => {
+              try {
+                console.log('🔄 Loading remaining videos...');
+                const allVideos = await hybridVimeoService.getAllUserVideos(false);
+                const allFilteredVideos = remoteConfigService.filterVideos(allVideos);
+                setVideos(allFilteredVideos);
+                console.log(`✅ Loaded all ${allFilteredVideos.length} videos`);
+              } catch (error) {
+                console.error('❌ Full video loading failed:', error);
+              }
+            }, 3000); // 3 saniye sonra kalan videoları yükle
+          } else {
+            console.log('📦 No cached videos found - videos will be available after first manual refresh');
+          }
+        } catch (error) {
+          console.error('❌ Background video loading failed:', error);
+        }
+      }, 1000); // 1 saniye sonra yükle
       
     } catch (err) {
       console.error('🔍 DEBUG: Error in initializeFromStorage:', err);

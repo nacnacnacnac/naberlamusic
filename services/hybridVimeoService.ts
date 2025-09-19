@@ -3,9 +3,9 @@
  * Uses backend tokens when available, falls back to local token
  */
 
+import { VimeoConfig } from '@/types/vimeo';
 import { tokenService } from './tokenService';
 import { vimeoService } from './vimeoService';
-import { VimeoConfig } from '@/types/vimeo';
 
 class HybridVimeoService {
   private useBackendTokens: boolean = false;
@@ -139,7 +139,7 @@ class HybridVimeoService {
   /**
    * Get all user videos
    */
-  async getAllUserVideos(forceRefresh: boolean = false) {
+  async getAllUserVideos(forceRefresh: boolean = false, limit?: number) {
     // Try cache first unless force refresh
     if (!forceRefresh) {
       const cachedVideos = await vimeoService.getCachedVideos();
@@ -198,6 +198,13 @@ class HybridVimeoService {
     console.log('🔍 DEBUG: About to call vimeoService.getAllUserVideos()');
     const result = await vimeoService.getAllUserVideos();
     console.log('🔍 DEBUG: vimeoService.getAllUserVideos() completed, got', result.length, 'videos');
+    
+    // Apply limit if specified for performance optimization
+    if (limit && limit > 0) {
+      console.log(`⚡ Performance optimization: limiting to ${limit} videos`);
+      return result.slice(0, limit);
+    }
+    
     return result;
   }
 
