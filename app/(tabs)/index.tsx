@@ -25,8 +25,9 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, DeviceEventEmitter, Dimensions, Image, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-// Background video import
-const backgroundVideo = require('@/assets/videos/NLA6.mp4');
+// Background video imports
+const backgroundVideo = require('@/assets/videos/NLA6.mp4'); // Desktop/web için
+const mobileBackgroundVideo = require('@/assets/videos/NLA_mobil.mp4'); // Mobil web için
 const heartImage = require('@/assets/hearto.png');
 
 // Integration Testing Infrastructure
@@ -72,10 +73,26 @@ const debugLog = {
 
 const { width } = Dimensions.get('window');
 
+// Mobile web detection - telefon üzerinden web'e giriş yapanları tespit et
+const isMobileWeb = Platform.OS === 'web' && 
+  width <= 768 && 
+  typeof navigator !== 'undefined' && 
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 export default function HomeScreen() {
   const { videos, isConfigured, isLoading, refreshVideos } = useVimeo();
   const { isConfigured: isBackgroundAudioConfigured } = useBackgroundAudio();
   const { isAuthenticated, user } = useAuth();
+  
+  // Debug: Log video selection
+  useEffect(() => {
+    console.log('📱 Mobile Web Detection:', {
+      isMobileWeb,
+      width,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+      selectedVideo: isMobileWeb ? 'NLA_mobil.mp4 (Mobile)' : 'NLA6.mp4 (Desktop)'
+    });
+  }, []);
   
   // Check if user is logged in with Google (not guest/developer)
   const isGoogleUser = isAuthenticated && user && user.email && !user.email.includes('developer@') && !user.email.includes('guest@');
@@ -1881,13 +1898,13 @@ export default function HomeScreen() {
                     objectFit: 'cover'
                   }}
                 >
-                  <source src={backgroundVideo} type="video/mp4" />
+                  <source src={isMobileWeb ? mobileBackgroundVideo : backgroundVideo} type="video/mp4" />
                 </video>
               </div>
             ) : (
               <Video
-                source={backgroundVideo}
-                style={styles.backgroundVideoStyle}
+                source={mobileBackgroundVideo} // Mobil native için de NLA.mp4 kullan
+                style={styles.backgroundVideoMobile}
                 shouldPlay
                 isLooping
                 isMuted
@@ -2418,6 +2435,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Platform.OS === 'web' ? 'transparent' : '#000000', // Web'de transparent
     position: 'relative',
+    paddingTop: Platform.OS !== 'web' ? 0 : 0, // Safe area için padding
   },
   noVideoBackground: {
     position: 'absolute',
@@ -2896,10 +2914,10 @@ const styles = StyleSheet.create({
   // Gradient Overlays
   headerGradient: {
     position: 'absolute',
-    top: 0,
+    top: -10, // Gradient'i mobilde daha da aşağı indir
     left: 0,
     right: 0,
-    height: 150, // Header'dan aşağı gradient
+    height: 200, // Header'dan aşağı gradient
     zIndex: 2, // Overlay'in üzerinde ama content'in altında
   },
   leftSideGradient: {
@@ -2917,5 +2935,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 150, // Sağdan sola gradient
     zIndex: 2, // Overlay'in üzerinde ama content'in altında
+  },
+  // Background Video Mobile Style with Safe Area
+  backgroundVideoMobile: {
+    position: 'absolute',
+    top: 0, // Safe area'nın üstünden başla
+    left: 0,
+    right: 0,
+    bottom: 0, // Safe area'nın altına kadar
+    width: '100%',
+    height: '100%',
+    zIndex: -1,
   },
 });

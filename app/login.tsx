@@ -1,32 +1,46 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, TouchableOpacity, StatusBar, Platform, Animated, Dimensions, Easing, Alert, Text } from 'react-native';
+import { ThemedText } from '@/components/ThemedText';
+import { IconSymbol } from '@/components/ui/IconSymbol';
+import { useAuth } from '@/contexts/AuthContext';
+import { useVimeo } from '@/contexts/VimeoContext';
+import { Video } from 'expo-av';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Video } from 'expo-av';
 import { router } from 'expo-router';
-import { ThemedText } from '@/components/ThemedText';
-import { useVimeo } from '@/contexts/VimeoContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { IconSymbol } from '@/components/ui/IconSymbol';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import * as NavigationBar from 'expo-navigation-bar';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Dimensions, Easing, Platform, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 // Asset imports for web
 const appStoreImage = Platform.OS === 'web' ? '/images/appstore2.png' : require('@/assets/images/appstore2.png');
 const androidStoreImage = Platform.OS === 'web' ? '/images/android_store.png' : require('@/assets/images/android_store.png');
 const spotifyStoreImage = Platform.OS === 'web' ? '/spotify_store.png' : require('@/assets/images/spotify_store.png');
-const backgroundVideo = require('@/assets/videos/NLA.mp4');
+// Background video imports
+const backgroundVideo = require('@/assets/videos/NLA.mp4'); // Desktop/web için
+const mobileBackgroundVideo = require('@/assets/videos/NLA_mobil_login.mp4'); // Mobil web için
 
 const { width, height } = Dimensions.get('window');
 
-// Mobile web detection
-const isMobileWeb = Platform.OS === 'web' && width <= 768;
+// Mobile web detection - telefon üzerinden web'e giriş yapanları tespit et
+const isMobileWeb = Platform.OS === 'web' && 
+  width <= 768 && 
+  typeof navigator !== 'undefined' && 
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 const isMobileWebPortrait = isMobileWeb && height > width;
 
 export default function LoginScreen() {
   const { isLoading, videos } = useVimeo();
   const { signIn, isLoading: authLoading, isAuthenticated } = useAuth();
   const [progressAnim] = useState(new Animated.Value(0));
+  
+  // Debug: Log video selection for login
+  useEffect(() => {
+    console.log('🔐 Login Mobile Web Detection:', {
+      isMobileWeb,
+      width,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+      selectedVideo: isMobileWeb ? 'NLA_mobil_login.mp4 (Mobile)' : 'NLA.mp4 (Desktop)'
+    });
+  }, []);
   const [showLoading, setShowLoading] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -578,13 +592,13 @@ export default function LoginScreen() {
               objectFit: 'cover'
             }}
           >
-               <source src={backgroundVideo} type="video/mp4" />
+               <source src={isMobileWeb ? mobileBackgroundVideo : backgroundVideo} type="video/mp4" />
           </video>
         </div>
       ) : (
         <View style={[styles.videoContainer, isLandscape && styles.videoContainerLandscape]}>
           <Video
-            source={backgroundVideo}
+            source={mobileBackgroundVideo} // Mobil native için de login videosu kullan
             style={[styles.backgroundVideo, isLandscape && styles.backgroundVideoLandscape]}
             shouldPlay
             isLooping
