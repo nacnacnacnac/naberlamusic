@@ -26,8 +26,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, DeviceEventEmitter, Dimensions, Image, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Background video import
-const backgroundVideo = require('@/assets/videos/NLA2.mp4');
-const overlayImage = require('@/assets/images/ten.png');
+const backgroundVideo = require('@/assets/videos/NLA6.mp4');
 const heartImage = require('@/assets/hearto.png');
 
 // Integration Testing Infrastructure
@@ -127,9 +126,6 @@ export default function HomeScreen() {
   // Landscape detection
   const [isLandscape, setIsLandscape] = useState(false);
   
-  // ten.png animation
-  const tenPngOpacity = useRef(new Animated.Value(0)).current;
-  const tenPngTranslateY = useRef(new Animated.Value(-50)).current;
   const [showPlaylistModal, setShowPlaylistModal] = useState(false);
   const [showMainPlaylistModal, setShowMainPlaylistModal] = useState(false);
   const [mainPlaylistInitialView, setMainPlaylistInitialView] = useState<'main' | 'selectPlaylist' | 'createPlaylist' | 'profile'>('main');
@@ -231,21 +227,6 @@ export default function HomeScreen() {
       useNativeDriver: true,
     }).start();
 
-    // ten.png animation with delay
-    setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(tenPngOpacity, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(tenPngTranslateY, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        })
-      ]).start();
-    }, 500); // 500ms delay after page fade-in
   }, []);
 
 
@@ -1914,54 +1895,6 @@ export default function HomeScreen() {
               />
             )}
             
-            {/* ten.png Overlay - Animated entrance from top */}
-            {Platform.OS === 'web' ? (
-              <Animated.View style={{
-                position: 'absolute',
-                top: '50%',
-                left: '52%',
-                transform: [
-                  { translateX: '-50%' },
-                  { translateY: '-50%' },
-                  { translateY: tenPngTranslateY }
-                ],
-                zIndex: 10,
-                pointerEvents: 'none',
-                opacity: tenPngOpacity
-              }}>
-                <img 
-                  src="/ten.png" 
-                  alt="Overlay"
-                  style={{
-                    maxWidth: typeof window !== 'undefined' && window.innerWidth <= 768 ? '90%' : '70%',
-                    maxHeight: typeof window !== 'undefined' && window.innerWidth <= 768 ? '90%' : '70%',
-                    width: typeof window !== 'undefined' && window.innerWidth <= 768 ? '350px' : '500px',
-                    height: 'auto',
-                    objectFit: 'contain'
-                  }}
-                />
-              </Animated.View>
-            ) : (
-              <Animated.View style={[
-                styles.overlayImageStyle,
-                {
-                  opacity: tenPngOpacity,
-                  transform: [
-                    { translateX: -160 },
-                    { translateY: Animated.add(tenPngTranslateY, -31) }
-                  ]
-                }
-              ]}>
-                <Image
-                  source={overlayImage}
-                  style={{
-                    width: 350,
-                    height: 62, // 350 * (172/971) = ~62
-                  }}
-                  resizeMode="contain"
-                />
-              </Animated.View>
-            )}
             
             {/* Dark overlay for better text readability */}
             <LinearGradient
