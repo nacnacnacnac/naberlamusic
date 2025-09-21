@@ -84,6 +84,21 @@ export default function HomeScreen() {
   const { isConfigured: isBackgroundAudioConfigured } = useBackgroundAudio();
   const { isAuthenticated, user } = useAuth();
   
+  // Disable scroll on web
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Disable scroll
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Cleanup on unmount
+      return () => {
+        document.body.style.overflow = 'auto';
+        document.documentElement.style.overflow = 'auto';
+      };
+    }
+  }, []);
+  
   // Debug: Log video selection
   useEffect(() => {
     console.log('📱 Mobile Web Detection:', {
@@ -208,32 +223,24 @@ export default function HomeScreen() {
     return () => subscription?.remove();
   }, []);
 
-  // Set web body background to black
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      document.body.style.backgroundColor = '#000000';
-      document.documentElement.style.backgroundColor = '#000000';
-      
-      return () => {
-        // Cleanup on unmount
-        document.body.style.backgroundColor = '';
-        document.documentElement.style.backgroundColor = '';
-      };
-    }
-  }, []);
+  // Set web body background to black immediately - before component mounts
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    document.body.style.backgroundColor = '#000000';
+    document.documentElement.style.backgroundColor = '#000000';
+    // Add CSS for safe areas
+    document.body.style.cssText += `
+      background-color: #000000 !important;
+      margin: 0 !important;
+      padding-top: env(safe-area-inset-top, 0) !important;
+      padding-bottom: env(safe-area-inset-bottom, 0) !important;
+      padding-left: env(safe-area-inset-left, 0) !important;
+      padding-right: env(safe-area-inset-right, 0) !important;
+    `;
+    document.documentElement.style.cssText += `
+      background-color: #000000 !important;
+    `;
+  }
 
-  // Set web body background to black
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      document.body.style.backgroundColor = '#000000';
-      document.documentElement.style.backgroundColor = '#000000';
-      
-      return () => {
-        document.body.style.backgroundColor = '';
-        document.documentElement.style.backgroundColor = '';
-      };
-    }
-  }, []);
 
   // Page animations on mount
   useEffect(() => {

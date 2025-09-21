@@ -28,6 +28,14 @@ const isMobileWeb = Platform.OS === 'web' &&
 const isMobileWebPortrait = isMobileWeb && height > width;
 
 export default function LoginScreen() {
+  // Immediate body background fix for web
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    document.body.style.backgroundColor = '#000000';
+    document.documentElement.style.backgroundColor = '#000000';
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+  }
+
   const { isLoading, videos } = useVimeo();
   const { signIn, isLoading: authLoading, isAuthenticated } = useAuth();
   const [progressAnim] = useState(new Animated.Value(0));
@@ -41,6 +49,22 @@ export default function LoginScreen() {
       selectedVideo: isMobileWeb ? 'NLA_mobil_login.mp4 (Mobile)' : 'NLA.mp4 (Desktop)'
     });
   }, []);
+
+  // Disable scroll on web
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Disable scroll
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // Cleanup on unmount
+      return () => {
+        document.body.style.overflow = 'auto';
+        document.documentElement.style.overflow = 'auto';
+      };
+    }
+  }, []);
+
   const [showLoading, setShowLoading] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -116,19 +140,23 @@ export default function LoginScreen() {
     return () => subscription?.remove();
   }, []);
 
-  // Set web body background to black
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      document.body.style.backgroundColor = '#000000';
-      document.documentElement.style.backgroundColor = '#000000';
-      
-      return () => {
-        // Cleanup on unmount
-        document.body.style.backgroundColor = '';
-        document.documentElement.style.backgroundColor = '';
-      };
-    }
-  }, []);
+  // Set web body background to black immediately - before component mounts
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    document.body.style.backgroundColor = '#000000';
+    document.documentElement.style.backgroundColor = '#000000';
+    // Add CSS for safe areas
+    document.body.style.cssText += `
+      background-color: #000000 !important;
+      margin: 0 !important;
+      padding-top: env(safe-area-inset-top, 0) !important;
+      padding-bottom: env(safe-area-inset-bottom, 0) !important;
+      padding-left: env(safe-area-inset-left, 0) !important;
+      padding-right: env(safe-area-inset-right, 0) !important;
+    `;
+    document.documentElement.style.cssText += `
+      background-color: #000000 !important;
+    `;
+  }
 
   // Start logo animation and page fade-in on component mount
   useEffect(() => {
@@ -1986,8 +2014,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     width: '100%',
     height: '100%',
-    minHeight: '100vh',
+    minHeight: Platform.OS === 'web' ? '100vh' : '100%',
     overflow: 'hidden',
+    ...(Platform.OS === 'web' && {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 0,
+    }),
   },
   videoContainer: {
     position: 'absolute',

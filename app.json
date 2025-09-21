@@ -5,6 +5,7 @@
     "version": "1.6.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon-1024x1024.png",
+    "backgroundColor": "#000000",
     "scheme": [
       "naberla",
       "com.googleusercontent.apps.127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb"
@@ -85,6 +86,11 @@
       "bundler": "metro",
       "output": "static",
       "favicon": "./public/favicon.ico",
+      "meta": {
+        "viewport": "width=device-width, initial-scale=1.0, viewport-fit=cover",
+        "theme-color": "#000000",
+        "apple-mobile-web-app-status-bar-style": "black-translucent"
+      },
       "splash": {
         "image": "./assets/images/splash-icon.png",
         "resizeMode": "contain",

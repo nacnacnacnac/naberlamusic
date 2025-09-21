@@ -2,7 +2,9 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as NavigationBar from 'expo-navigation-bar';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,12 +15,29 @@ import { VimeoProvider } from '@/contexts/VimeoContext';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
+// Set system UI background color outside of component (as per Expo docs)
+SystemUI.setBackgroundColorAsync("#000000");
+
+// Prevent splash screen from auto-hiding
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  // Hide splash screen when fonts are loaded
+  useEffect(() => {
+    if (loaded) {
+      const hideSplash = async () => {
+        // Small delay to prevent white flash (Stack Overflow solution)
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await SplashScreen.hideAsync();
+      };
+      hideSplash();
+    }
+  }, [loaded]);
 
   // Web için Google Font import ve Google Analytics
   useEffect(() => {

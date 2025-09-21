@@ -650,7 +650,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                 
                 return 'User';
               })()
-            ) : 'Guest'}
+            ) : 'LA Bebe'}
           </ThemedText>
         </View>
         <View style={styles.profileRight}>
