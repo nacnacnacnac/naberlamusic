@@ -582,13 +582,12 @@ export default function LoginScreen() {
             playsInline
             style={{
               position: 'absolute',
-              top: '50%',
-              left: '50%',
-              minWidth: '100%',
-              minHeight: '100%',
-              width: 'auto',
-              height: 'auto',
-              transform: 'translate(-50%, -50%)',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100%',
+              height: '100%',
               objectFit: 'cover'
             }}
           >
@@ -608,17 +607,17 @@ export default function LoginScreen() {
         </View>
       )}
       
-      {/* Dark Overlay */}
+      {/* Dark Overlay - Hafifletildi */}
       <LinearGradient
-        colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)', 'rgba(0,0,0,0.8)']}
+        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.3)']}
         style={styles.overlay}
       />
 
-      {/* Header Gradient - Only over video - Portrait Mode */}
+      {/* Bottom Gradient - Aşağıdan yukarı siyahtan transparan */}
       {!isLandscape && (
         <LinearGradient
-          colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0)']}
-          style={styles.headerGradient}
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
+          style={styles.bottomGradient}
         />
       )}
 
@@ -648,11 +647,6 @@ export default function LoginScreen() {
           {/* Portrait Mode - Vertical Gradients (Top/Bottom) */}
           {!isLandscape && (
             <>
-              {/* Top Gradient */}
-              <LinearGradient
-                colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0)']}
-                style={styles.topGradient}
-              />
               {/* Bottom Gradient */}
               <LinearGradient
                 colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
@@ -2007,16 +2001,14 @@ const styles = StyleSheet.create({
   },
   backgroundVideo: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    width: '100vw',
-    height: '100vh',
-    minWidth: '100%',
-    minHeight: '100%',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
     transform: [
-      { translateX: '-50%' },
-      { translateY: '-50%' },
-      { scale: 1.1 }
+      { scale: 1.0 } // 1080x1920 için scale kaldırıldı
     ],
     objectFit: 'cover',
   },
@@ -2032,14 +2024,6 @@ const styles = StyleSheet.create({
     ],
   },
   // Mobile Gradient Overlays
-  topGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-    zIndex: 10,
-  },
   bottomGradient: {
     position: 'absolute',
     bottom: 0,
@@ -2087,12 +2071,12 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  headerGradient: {
+  bottomGradient: {
     position: 'absolute',
-    top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
-    height: 150, // Header'dan aşağı gradient
+    height: 150, // Bottom'dan yukarı gradient
     zIndex: 2, // Overlay'in üzerinde ama content'in altında
   },
   leftSideGradient: {
