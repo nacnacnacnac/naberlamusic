@@ -107,6 +107,12 @@ target 'naberla' do
           config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         end
         
+        # RNWorklets header search path fix
+        if target.name.include?('RNWorklets')
+          config.build_settings['HEADER_SEARCH_PATHS'] ||= []
+          config.build_settings['HEADER_SEARCH_PATHS'] << "$(PODS_ROOT)/RNWorklets/cpp"
+        end
+        
         # Folly coroutine fix for React Native 0.81.0
         config.build_settings['FOLLY_CFG_NO_COROUTINES'] = '1'
         config.build_settings['FOLLY_HAS_COROUTINES'] = '0'
