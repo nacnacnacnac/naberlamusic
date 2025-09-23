@@ -16,6 +16,7 @@ import { adminApiService } from '@/services/adminApiService';
 import { hybridVimeoService } from '@/services/hybridVimeoService';
 import Toast from '@/components/Toast';
 import { authService } from '@/services/authService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function DebugApiScreen() {
   const [loading, setLoading] = useState(false);
@@ -307,13 +308,12 @@ export default function DebugApiScreen() {
     
     try {
       // Clear all the filtering and error tracking we added
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
       
       addResult('Clearing private video list...');
-      await AsyncStorage.default.removeItem('private_video_ids');
+      await AsyncStorage.removeItem('private_video_ids');
       
       addResult('Clearing access denied log...');
-      await AsyncStorage.default.removeItem('access_denied_log');
+      await AsyncStorage.removeItem('access_denied_log');
       
       addResult('🔍 DEBUG: Clearing video cache...');
       try {
