@@ -60,7 +60,7 @@
         "MPRemoteCommandPauseEnabled": true,
         "MPRemoteCommandTogglePlayPauseEnabled": true,
         "MPRemoteCommandStopEnabled": false,
-        "MPNowPlayingInfoPropertyDefaultPlaybackRate": 1.0,
+        "MPNowPlayingInfoPropertyDefaultPlaybackRate": 1,
         "MPNowPlayingInfoPropertyPlaybackQueueIndex": 0,
         "MPNowPlayingInfoPropertyPlaybackQueueCount": 1,
         "ITSAppUsesNonExemptEncryption": false,
@@ -181,7 +181,9 @@
           "preferredSkipIntervals": []
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
