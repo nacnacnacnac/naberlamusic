@@ -8,7 +8,6 @@ ENV['RCT_NEW_ARCH_ENABLED'] ||= '0' if podfile_properties['newArchEnabled'] == '
 ENV['EX_DEV_CLIENT_NETWORK_INSPECTOR'] ||= podfile_properties['EX_DEV_CLIENT_NETWORK_INSPECTOR']
 ENV['RCT_USE_RN_DEP'] ||= '1' if podfile_properties['ios.buildReactNativeFromSource'] != 'true' && podfile_properties['newArchEnabled'] != 'false'
 ENV['RCT_USE_PREBUILT_RNCORE'] ||= '1' if podfile_properties['ios.buildReactNativeFromSource'] != 'true' && podfile_properties['newArchEnabled'] != 'false'
-ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
 platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 
 prepare_react_native_project!
@@ -77,45 +76,11 @@ target 'naberla' do
       :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
     )
     
-    # Modify RCT-Folly Portability.h to disable coroutines
-    Dir.glob("Pods/RCT-Folly/folly/Portability.h").each do |file|
-      # First try to make the file writable
-      system "chmod +w #{file}"
-      
-      contents = File.read(file)
-      modified_contents = contents.gsub(/#define FOLLY_HAS_COROUTINES 1/, '#define FOLLY_HAS_COROUTINES 0')
-      
-      # Try writing with elevated privileges if needed
-      if File.writable?(file)
-        File.write(file, modified_contents)
-      else
-        system "sudo chmod +w #{file}"
-        File.write(file, modified_contents)
-      end
-    rescue => e
-      Pod::UI.warn "Failed to modify Portability.h: #{e.message}"
-    end
-    
     # Firebase ve tüm pod'lar için build settings
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['SWIFT_VERSION'] = '5.0'
         config.build_settings['DEFINES_MODULE'] = 'YES'
-        
-        # React Native module redefinition fix
-        if target.name.include?('React-RuntimeHermes') || target.name.include?('react_runtime')
-          config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-        end
-        
-        # RNWorklets header search path fix
-        if target.name.include?('RNWorklets')
-          config.build_settings['HEADER_SEARCH_PATHS'] ||= []
-          config.build_settings['HEADER_SEARCH_PATHS'] << "$(PODS_ROOT)/RNWorklets/cpp"
-        end
-        
-        # Folly coroutine fix for React Native 0.81.0
-        config.build_settings['FOLLY_CFG_NO_COROUTINES'] = '1'
-        config.build_settings['FOLLY_HAS_COROUTINES'] = '0'
       end
     end
   end
