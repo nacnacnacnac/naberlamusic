@@ -15,13 +15,15 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "RCT_USE_PREBUILT_RNCORE": "0"
+        "RCT_USE_PREBUILT_RNCORE": "0",
+        "RCT_USE_RN_DEP": "0"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "RCT_USE_PREBUILT_RNCORE": "0"
+        "RCT_USE_PREBUILT_RNCORE": "0",
+        "RCT_USE_RN_DEP": "0"
       }
     },
     "production-old": {
