@@ -1,11 +1,13 @@
 module.exports = function (api) {
   api.cache(true);
   
-  const plugins = [];
+  const plugins = [
+    'react-native-reanimated/plugin', // Must be last
+  ];
 
   // Production'da console.log'ları kaldır
   if (process.env.NODE_ENV === 'production') {
-    plugins.push([
+    plugins.unshift([
       'transform-remove-console',
       {
         exclude: ['error', 'warn'], // error ve warn'ları koru
