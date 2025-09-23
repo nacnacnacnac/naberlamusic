@@ -3,7 +3,7 @@ import { Platform, View, Image } from 'react-native';
 import { IconSymbol } from './IconSymbol';
 
 interface CustomIconProps {
-  name: 'play' | 'pause' | 'skip-next' | 'skip-previous' | 'volume-up' | 'playlist' | 'chevron-up' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'minus' | 'rewind' | 'fast-forward' | 'keyboard-arrow-down' | 'heart' | 'delete' | 'share';
+  name: 'play' | 'pause' | 'skip-next' | 'skip-previous' | 'volume-up' | 'playlist' | 'chevron-up' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'minus' | 'rewind' | 'fast-forward' | 'keyboard-arrow-down' | 'heart' | 'delete' | 'share' | 'logout' | 'trash' | 'apple';
   size?: number;
   color?: string;
   style?: any;
@@ -50,6 +50,9 @@ const iconMapping = {
   'delete': 'icons8-rewind-50.png', // Geçici olarak rewind kullan
   'rewind': 'icons8-rewind-50.png',
   'fast-forward': 'icons8-fast-forward-30.png',
+  'logout': 'icons8-end-30.png', // Logout için end icon'u kullan
+  'trash': 'icons8-rewind-50.png', // Trash için rewind icon'u kullan (geçici)
+  'apple': 'icons8-plus-50.png', // Apple için plus icon'u kullan (geçici)
 };
 
 const fallbackMapping = {
@@ -71,6 +74,9 @@ const fallbackMapping = {
   'rewind': 'backward.fill',
   'fast-forward': 'forward.fill',
   'share': 'square.and.arrow.up',
+  'logout': 'rectangle.portrait.and.arrow.right',
+  'trash': 'trash',
+  'apple': 'applelogo',
 };
 
 export function CustomIcon({ name, size = 24, color = '#e0af92', style }: CustomIconProps) {
@@ -80,14 +86,14 @@ export function CustomIcon({ name, size = 24, color = '#e0af92', style }: Custom
   // Color prop'undan aktif/disabled durumunu anlayalım (hem web hem mobil)
   const isDisabled = isPlayerButton && color === '#666666';
   
-  // Debug logging
-  if (__DEV__ && isPlayerButton && Platform.OS !== 'web') {
-    console.log(`🎨 CustomIcon Debug - ${name}:`, {
-      color,
-      isDisabled,
-      platform: Platform.OS
-    });
-  }
+  // Debug logging (disabled to reduce spam)
+  // if (__DEV__ && isPlayerButton && Platform.OS !== 'web') {
+  //   console.log(`🎨 CustomIcon Debug - ${name}:`, {
+  //     color,
+  //     isDisabled,
+  //     platform: Platform.OS
+  //   });
+  // }
   
   // Web'de özel SVG iconları veya player butonları için Image
   if (Platform.OS === 'web' || isPlayerButton) {
@@ -178,11 +184,11 @@ export function CustomIcon({ name, size = 24, color = '#e0af92', style }: Custom
         if (name === 'skip-previous') iconFile = 'left_arrow_active.png';
       }
       
-      // Debug selected icon
-      if (__DEV__) {
-        console.log(`🎨 Selected controller icon for ${name}:`, iconFile);
-        console.log(`🎨 Platform: ${Platform.OS}, isPlayerButton: ${isPlayerButton}, isDisabled: ${isDisabled}`);
-      }
+      // Debug selected icon (disabled to reduce spam)
+      // if (__DEV__) {
+      //   console.log(`🎨 Selected controller icon for ${name}:`, iconFile);
+      //   console.log(`🎨 Platform: ${Platform.OS}, isPlayerButton: ${isPlayerButton}, isDisabled: ${isDisabled}`);
+      // }
     }
     
     if (iconFile) {

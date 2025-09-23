@@ -14,9 +14,12 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { VimeoProvider } from '@/contexts/VimeoContext';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
 import { useColorScheme } from '@/hooks/useColorScheme';
+// Background audio handled by expo-video SDK 54
 
 // Set system UI background color outside of component (as per Expo docs)
 SystemUI.setBackgroundColorAsync("#000000");
+
+// Background audio handled by expo-video SDK 54
 
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
@@ -129,9 +132,9 @@ export default function RootLayout() {
           // Hide it completely
           await NavigationBar.setVisibilityAsync('hidden');
           await NavigationBar.setBehaviorAsync('overlay-swipe');
-          console.log('🔧 Navigation bar hidden and transparent');
+          // console.log('🔧 Navigation bar hidden and transparent'); // Debug log kaldırıldı
         } catch (error) {
-          console.log('⚠️ Navigation bar error:', error);
+          // console.log('⚠️ Navigation bar error:', error); // Debug log kaldırıldı
         }
       };
       
@@ -152,21 +155,24 @@ export default function RootLayout() {
     if (Platform.OS !== 'ios') return;
 
     const handleAppStateChange = async (nextAppState: string) => {
+      console.log('🔊 App state changed to:', nextAppState);
+      
       if (nextAppState === 'background' || nextAppState === 'inactive') {
-        // Reinforce background audio when app goes to background
+        // Background audio için iOS ayarları
         try {
-          const { Audio } = require('expo-av');
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: true,
-            interruptionModeIOS: 2, // DoNotMix
-            shouldDuckAndroid: false,
-            allowsRecordingIOS: false,
-          });
-          console.log('🔊 [LAYOUT] Background audio reinforced on app state change:', nextAppState);
+          // expo-video için background audio mode
+          console.log('🔊 Enabling background audio mode');
+          
+          // iOS için background audio session
+          if (Platform.OS === 'ios') {
+            // expo-video otomatik handle ediyor ama force edebiliriz
+            console.log('🔊 iOS background audio should continue via expo-video');
+          }
         } catch (error) {
-          console.warn('⚠️ [LAYOUT] Failed to reinforce background audio:', error);
+          console.error('🔊 Background audio setup error:', error);
         }
+      } else if (nextAppState === 'active') {
+        console.log('🔊 App became active - audio should continue');
       }
     };
 

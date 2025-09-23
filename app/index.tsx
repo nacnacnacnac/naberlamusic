@@ -14,12 +14,16 @@ export default function Index() {
   
   // Get shared video ID from URL params
   useEffect(() => {
-    if (Platform.OS === 'web') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const vParam = urlParams.get('v');
-      if (vParam) {
-        console.log('🔗 Shared video detected in index:', vParam);
-        setSharedVideoId(vParam);
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const vParam = urlParams.get('v');
+        if (vParam) {
+          console.log('🔗 Shared video detected in index:', vParam);
+          setSharedVideoId(vParam);
+        }
+      } catch (error) {
+        console.warn('Failed to parse URL params:', error);
       }
     }
     

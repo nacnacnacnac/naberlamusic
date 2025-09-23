@@ -2,8 +2,9 @@ import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVimeo } from '@/contexts/VimeoContext';
-import { Video } from 'expo-av';
+// Video component now handled by expo-video
 import { Image } from 'expo-image';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -17,45 +18,68 @@ const spotifyStoreImage = Platform.OS === 'web' ? '/spotify_store.png' : require
 // Background video imports
 const backgroundVideo = require('@/assets/videos/NLA.mp4'); // Desktop/web için
 const mobileBackgroundVideo = require('@/assets/videos/NLA_mobil_login.mp4'); // Mobil web için
+const nativeMobileVideo = require('@/assets/videos/NLA_mobil.mp4'); // Native mobile için
 
 const { width, height } = Dimensions.get('window');
 
-// Mobile web detection - telefon üzerinden web'e giriş yapanları tespit et
+// Safe mobile web detection - only check on web platform
 const isMobileWeb = Platform.OS === 'web' && 
   width <= 768 && 
-  typeof navigator !== 'undefined' && 
-  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' ? 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) : 
+    false);
 const isMobileWebPortrait = isMobileWeb && height > width;
 
 export default function LoginScreen() {
-  // Immediate body background fix for web
-  if (Platform.OS === 'web' && typeof document !== 'undefined') {
-    document.body.style.backgroundColor = '#000000';
-    document.documentElement.style.backgroundColor = '#000000';
-    document.body.style.margin = '0';
-    document.body.style.padding = '0';
-  }
 
   const { isLoading, videos } = useVimeo();
   const { signIn, isLoading: authLoading, isAuthenticated } = useAuth();
   const [progressAnim] = useState(new Animated.Value(0));
   
+  // Background video player for native - use login mobile video
+  const backgroundVideoPlayer = useVideoPlayer(mobileBackgroundVideo, player => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
+  
   // Debug: Log video selection for login
   useEffect(() => {
-    console.log('🔐 Login Mobile Web Detection:', {
+    console.log('🔐 Login Video Selection:', {
+      platform: Platform.OS,
       isMobileWeb,
       width,
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
-      selectedVideo: isMobileWeb ? 'NLA_mobil_login.mp4 (Mobile)' : 'NLA.mp4 (Desktop)'
+      userAgent: Platform.OS === 'web' && typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' ? navigator.userAgent : 'N/A',
+      webVideo: isMobileWeb ? 'NLA_mobil_login.mp4 (Mobile Web)' : 'NLA.mp4 (Desktop Web)',
+      nativeVideo: 'NLA_mobil_login.mp4 (Native Mobile Login)'
     });
   }, []);
 
-  // Disable scroll on web
+  // Web-specific DOM setup
   useEffect(() => {
-    if (Platform.OS === 'web') {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      // Set body background and styles
+      document.body.style.backgroundColor = '#000000';
+      document.documentElement.style.backgroundColor = '#000000';
+      document.body.style.margin = '0';
+      document.body.style.padding = '0';
+      
       // Disable scroll
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
+      
+      // Add CSS for safe areas
+      document.body.style.cssText += `
+        background-color: #000000 !important;
+        margin: 0 !important;
+        padding-top: env(safe-area-inset-top, 0) !important;
+        padding-bottom: env(safe-area-inset-bottom, 0) !important;
+        padding-left: env(safe-area-inset-left, 0) !important;
+        padding-right: env(safe-area-inset-right, 0) !important;
+      `;
+      document.documentElement.style.cssText += `
+        background-color: #000000 !important;
+      `;
       
       // Cleanup on unmount
       return () => {
@@ -77,7 +101,7 @@ export default function LoginScreen() {
   // Page fade-in animations
   const pageOpacity = useRef(new Animated.Value(0)).current;
   const mainButtonOpacity = useRef(new Animated.Value(0)).current;
-  const mainButtonTranslateY = useRef(new Animated.Value(30)).current;
+  const mainButtonTranslateY = useRef(new Animated.Value(50)).current; // Daha büyük başlangıç değeri
   const storeLogosOpacity = useRef(new Animated.Value(0)).current;
   const storeLogosTranslateY = useRef(new Animated.Value(20)).current;
   const supportLinksOpacity = useRef(new Animated.Value(0)).current;
@@ -140,23 +164,6 @@ export default function LoginScreen() {
     return () => subscription?.remove();
   }, []);
 
-  // Set web body background to black immediately - before component mounts
-  if (Platform.OS === 'web' && typeof document !== 'undefined') {
-    document.body.style.backgroundColor = '#000000';
-    document.documentElement.style.backgroundColor = '#000000';
-    // Add CSS for safe areas
-    document.body.style.cssText += `
-      background-color: #000000 !important;
-      margin: 0 !important;
-      padding-top: env(safe-area-inset-top, 0) !important;
-      padding-bottom: env(safe-area-inset-bottom, 0) !important;
-      padding-left: env(safe-area-inset-left, 0) !important;
-      padding-right: env(safe-area-inset-right, 0) !important;
-    `;
-    document.documentElement.style.cssText += `
-      background-color: #000000 !important;
-    `;
-  }
 
   // Start logo animation and page fade-in on component mount
   useEffect(() => {
@@ -172,24 +179,46 @@ export default function LoginScreen() {
     
     // Staggered animations for UI elements
     setTimeout(() => {
-      // Main button animation - Opacity + kayma
+      // Main button animation - Reset values first, then animate
+      mainButtonOpacity.setValue(0);
+      mainButtonTranslateY.setValue(50);
+      buttonOpacity.setValue(0);
+      
+      console.log('🎵 Starting main button animation...');
+      
       Animated.parallel([
         Animated.timing(mainButtonOpacity, {
           toValue: 1,
-          duration: 800,
+          duration: 1000, // Biraz daha uzun süre
+          easing: Easing.out(Easing.cubic), // Smooth easing
           useNativeDriver: true,
         }),
         Animated.timing(buttonOpacity, {
           toValue: 1,
-          duration: 800,
+          duration: 1000,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(mainButtonTranslateY, {
           toValue: 0,
-          duration: 800,
+          duration: 1000,
+          easing: Easing.out(Easing.cubic), // Smooth easing
           useNativeDriver: true,
         })
-      ]).start();
+      ]).start((finished) => {
+        if (finished) {
+          console.log('🎵 ✅ Main button animation completed successfully');
+        } else {
+          console.log('🎵 ⚠️ Main button animation was interrupted - forcing final values');
+          // Animasyon kesintiye uğrarsa, final değerleri zorla ayarla
+          setTimeout(() => {
+            mainButtonOpacity.setValue(1);
+            mainButtonTranslateY.setValue(0);
+            buttonOpacity.setValue(1);
+            console.log('🎵 🔧 Final values forced for main button');
+          }, 100);
+        }
+      });
     }, 1800); // 1 saniye daha geç: 800ms -> 1800ms
 
     setTimeout(() => {
@@ -305,9 +334,9 @@ export default function LoginScreen() {
       
       // Step 2: Naber and La slide out with synchronized mask effect + Logo wrapper slides to final position
       Animated.parallel([
-        // Logo wrapper movement - sola başlayıp sağa kayma
+        // Logo wrapper movement - sola başlayıp sağa kayıp orada kalır
         Animated.timing(logoWrapperX, {
-          toValue: Platform.OS === 'web' ? (isMobileWebPortrait ? 3 : 35) : 0, // Mobil web: 3px sağa, Desktop: 35px sağa, Native: 0
+          toValue: Platform.OS === 'web' ? (isMobileWebPortrait ? 33 : 65) : 30, // Mobil web: 33px (3+30), Desktop: 65px (35+30), Native: 30px - orada kalır
           duration: 800,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
@@ -624,13 +653,11 @@ export default function LoginScreen() {
         </div>
       ) : (
         <View style={[styles.videoContainer, isLandscape && styles.videoContainerLandscape]}>
-          <Video
-            source={mobileBackgroundVideo} // Mobil native için de login videosu kullan
+          <VideoView
+            player={backgroundVideoPlayer}
             style={[styles.backgroundVideo, isLandscape && styles.backgroundVideoLandscape]}
-            shouldPlay
-            isLooping
-            isMuted
-            resizeMode="cover"
+            contentFit="cover"
+            nativeControls={false}
           />
         </View>
       )}
@@ -779,9 +806,9 @@ export default function LoginScreen() {
           </View>
         </Animated.View>
         
-        {/* Auth Buttons Container - Animated entrance */}
+        {/* Ripple Container - Bağımsız */}
         <Animated.View style={[
-          styles.buttonContainer,
+          styles.rippleContainer,
           {
             opacity: buttonOpacity,
             transform: [{ translateY: buttonY }],
@@ -795,12 +822,20 @@ export default function LoginScreen() {
               opacity: ripple1Opacity,
             }
           ]} />
-          
+        </Animated.View>
+
+        {/* Auth Buttons Container - Animated entrance */}
+        <Animated.View style={[
+          styles.buttonContainer,
+          {
+            opacity: buttonOpacity,
+            transform: [{ translateY: buttonY }],
+          }
+        ]}>
           {/* Main Action Button */}
           <Animated.View style={[styles.mainButtonContainer, { 
             opacity: mainButtonOpacity,
             transform: [
-              { scale: authScaleAnim },
               { scale: buttonScale },
               { translateY: mainButtonTranslateY }
             ] 
@@ -822,14 +857,22 @@ export default function LoginScreen() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      marginLeft: 2,
                     }}
                     dangerouslySetInnerHTML={{
-                      __html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="32" height="32" style="fill: black;"><path d="M56.379,30.904c1.774,1.103,2.833,3.008,2.833,5.096s-1.059,3.993-2.832,5.096L22.167,62.362 C21.2,62.964,20.101,63.266,19,63.266c-1.004,0-2.008-0.25-2.915-0.755C14.183,61.454,13,59.444,13,57.267V14.733 c0-2.177,1.183-4.187,3.085-5.245c1.903-1.057,4.234-1,6.083,0.149L56.379,30.904z"/></svg>`
+                      __html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" style="fill: black; margin-left: 2px;"><path d="M8 5v14l11-7z"/></svg>`
                     }}
                   />
                 ) : (
-                  <ThemedText style={styles.arrowText}>›</ThemedText>
+                  <Image
+                    source={require('@/assets/iconz/icons8-play-60.png')}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      tintColor: '#000000',
+                      marginLeft: 2, // Play icon'u sağa kaydır (ortalama için)
+                    }}
+                    resizeMode="contain"
+                  />
                 )}
               </View>
             </TouchableOpacity>
@@ -2227,9 +2270,26 @@ const styles = StyleSheet.create({
     width: 250,
     height: 150,
   },
+  rippleContainer: {
+    position: 'absolute',
+    // Ripple için çok çok az daha aşağı indi
+    ...(Platform.OS === 'web' && !isMobileWebPortrait && {
+      bottom: 230, // Ripple çok çok az daha aşağı indi (235 - 5)
+    }),
+    ...(isMobileWebPortrait && {
+      bottom: 135, // Ripple çok çok az daha aşağı indi (140 - 5)
+    }),
+    ...(Platform.OS !== 'web' && {
+      bottom: 120, // Ripple çok çok az daha aşağı indi (125 - 5)
+    }),
+    alignSelf: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5, // Ana butonun arkasında ama görünür
+  },
   buttonContainer: {
     position: 'absolute',
-    bottom: 80, // Progress barın üstünde
+    bottom: 80, // Ana buton için orijinal pozisyon
     alignSelf: 'center',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2243,6 +2303,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, // Thinner border (was 2, now 1)
     borderColor: '#666666', // Dark grey color
     backgroundColor: 'transparent', // Transparent inside
+    // Ana butonun tam arkasında konumlan - efekt için
+    zIndex: 1, // Ana butonun arkasında ama görünür
+    alignSelf: 'center',
     // Web adjustments - 200px yukarı
     ...(Platform.OS === 'web' && !isMobileWebPortrait && {
       bottom: 200, // 200px yukarı
@@ -2322,16 +2385,21 @@ const styles = StyleSheet.create({
   // Auth Button Styles
   mainButtonContainer: {
     position: 'absolute',
-    zIndex: 3,
-    // Web adjustments - 200px yukarı
+    zIndex: 15, // Ripple'ın üstünde (ripple zIndex: 5)
+    // Web adjustments - çok daha aşağıda
     ...(Platform.OS === 'web' && !isMobileWebPortrait && {
-      bottom: 200, // 200px yukarı
+      bottom: 120, // Çok daha aşağı indi (200 - 80)
     }),
     // Mobile web adjustments
     ...(isMobileWebPortrait && {
-      bottom: 55, // 90px aşağı indi (145-90=55)
+      bottom: 25, // Çok daha aşağı indi (65 - 40)
       left: 'calc(50% - 47px)', // 3px sağa (50-3=47px)
       transform: 'translateX(-50%)', // Transform korunuyor
+    }),
+    // Native mobile adjustments
+    ...(Platform.OS !== 'web' && {
+      bottom: 10, // Çok daha aşağı indi (50 - 40)
+      alignSelf: 'center',
     }),
   },
   authButton: {

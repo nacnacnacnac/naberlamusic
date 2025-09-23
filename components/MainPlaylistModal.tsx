@@ -7,7 +7,7 @@ import { firestoreService } from '@/services/firestoreService';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { Image as ExpoImage } from 'expo-image';
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
-import { Animated, Image, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 // CSS animasyonunu kaldırdık - React Animated kullanıyoruz
 
@@ -46,6 +46,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   const [currentView, setCurrentView] = React.useState<'main' | 'selectPlaylist' | 'createPlaylist' | 'profile'>(initialView);
   const [selectedVideoForPlaylist, setSelectedVideoForPlaylist] = React.useState<any>(null);
   const [userPlaylistsForSelection, setUserPlaylistsForSelection] = React.useState<any[]>([]);
+  const [isLoadingPlaylists, setIsLoadingPlaylists] = React.useState(false);
   const [deletedPlaylistIds, setDeletedPlaylistIds] = React.useState<Set<string>>(new Set());
   const [deletingPlaylistId, setDeletingPlaylistId] = React.useState<string | null>(null);
   const [fadingVideos, setFadingVideos] = React.useState<Set<string>>(new Set());
@@ -92,6 +93,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   
   // Update currentView when initialView changes
   React.useEffect(() => {
+    console.log('🔍 MainPlaylistModal - initialView changed to:', initialView);
     setCurrentView(initialView);
     setIsInitialized(true);
   }, [initialView]);
@@ -258,7 +260,12 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
             >
               <Image 
                 source={require('@/assets/images/ok_left.png')}
-                style={{ width: 20, height: 20, tintColor: '#e0af92' }}
+                style={{ 
+                  width: 20, 
+                  height: 20, 
+                  tintColor: '#e0af92'
+                  // transform kaldırıldı - sola baksın (geri gitme için)
+                }}
                 resizeMode="contain"
               />
             </TouchableOpacity>
@@ -365,7 +372,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
 
               {/* App Info */}
               <View style={styles.appInfo}>
-                <ThemedText style={styles.appInfoText}>Naber LA v1.6.0</ThemedText>
+                <ThemedText style={styles.appInfoText}>Naber LA v1.6.2</ThemedText>
                 <View style={styles.madeWithContainer}>
                   <ThemedText style={styles.madeWithText}>Made with </ThemedText>
                   <ExpoImage
@@ -445,6 +452,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
 
   // Create Playlist View
   if (currentView === 'createPlaylist') {
+    console.log('🔍 MainPlaylistModal - Rendering CreatePlaylistModal');
     return (
       <CreatePlaylistModal
         onClose={() => setCurrentView('main')}
@@ -462,10 +470,20 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   if (currentView === 'selectPlaylist' && selectedVideoForPlaylist) {
     return (
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Header - Profile header style */}
+        <View style={styles.selectPlaylistHeader}>
+          <View style={styles.selectPlaylistHeaderLeft}>
+            <View style={styles.selectPlaylistHeaderIconContainer}>
+              <CustomIcon
+                name="plus"
+                size={20}
+                color="#e0af92"
+              />
+            </View>
+            <ThemedText style={styles.selectPlaylistHeaderTitle}>Add to Playlist</ThemedText>
+          </View>
           <TouchableOpacity 
-            style={styles.closeButton}
+            style={styles.selectPlaylistBackButton}
             onPress={() => setCurrentView('main')}
             activeOpacity={0.7}
           >
@@ -475,8 +493,6 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
               resizeMode="contain"
             />
           </TouchableOpacity>
-          <ThemedText style={styles.headerTitle}>Add to Playlist</ThemedText>
-          <View style={styles.headerRight} />
         </View>
 
         {/* Video Info */}
@@ -518,27 +534,34 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
           </TouchableOpacity>
 
           {/* User Playlists */}
-          {userPlaylistsForSelection.map((playlist) => (
-            <TouchableOpacity
-              key={playlist.id}
-              style={styles.selectPlaylistItem}
-              onPress={() => handleAddToUserPlaylist(playlist)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.selectPlaylistIcon}>
-                <CustomIcon name="heart" size={20} color="#e0af92" />
-              </View>
-              <View style={styles.selectPlaylistInfo}>
-                <ThemedText style={styles.selectPlaylistName} numberOfLines={1}>
-                  {playlist.name}
-                </ThemedText>
-                <ThemedText style={styles.selectPlaylistCount}>
-                  {playlist.videos?.length || 0} video{(playlist.videos?.length || 0) !== 1 ? 's' : ''}
-                </ThemedText>
-              </View>
-              <CustomIcon name="plus" size={16} color="#666666" />
-            </TouchableOpacity>
-          ))}
+          {isLoadingPlaylists ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#e0af92" />
+              <ThemedText style={styles.loadingText}>Loading playlists...</ThemedText>
+            </View>
+          ) : (
+            userPlaylistsForSelection.map((playlist) => (
+              <TouchableOpacity
+                key={playlist.id}
+                style={styles.selectPlaylistItem}
+                onPress={() => handleAddToUserPlaylist(playlist)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.selectPlaylistIcon}>
+                  <CustomIcon name="heart" size={20} color="#e0af92" />
+                </View>
+                <View style={styles.selectPlaylistInfo}>
+                  <ThemedText style={styles.selectPlaylistName} numberOfLines={1}>
+                    {playlist.name}
+                  </ThemedText>
+                  <ThemedText style={styles.selectPlaylistCount}>
+                    {playlist.videos?.length || 0} video{(playlist.videos?.length || 0) !== 1 ? 's' : ''}
+                  </ThemedText>
+                </View>
+                <CustomIcon name="plus" size={16} color="#666666" />
+              </TouchableOpacity>
+            ))
+          )}
         </ScrollView>
       </View>
     );
@@ -591,36 +614,40 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
     }
   };
 
+  // Main Playlist View (default)
+  console.log('🔍 MainPlaylistModal - Rendering Main View, currentView:', currentView);
   return (
     <View style={styles.container}>
-      {/* Profile Section - Always show, content changes based on auth status */}
-      <TouchableOpacity 
-        onPress={() => {
-          console.log('👤 Profile section clicked, current view:', currentView);
-          setCurrentView('profile');
-        }}
-        activeOpacity={0.7}
-      >
-        <View style={styles.profileSection}>
-          {/* Shimmer overlay */}
-          <Animated.View
-            style={[
-              styles.shimmerOverlay,
-              {
-                transform: [{
-                  translateX: shimmerAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-400, 400], // Soldan sağa kayma
-                  })
-                }],
-                opacity: shimmerAnimation.interpolate({
-                  inputRange: [0, 0.3, 0.7, 1],
-                  outputRange: [0, 1, 1, 0], // Yumuşak fade in/out
+      {/* Profile Section - Separate clickable areas */}
+      <View style={styles.profileSection}>
+        {/* Shimmer overlay */}
+        <Animated.View
+          style={[
+            styles.shimmerOverlay,
+            {
+              transform: [{
+                translateX: shimmerAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-400, 400], // Soldan sağa kayma
                 })
-              }
-            ]}
-          />
-        <View style={styles.profileLeft}>
+              }],
+              opacity: shimmerAnimation.interpolate({
+                inputRange: [0, 0.3, 0.7, 1],
+                outputRange: [0, 1, 1, 0], // Yumuşak fade in/out
+              })
+            }
+          ]}
+        />
+        
+        {/* Clickable Profile Area - Only icon and text */}
+        <TouchableOpacity 
+          style={styles.profileLeft}
+          onPress={() => {
+            console.log('👤 Profile section clicked, current view:', currentView);
+            setCurrentView('profile');
+          }}
+          activeOpacity={0.7}
+        >
           <View style={styles.profileIconContainer}>
             <Image
               source={require('@/assets/images/profile2.png')}
@@ -652,22 +679,29 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
               })()
             ) : 'LA Bebe'}
           </ThemedText>
-        </View>
-        <View style={styles.profileRight}>
-          <TouchableOpacity 
-            style={styles.closeButtonInProfile}
-            onPress={handleModalClose}
-            activeOpacity={0.7}
-          >
-            <Image 
-              source={require('@/assets/images/ok_left.png')}
-              style={{ width: 20, height: 20, tintColor: '#e0af92' }}
-              resizeMode="contain"
-            />
-           </TouchableOpacity>
-         </View>
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+        
+        {/* Non-clickable middle area */}
+        <View style={styles.profileMiddle} />
+        
+        {/* Close button - separate clickable area */}
+        <TouchableOpacity 
+          style={styles.profileRight}
+          onPress={handleModalClose}
+          activeOpacity={0.7}
+        >
+          <Image 
+            source={require('@/assets/images/ok_left.png')}
+            style={{ 
+              width: 20, 
+              height: 20, 
+              tintColor: '#e0af92',
+              transform: [{ rotate: '-90deg' }] // Aşağı bakacak şekilde döndür
+            }}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+      </View>
 
       {/* Header */}
       <View style={styles.header}>
@@ -760,10 +794,29 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
             console.log('🔍 Filtering out deleted playlist:', playlist.id, playlist.name);
           }
           return !isDeleted;
+        }).filter(playlist => {
+          // Web-only playlist'leri filtrele - sadece "Naber LA - AI" kalacak
+          if (playlist.isWebOnly) {
+            return playlist.name === 'Naber LA - AI' || playlist.name === 'NABER LA AI';
+          }
+          
+          // Admin playlist'leri de kontrol et (2015-2025 playlist'leri muhtemelen admin)
+          if (playlist.isAdminPlaylist) {
+            // Sadece "NABER LA AI" admin playlist'ini göster
+            return playlist.name === 'NABER LA AI' || playlist.name === 'Naber LA - AI';
+          }
+          
+          return true; // User playlist'leri gösterilsin
         }).sort((a, b) => {
-          // "NABER LA AI" playlist always comes first in admin playlists
-          if (a.name === 'NABER LA AI' && b.name !== 'NABER LA AI') return -1;
-          if (b.name === 'NABER LA AI' && a.name !== 'NABER LA AI') return 1;
+          // "Liked Songs" always comes first
+          if (a.name === 'Liked Songs' && b.name !== 'Liked Songs') return -1;
+          if (b.name === 'Liked Songs' && a.name !== 'Liked Songs') return 1;
+          
+          // "NABER LA AI" or "Naber LA - AI" comes second
+          if ((a.name === 'NABER LA AI' || a.name === 'Naber LA - AI') && 
+              (b.name !== 'NABER LA AI' && b.name !== 'Naber LA - AI')) return -1;
+          if ((b.name === 'NABER LA AI' || b.name === 'Naber LA - AI') && 
+              (a.name !== 'NABER LA AI' && a.name !== 'Naber LA - AI')) return 1;
           
           // Keep original order for other playlists
           return 0;
@@ -783,11 +836,16 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                 activeOpacity={0.7}
               >
                 <View style={styles.playlistTitleContainer}>
-                  <ExpoImage 
-                    source={require('@/assets/images/playlist.svg')}
-                    style={styles.playlistHeaderIcon}
-                    contentFit="contain"
-                  />
+                  <View style={[
+                    styles.playlistIconContainer,
+                    playlist.name === 'Liked Songs' && styles.likedSongsIconContainer
+                  ]}>
+                    <CustomIcon 
+                      name="heart" 
+                      size={20} 
+                      color={playlist.name === 'Liked Songs' ? "#e0af92" : "#1a1a1a"} 
+                    />
+                  </View>
                   <ThemedText style={styles.playlistTitle}>{playlist.name}</ThemedText>
                 </View>
                 
@@ -799,8 +857,8 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                     </View>
                   )}
                   
-                  {/* Delete Button - Only for user playlists, in circle before arrow */}
-                  {!playlist.isAdminPlaylist && (
+                  {/* Delete Button - Only for user playlists, exclude Liked Songs */}
+                  {!playlist.isAdminPlaylist && playlist.name !== 'Liked Songs' && (
                     <TouchableOpacity 
                       style={[
                         styles.deletePlaylistButtonCircle,
@@ -959,14 +1017,23 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                         </View>
                         </TouchableOpacity>
                         
-                        {/* + Button (Admin playlists) or - Button (User playlists) */}
-                        {(Platform.OS !== 'web' || hoveredVideo === `${playlist.id}-${playlistVideo.id}`) && (
+                        {/* + Button (Admin playlists) or - Button (User playlists) - Sadece çalan şarkıda göster */}
+                        {((currentVideo?.id && playlistVideo.id && currentVideo.id === playlistVideo.id) || 
+                          (currentVideo?.id && playlistVideo.vimeo_id && currentVideo.id === playlistVideo.vimeo_id) ||
+                          (currentVideo?.vimeo_id && playlistVideo.id && currentVideo.vimeo_id === playlistVideo.id) ||
+                          (currentVideo?.vimeo_id && playlistVideo.vimeo_id && currentVideo.vimeo_id === playlistVideo.vimeo_id)) && (
                           <TouchableOpacity
                             style={[
                               styles.addToPlaylistButton,
                               !playlist.isAdminPlaylist && styles.removeFromPlaylistButton // Gri background for user playlists
                             ]}
                             onPress={async () => {
+                              // Auth kontrolü - eğer auth değilse profil aç
+                              if (!isAuthenticated) {
+                                setCurrentView('profile');
+                                return;
+                              }
+                              
                               const vimeoIdToUse = playlistVideo.vimeo_id || playlistVideo.id;
                               
                               if (playlist.isAdminPlaylist) {
@@ -977,16 +1044,22 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                                   thumbnail: playlistVideo.thumbnail
                                 });
                                 
-                                // User playlist'leri yükle
-                                try {
-                                  const userPlaylists = await hybridPlaylistService.getUserPlaylists();
-                                  setUserPlaylistsForSelection(userPlaylists);
-                                } catch (error) {
-                                  console.error('Error loading user playlists:', error);
-                                  setUserPlaylistsForSelection([]);
-                                }
-                                
+                                // UI'ı hemen değiştir
                                 setCurrentView('selectPlaylist');
+                                setIsLoadingPlaylists(true);
+                                
+                                // User playlist'leri arka planda yükle
+                                setTimeout(async () => {
+                                  try {
+                                    const userPlaylists = await hybridPlaylistService.getUserPlaylists();
+                                    setUserPlaylistsForSelection(userPlaylists);
+                                  } catch (error) {
+                                    console.error('Error loading user playlists:', error);
+                                    setUserPlaylistsForSelection([]);
+                                  } finally {
+                                    setIsLoadingPlaylists(false);
+                                  }
+                                }, 0);
                               } else {
                                 // User playlist: Remove from playlist with fade animation
                                 const videoKey = `${playlist.id}-${vimeoIdToUse}`;
@@ -1098,12 +1171,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingLeft: 20,
+    paddingRight: 5, // Sağ padding'i azalt
     paddingVertical: 15,
     backgroundColor: '#0a0a0a', // Base background
     borderBottomWidth: 1,
     borderBottomColor: '#0a0a0a', // Diğer playlist'ler kadar koyu çizgi
-    position: 'relative', // Overlay için
+    position: 'relative', // Absolute positioning için gerekli
     overflow: 'hidden', // Shimmer'ın dışarı taşmasını engelle
   },
   shimmerOverlay: {
@@ -1122,9 +1196,18 @@ const styles = StyleSheet.create({
   profileLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    gap: 10,
-    minWidth: 200, // Sabit minimum genişlik - büyüyüp küçülme efektini önler
+    gap: 8, // Biraz daha yakın
+    paddingRight: 10, // Sağdan biraz boşluk
+  },
+  profileMiddle: {
+    flex: 1, // Ortadaki boş alan
+  },
+  profileRight: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#101010',
+    marginLeft: 'auto', // Sağa itel
+    marginRight: 10, // Biraz sola al
   },
   closeButtonInProfile: {
     padding: 8,
@@ -1140,6 +1223,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#101010', // Daha koyu gri
+    marginLeft: -5, // Biraz sola al
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1160,7 +1244,8 @@ const styles = StyleSheet.create({
   profileMainContent: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 20,
+    justifyContent: 'center', // İçeriği dikey olarak ortala
+    alignItems: 'center', // İçeriği yatay olarak ortala
   },
   welcomeSection: {
     alignItems: 'center',
@@ -1182,10 +1267,14 @@ const styles = StyleSheet.create({
   },
   welcomeTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '600', // bold yerine 600 kullan
     color: '#e0af92',
     marginBottom: 8,
     textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif', // Daha basit font
+    letterSpacing: 1, // Daha fazla harfler arası boşluk
+    ...(Platform.OS === 'android' && { includeFontPadding: false }), // Android font padding kaldır
+    lineHeight: 34, // Line height ekle
   },
   welcomeUserText: {
     fontSize: 20,
@@ -1337,12 +1426,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 15,
+    paddingLeft: 20,
+    paddingRight: 5, // Main profile section ile aynı
+    paddingVertical: 15, // Main profile section ile aynı boyut
     borderBottomWidth: 1,
     borderBottomColor: '#0a0a0a', // Tutarlı koyu çizgi
-    backgroundColor: '#000000', // Siyah background
+    backgroundColor: '#0a0a0a', // Main profile section ile aynı gri background
+    position: 'relative', // Shimmer için
+    overflow: 'hidden',
   },
   profileHeaderLeft: {
     flexDirection: 'row',
@@ -1352,8 +1443,9 @@ const styles = StyleSheet.create({
   },
   profileBackButton: {
     padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#101010', // Daha koyu gri
+    // borderRadius ve backgroundColor kaldırıldı - yuvarlak arka plan yok
+    position: 'absolute',
+    right: 15, // Sağdan 15px mesafe - sağa geri al
   },
   profileHeaderTitle: {
     fontSize: 20,
@@ -1371,6 +1463,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#101010', // Daha koyu gri
+    marginLeft: -5, // Main profile section ile aynı - biraz sola al
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1537,11 +1630,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  playlistHeaderIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 12,
-    tintColor: '#e0af92',
+  playlistIconContainer: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 6, // Daha yakın - 12'den 6'ya
+    marginLeft: -8, // Daha da sola kaydır
+    // Yuvarlak çerçeve yok - sadece icon
+  },
+  likedSongsIconContainer: {
+    // Liked Songs için özel stil - şu an için boş, gerekirse eklenebilir
   },
   playlistTitle: {
     fontSize: 16,
@@ -1564,6 +1663,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#0a0a0a', // Gerçekten koyu gri çizgi
     backgroundColor: '#000000',
     position: 'relative',
+    minHeight: 58, // Minimum height belirle
   },
   videoTouchable: {
     flexDirection: 'row',
@@ -1571,10 +1671,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   addToPlaylistButton: {
-    position: 'absolute',
-    right: 20,
-    top: '50%',
-    transform: [{ translateY: -16 }],
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -1583,6 +1679,7 @@ const styles = StyleSheet.create({
     borderColor: '#333333', // Koyu gri çerçeve
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 12, // Sol taraftan boşluk
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1686,9 +1783,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#0a0a0a', // Gerçekten koyu gri çizgi
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
+    backgroundColor: '#000000', // Siyah background
+    // borderRadius kaldırıldı
     marginBottom: 10,
+  },
+  // Select Playlist Header Styles - Profile header ile aynı
+  selectPlaylistHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: 20,
+    paddingRight: 5, // Profile header ile aynı
+    paddingVertical: 15, // Profile header ile aynı boyut
+    borderBottomWidth: 1,
+    borderBottomColor: '#0a0a0a', // Tutarlı koyu çizgi
+    backgroundColor: '#0a0a0a', // Profile header ile aynı gri background
+    position: 'relative', // Shimmer için
+    overflow: 'hidden',
+  },
+  selectPlaylistHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  selectPlaylistBackButton: {
+    padding: 8,
+    // borderRadius ve backgroundColor kaldırıldı - yuvarlak arka plan yok
+    position: 'absolute',
+    right: 15, // Profile header ile aynı pozisyon
+  },
+  selectPlaylistHeaderTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffffff', // Beyaz renk
+    textAlign: 'left',
+  },
+  selectPlaylistHeaderIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#101010', // Daha koyu gri
+    marginLeft: -5, // Profile header ile aynı - biraz sola al
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectPlaylistHeaderIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#e0af92',
   },
   createPlaylistIcon: {
     width: 40,
@@ -1747,6 +1890,17 @@ const styles = StyleSheet.create({
   removeFromPlaylistButton: {
     backgroundColor: 'transparent',
     borderColor: '#333333',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#666666',
+    textAlign: 'center',
   },
 });
 

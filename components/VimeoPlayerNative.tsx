@@ -4,8 +4,9 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useMediaSession } from '@/hooks/useMediaSession';
 import { hybridVimeoService } from '@/services/hybridVimeoService';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
-import { Video } from 'expo-av';
-import { useVideoPlayer } from 'expo-video';
+// Migrated from expo-av to expo-video
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEvent, useEventListener } from 'expo';
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Animated, DeviceEventEmitter, Image, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -25,6 +26,7 @@ interface VimeoPlayerProps {
   video: SimplifiedVimeoVideo;
   isFullscreen?: boolean;
   playerHeight?: number;
+  isPaused?: boolean;
   onPlayStateChange?: (isPlaying: boolean) => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onError?: (error: string) => void;
@@ -36,13 +38,13 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   video,
   isFullscreen = false,
   playerHeight = 300,
+  isPaused = false,
   onPlayStateChange,
   onTimeUpdate,
   onError,
   onReady,
   onNext,
 }, ref) => {
-  const videoRef = useRef<Video>(null);
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,17 +52,92 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [shouldPlay, setShouldPlay] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
-  // Web için expo-video player
-  const webVideoPlayer = Platform.OS === 'web' ? useVideoPlayer(videoUri || '', player => {
-    console.log('🎬 Initializing web video player with:', videoUri);
+  // expo-video player for both web and native
+  const videoPlayer = useVideoPlayer('', player => {
+    console.log('🎬 Initializing empty video player');
     player.loop = false;
-    player.muted = false;
+    player.muted = isMuted;
     player.volume = 1.0;
-    player.allowsExternalPlayback = true;
-    player.staysActiveInBackground = false;
-    console.log('🎬 Player initialized - muted:', player.muted, 'volume:', player.volume);
-  }) : null;
+    if (Platform.OS === 'web') {
+      player.allowsExternalPlayback = true;
+      player.staysActiveInBackground = false;
+    }
+  });
+
+  // Update video source when videoUri changes
+  useEffect(() => {
+    if (videoUri && videoPlayer) {
+      console.log('🎬 Updating video player source:', videoUri);
+      
+      // Video source değiştiğinde loading state'ini resetle
+      setIsLoading(true);
+      setError(null);
+      setIsReady(false);
+      
+      // Use replaceAsync to avoid UI freezes on iOS
+      videoPlayer.replaceAsync(videoUri).catch(error => {
+        console.error('❌ Failed to replace video source:', error);
+        setIsLoading(false);
+        setError(error.message || 'Failed to load video');
+      });
+    }
+  }, [videoUri, videoPlayer]);
+
+  // Use expo-video event listeners according to docs
+  useEventListener(videoPlayer, 'playingChange', ({ isPlaying }) => {
+    setIsPlaying(isPlaying);
+    onPlayStateChange?.(isPlaying);
+  });
+
+  useEventListener(videoPlayer, 'statusChange', ({ status, error }) => {
+    console.log('🎬 Status change:', status, error ? `Error: ${error}` : '');
+    
+    if (status === 'loading') {
+      console.log('🎬 Video loading started - setting isLoading: true');
+      setIsLoading(true);
+      setError(null);
+    } else if (status === 'readyToPlay') {
+      console.log('🎬 Video ready to play - setting isLoading: false');
+      
+      setIsLoading(false);
+      setIsReady(true);
+      onReady?.();
+      
+      // Always call handleVideoReady when video is ready
+      handleVideoReady();
+    } else if (status === 'error' && error) {
+      const errorMessage = typeof error === 'string' ? error : 
+                          error?.message || 
+                          JSON.stringify(error) || 
+                          'Unknown video error';
+      // Handle specific error cases
+      if (errorMessage.includes('Cannot Open') || errorMessage.includes('Failed to load')) {
+        console.log('🎬 Video not available, will try next video');
+        console.log('📹 Skipping unavailable video:', errorMessage);
+        setError('Video not available');
+        // Don't call onError for unavailable videos - this is expected behavior
+        
+        // Auto-skip to next video after a short delay
+        setTimeout(() => {
+          onNext?.();
+        }, 2000);
+      } else {
+        console.error('❌ Video player error:', errorMessage);
+        setError(errorMessage);
+        onError?.(errorMessage);
+      }
+    }
+  });
+
+  useEventListener(videoPlayer, 'timeUpdate', ({ currentTime, duration }) => {
+    setCurrentTime(currentTime || 0);
+    setDuration(duration || 0);
+    onTimeUpdate?.(currentTime || 0, duration || 0);
+  });
+
+  // Simplified: Only handle video ready state, let main app control play/pause via ref methods
 
   // Web video player state
   const [webVideoReady, setWebVideoReady] = useState(false);
@@ -276,112 +353,20 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       try {
         console.log('🎬 VimeoPlayerNative.play() called');
         
-        if (Platform.OS === 'web') {
-          // Web: HTML5 video player
-          console.log('🌐 Playing HTML5 video with sound');
+        if (videoPlayer) {
+          videoPlayer.play();
+          setIsPlaying(true);
+          setShouldPlay(true);
           
-          const videoElement = (globalThis as any).webVideoElement;
-          if (videoElement) {
-            try {
-              videoElement.muted = false;
-              videoElement.volume = 1.0;
-              
-              console.log('🎬 HTML5 video state:', {
-                muted: videoElement.muted,
-                volume: videoElement.volume,
-                paused: videoElement.paused,
-                readyState: videoElement.readyState
-              });
-              
-              const playPromise = videoElement.play();
-              
-              // Update state immediately
-              setIsPlaying(true);
-              setShouldPlay(true);
-              
-              // Update web media session playback state
-              if (Platform.OS === 'web' && 'mediaSession' in navigator) {
-                (navigator as any).mediaSession.playbackState = 'playing';
-              }
-              
-              if (playPromise && typeof playPromise.then === 'function') {
-                playPromise.then(() => {
-                  console.log('🔊 HTML5 video play successful');
-                  // Don't call onPlayStateChange to avoid loops
-                }).catch((error: any) => {
-                  console.error('❌ HTML5 video play failed:', error);
-                  // Revert state on error
-                  setIsPlaying(false);
-                  setShouldPlay(false);
-                  onError?.(error.message);
-                });
-              } else {
-                console.log('🔊 HTML5 video play called (sync)');
-                // Don't call onPlayStateChange to avoid loops
-              }
-            } catch (error: any) {
-              console.error('❌ HTML5 video play error:', error);
-              onError?.(error.message);
-            }
-          } else {
-            console.error('❌ HTML5 video element not found');
-          }
-          return;
-        }
-        
-        // Native: expo-av player
-        console.log('📱 Playing native video');
-        
-        // AGGRESSIVELY stop any other audio sources first
-        try {
-          const { Audio } = require('expo-av');
-          
-          // Force unload all audio instances
-          console.log('🔇 FORCE STOPPING ALL AUDIO INSTANCES');
-          
-          // Try to access and stop any global audio instances
-          if (Audio._instances) {
-            console.log('🔇 Found Audio._instances, clearing...');
-            Audio._instances.forEach((instance: any) => {
-              try {
-                if (instance.unloadAsync) instance.unloadAsync();
-                if (instance.stopAsync) instance.stopAsync();
-              } catch (e) {}
-            });
+          // Update web media session playback state
+          if (Platform.OS === 'web' && 'mediaSession' in navigator) {
+            (navigator as any).mediaSession.playbackState = 'playing';
           }
           
-          // Reset audio mode completely
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: false,
-            staysActiveInBackground: false,
-            interruptionModeIOS: 1, // MixWithOthers first to reset
-          });
-          
-          // Then set our desired mode
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: true,
-            interruptionModeIOS: 0, // DoNotMix - stop other audio
-          });
-          
-          console.log('🔇 AUDIO CLEANUP COMPLETED');
-        } catch (audioError) {
-          console.log('⚠️ Audio mode setup error:', audioError);
-        }
-        
-        setShouldPlay(true);
-        if (videoRef.current && videoUri) {
-          console.log('🎬 Video ref and URI available, playing...');
-          await videoRef.current.playAsync();
-          await updatePlaybackState(true);
-          setTimeout(() => {
-            onPlayStateChange?.(false);
-          }, 100);
+          onPlayStateChange?.(true);
+          console.log('🔊 expo-video play successful');
         } else {
-          console.log('⚠️ Video ref or URI not available:', { 
-            hasRef: !!videoRef.current, 
-            hasUri: !!videoUri 
-          });
+          console.error('❌ Video player not available');
         }
       } catch (error: any) {
         console.log('❌ Play error:', error);
@@ -393,43 +378,20 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       try {
         console.log('⏸️ VimeoPlayerNative.pause() called');
         
-        if (Platform.OS === 'web') {
-          // Web: HTML5 video player
-          console.log('🌐 Pausing HTML5 video');
+        if (videoPlayer) {
+          videoPlayer.pause();
+          setIsPlaying(false);
+          setShouldPlay(false);
           
-          const videoElement = (globalThis as any).webVideoElement;
-          if (videoElement) {
-            try {
-              videoElement.pause();
-              // Update state immediately
-              setIsPlaying(false);
-              setShouldPlay(false);
-              
-              // Update web media session playback state
-              if (Platform.OS === 'web' && 'mediaSession' in navigator) {
-                (navigator as any).mediaSession.playbackState = 'paused';
-              }
-              // Don't call onPlayStateChange to avoid loops
-              console.log('🔊 HTML5 video paused successfully');
-            } catch (error: any) {
-              console.error('❌ HTML5 video pause error:', error);
-              onError?.(error.message);
-            }
-          } else {
-            console.error('❌ HTML5 video element not found');
+          // Update web media session playback state
+          if (Platform.OS === 'web' && 'mediaSession' in navigator) {
+            (navigator as any).mediaSession.playbackState = 'paused';
           }
-          return;
-        }
-        
-        // Native: expo-av player
-        console.log('📱 Pausing native video');
-        setShouldPlay(false);
-        if (videoRef.current) {
-          await videoRef.current.pauseAsync();
-          await updatePlaybackState(false);
-          setTimeout(() => {
-            onPlayStateChange?.(true);
-          }, 100);
+          
+          onPlayStateChange?.(false);
+          console.log('🔊 expo-video paused successfully');
+        } else {
+          console.error('❌ Video player not available');
         }
       } catch (error: any) {
         console.log('❌ Pause error:', error);
@@ -447,8 +409,9 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
 
     async setCurrentTime(seconds: number) {
       try {
-        if (videoRef.current) {
-          await videoRef.current.setPositionAsync(seconds * 1000);
+        if (videoPlayer) {
+          videoPlayer.currentTime = seconds;
+          setCurrentTime(seconds);
         }
       } catch (error: any) {
         console.error('❌ Seek error:', error);
@@ -458,8 +421,8 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
 
     async destroy() {
       try {
-        if (videoRef.current) {
-          await videoRef.current.unloadAsync();
+        if (videoPlayer) {
+          videoPlayer.release();
         }
       } catch (error: any) {
         console.error('❌ Destroy error:', error);
@@ -474,109 +437,12 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       try {
         console.log('🔇 VimeoPlayerNative.setMuted() called with:', muted);
         
-        if (Platform.OS === 'web') {
-          // Web: HTML5 video player - try multiple methods
-          let videoElement = (globalThis as any).webVideoElement;
-          
-          // Fallback: try to find video element in DOM
-          if (!videoElement) {
-            videoElement = document.querySelector('video');
-            console.log('🔍 Fallback: Found video via DOM query:', !!videoElement);
-          }
-          
-          console.log('🔍 Video element check:', {
-            exists: !!videoElement,
-            currentMuted: videoElement?.muted,
-            currentVolume: videoElement?.volume,
-            paused: videoElement?.paused,
-            readyState: videoElement?.readyState,
-            src: videoElement?.src?.substring(0, 50) + '...'
-          });
-          
-          if (videoElement) {
-            const oldMuted = videoElement.muted;
-            const oldVolume = videoElement.volume;
-            
-            // Set muted property multiple times to ensure it sticks
-            videoElement.muted = muted;
-            
-            // Also set volume as backup (this seems to be working)
-            if (muted) {
-              videoElement.volume = 0;
-            } else {
-              videoElement.volume = 1.0;
-            }
-            
-            // Force the muted property again after volume change
-            videoElement.muted = muted;
-            
-            // Store the intended mute state globally for persistence
-            (globalThis as any).intendedMuteState = muted;
-            
-            // Set up a watcher to maintain mute state
-            if (!(globalThis as any).muteWatcher) {
-              (globalThis as any).muteWatcher = setInterval(() => {
-                const currentVideo = (globalThis as any).webVideoElement;
-                const intendedMute = (globalThis as any).intendedMuteState;
-                
-                if (currentVideo && typeof intendedMute === 'boolean') {
-                  // Force mute state if it's been overridden
-                  if (currentVideo.muted !== intendedMute) {
-                    console.log('🔧 Correcting mute state:', currentVideo.muted, '→', intendedMute);
-                    currentVideo.muted = intendedMute;
-                  }
-                  
-                  // Also maintain volume
-                  const expectedVolume = intendedMute ? 0 : 1.0;
-                  if (Math.abs(currentVideo.volume - expectedVolume) > 0.1) {
-                    console.log('🔧 Correcting volume:', currentVideo.volume, '→', expectedVolume);
-                    currentVideo.volume = expectedVolume;
-                  }
-                }
-              }, 100); // Check every 100ms
-            }
-            
-            // Wait a bit and verify the change stuck
-            setTimeout(() => {
-              console.log('🌐 HTML5 video mute change (final check):', {
-                from: oldMuted,
-                to: muted,
-                actualMuted: videoElement.muted,
-                fromVolume: oldVolume,
-                toVolume: videoElement.volume,
-                success: (muted ? videoElement.volume === 0 : videoElement.volume === 1)
-              });
-            }, 50);
-            
-            // Try to trigger events to ensure browser recognizes the change
-            videoElement.dispatchEvent(new Event('volumechange'));
-            
-          } else {
-            console.error('❌ HTML5 video element not found for mute - trying all videos');
-            // Last resort: try all video elements
-            const allVideos = document.querySelectorAll('video');
-            console.log('🔍 Found', allVideos.length, 'video elements in DOM');
-            allVideos.forEach((video, index) => {
-              console.log(`🎬 Video ${index}:`, {
-                muted: video.muted,
-                volume: video.volume,
-                src: video.src?.substring(0, 30) + '...'
-              });
-              video.muted = muted;
-              if (muted) {
-                video.volume = 0;
-              } else {
-                video.volume = 1.0;
-              }
-            });
-          }
-          return;
-        }
-        
-        // Native: expo-av player
-        if (videoRef.current) {
-          await videoRef.current.setIsMutedAsync(muted);
-          console.log('📱 Native video muted set to:', muted);
+        if (videoPlayer) {
+          videoPlayer.muted = muted;
+          setIsMuted(muted);
+          console.log('🔇 expo-video muted set to:', muted);
+        } else {
+          console.error('❌ Video player not available for mute');
         }
       } catch (error: any) {
         console.error('❌ setMuted error:', error);
@@ -585,13 +451,7 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     },
 
     isMuted() {
-      if (Platform.OS === 'web') {
-        const videoElement = (globalThis as any).webVideoElement;
-        return videoElement ? videoElement.muted : false;
-      }
-      // Native: expo-av doesn't have a direct way to check mute status
-      // We'll track this in the parent component
-      return false;
+      return isMuted;
     }
   }));
 
@@ -641,8 +501,8 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
   // Listen for global stop music events
   useEffect(() => {
     const stopMusicListener = DeviceEventEmitter.addListener('STOP_ALL_MUSIC', () => {
-      if (videoRef.current) {
-        videoRef.current.pauseAsync();
+      if (videoPlayer) {
+        videoPlayer.pause();
       }
       setShouldPlay(false);
     });
@@ -650,7 +510,7 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     return () => {
       stopMusicListener.remove();
     };
-  }, []);
+  }, [videoPlayer]);
 
 
   // Fetch video URL from Vimeo API
@@ -665,27 +525,10 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
       
       // AGGRESSIVELY stop any existing audio when switching videos
       try {
-        const { Audio } = require('expo-av');
+        // Audio cleanup now handled by expo-video
         
-        console.log('🔇 FORCE CLEARING ALL AUDIO ON VIDEO SWITCH');
-        
-        // Try to access and stop any global audio instances
-        if (Audio._instances) {
-          console.log('🔇 Found Audio._instances during video switch, clearing...');
-          Audio._instances.forEach((instance: any) => {
-            try {
-              if (instance.unloadAsync) instance.unloadAsync();
-              if (instance.stopAsync) instance.stopAsync();
-            } catch (e) {}
-          });
-        }
-        
-        // Reset audio mode completely
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: false,
-          staysActiveInBackground: false,
-          interruptionModeIOS: 1, // MixWithOthers first to reset
-        });
+        // SDK 54: expo-video handles audio cleanup automatically
+        console.log('🔇 SDK 54: Audio cleanup handled by expo-video on video switch');
         
         console.log('🔇 VIDEO SWITCH AUDIO CLEANUP COMPLETED');
       } catch (audioError) {
@@ -763,23 +606,21 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
 
   // Handle shouldPlay changes
   useEffect(() => {
-    if (!videoRef.current || !videoUri) return;
+    if (!videoPlayer || !videoUri) return;
     
     // Add small delay for Android compatibility
     const timer = setTimeout(() => {
-      if (videoRef.current && videoUri) {
+      if (videoPlayer && videoUri) {
         if (shouldPlay) {
-          videoRef.current.playAsync().catch(error => {
-          });
+          videoPlayer.play();
         } else {
-          videoRef.current.pauseAsync().catch(error => {
-          });
+          videoPlayer.pause();
         }
       }
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [shouldPlay, videoUri]);
+  }, [shouldPlay, videoUri, videoPlayer]);
 
   // Handle video ready
   const handleVideoReady = () => {
@@ -787,18 +628,13 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
     setIsLoading(false);
     setError(null);
     
-    // If shouldPlay is true, trigger play for web - DISABLED FOR DEBUGGING
-    if (Platform.OS === 'web' && shouldPlay) {
-      console.log('🎬 Auto-triggering play on video ready (web) - DISABLED FOR DEBUGGING');
-      // setTimeout(() => {
-      //   const videoElement = document.querySelector('video');
-      //   if (videoElement) {
-      //     videoElement.muted = false; // Sesli başlasın
-      //     videoElement.play().catch(error => {
-      //       console.log('❌ Auto-play failed on ready:', error);
-      //     });
-      //   }
-      // }, 100);
+    // Auto-start video playback when ready
+    console.log('🎬 Video ready, starting playback');
+    setShouldPlay(true);
+    
+    if (videoPlayer) {
+      videoPlayer.play();
+      console.log('🎬 Started video playback');
     }
     
     onReady?.();
@@ -848,10 +684,10 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
         handleVideoReady();
         
         // Ensure video starts from beginning
-        setTimeout(async () => {
-          if (videoRef.current) {
+        setTimeout(() => {
+          if (videoPlayer) {
             try {
-              await videoRef.current.setPositionAsync(0);
+              videoPlayer.currentTime = 0;
             } catch (error) {
             }
           }
@@ -965,22 +801,24 @@ export const VimeoPlayerNative = forwardRef<VimeoPlayerRef, VimeoPlayerProps>(({
           activeOpacity={1}
         >
           {videoUri && (
-            <Video
+            <VideoView
               key={`video-${video?.id}`}
-              ref={videoRef}
-              source={{ uri: videoUri }}
-              style={styles.video}
-              useNativeControls={false}
-              shouldPlay={shouldPlay}
-              isLooping={false}
-              isMuted={false}
-              volume={1.0}
-              showsTimecodes={false}
-              onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-              onLoad={() => {
-                handleVideoReady();
+              style={{
+                position: 'absolute',
+                top: -100, // Yukarıya taşı
+                left: -100, // Sola taşı
+                right: -100, // Sağa taşı
+                bottom: -100, // Aşağıya taşı
+                width: '120%', // Daha büyük genişlik
+                height: '120%', // Daha büyük yükseklik
+                backgroundColor: 'blue', // Debug - mavi alan görünmeli
               }}
-              resizeMode="contain"
+              player={videoPlayer}
+              allowsFullscreen
+              allowsPictureInPicture
+              contentFit="fill"
+              surfaceType="textureView"
+              nativeControls={false}
             />
           )}
 
@@ -1029,8 +867,16 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   videoContainer: {
-    flex: 1,
-    position: 'relative',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'transparent',
+    zIndex: -1,
+    overflow: 'hidden',
   },
   webVideoContainer: {
     position: 'fixed',
@@ -1050,7 +896,21 @@ const styles = StyleSheet.create({
     boxSizing: 'border-box',
   },
   video: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: -1, // Background video
+    backgroundColor: 'transparent',
+    // Tam ekran zorla - aspect ratio'yu boz
+    aspectRatio: undefined,
     flex: 1,
+    transform: [
+      { scale: 2.0 } // Daha da büyük scale
+    ],
   },
   webVideo: {
     position: 'fixed',

@@ -2,7 +2,7 @@ import { ThemedText } from '@/components/ThemedText';
 import { CustomIcon } from '@/components/ui/CustomIcon';
 import { useVimeo } from '@/contexts/VimeoContext';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
-import { Image } from 'expo-image';
+// import { Image } from 'expo-image'; // Removed - causing render error
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
@@ -181,11 +181,17 @@ export default function CreatePlaylistModal({
         {/* Video Info - Sadece video varsa göster */}
         {videoTitle && videoTitle.trim() !== '' && (
           <View style={styles.videoInfo}>
-            <Image 
-              source={require('@/assets/images/playlist.svg')}
-              style={styles.videoIcon}
-              contentFit="contain"
-            />
+            {videoId ? (
+              <RNImage 
+                source={{ uri: `https://vumbnail.com/${videoId}.jpg` }}
+                style={styles.videoThumbnail}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.videoThumbnailPlaceholder}>
+                <CustomIcon name="heart" size={20} color="#e0af92" />
+              </View>
+            )}
             <View style={styles.videoTextContainer}>
               <ThemedText style={styles.videoInfoLabel}>Video to add:</ThemedText>
               <ThemedText style={styles.videoTitle} numberOfLines={2}>
@@ -210,19 +216,6 @@ export default function CreatePlaylistModal({
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.inputLabel}>Description (Optional)</ThemedText>
-            <TextInput
-              style={[styles.textInput, styles.textArea]}
-              value={playlistDescription}
-              onChangeText={setPlaylistDescription}
-              placeholder="What's this playlist about?"
-              placeholderTextColor="#666666"
-              multiline
-              numberOfLines={3}
-              maxLength={200}
-            />
-          </View>
 
           <TouchableOpacity
             style={[styles.createButton, (!playlistName.trim() || isCreating) && styles.createButtonDisabled]}
@@ -253,12 +246,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 15,
+    paddingLeft: 20,
+    paddingRight: 5, // Profile header ile aynı
+    paddingVertical: 15, // Profile header ile aynı boyut
     borderBottomWidth: 1,
     borderBottomColor: '#0a0a0a', // Tutarlı koyu çizgi
-    backgroundColor: '#000000', // Siyah background
+    backgroundColor: '#0a0a0a', // Profile header ile aynı gri background
+    position: 'relative', // Shimmer için
+    overflow: 'hidden',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -268,8 +263,9 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#101010', // Daha koyu gri
+    // borderRadius ve backgroundColor kaldırıldı - yuvarlak arka plan yok
+    position: 'absolute',
+    right: 15, // Profile header ile aynı pozisyon
   },
   headerTitle: {
     fontSize: 20,
@@ -287,6 +283,7 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: '#101010', // Daha koyu gri
+    marginLeft: -5, // Profile header ile aynı - biraz sola al
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -310,11 +307,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333333',
   },
-  videoIcon: {
-    width: 40,
+  videoThumbnail: {
+    width: 60,
     height: 40,
-    tintColor: '#e0af92',
+    borderRadius: 6,
     marginRight: 15,
+    backgroundColor: '#101010', // Fallback background
+  },
+  videoThumbnailPlaceholder: {
+    width: 60,
+    height: 40,
+    backgroundColor: '#101010',
+    borderRadius: 6,
+    marginRight: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   videoTextContainer: {
     flex: 1,

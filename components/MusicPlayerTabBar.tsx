@@ -274,9 +274,9 @@ export default function MusicPlayerTabBar({
     <>
       {/* Simple black gradient for icons */}
       <LinearGradient
-        colors={['transparent', 'transparent', 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,1)', 'rgba(0,0,0,1)']}
+        colors={['transparent', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,1)']}
         style={styles.iconGradient}
-        start={{ x: 0, y: 0.5 }}
+        start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         pointerEvents="none"
       />
@@ -324,11 +324,6 @@ export default function MusicPlayerTabBar({
           }}
         >
           <CustomIcon name="skip-previous" size={28} color={currentVideo ? "#ffffff" : "#666666"} />
-          {__DEV__ && Platform.OS !== 'web' && (
-            <Text style={{position: 'absolute', top: -15, fontSize: 8, color: 'yellow', backgroundColor: 'black'}}>
-              PREV: {currentVideo ? 'ON' : 'OFF'}
-            </Text>
-          )}
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -342,11 +337,6 @@ export default function MusicPlayerTabBar({
             size={28} 
             color={Platform.OS === 'web' ? (currentVideo ? "#e0af92" : "#666666") : (currentVideo ? "#e0af92" : "#666666")} 
           />
-          {__DEV__ && Platform.OS !== 'web' && (
-            <Text style={{position: 'absolute', top: -15, fontSize: 8, color: 'yellow', backgroundColor: 'black'}}>
-              PLAY: {currentVideo ? 'ON' : 'OFF'}
-            </Text>
-          )}
         </TouchableOpacity>
 
         <TouchableOpacity 
@@ -359,11 +349,6 @@ export default function MusicPlayerTabBar({
           }}
         >
           <CustomIcon name="skip-next" size={28} color={currentVideo ? "#ffffff" : "#666666"} />
-          {__DEV__ && Platform.OS !== 'web' && (
-            <Text style={{position: 'absolute', top: -15, fontSize: 8, color: 'yellow', backgroundColor: 'black'}}>
-              NEXT: {currentVideo ? 'ON' : 'OFF'}
-            </Text>
-          )}
         </TouchableOpacity>
 
       </View>
@@ -373,8 +358,8 @@ export default function MusicPlayerTabBar({
         styles.rightActions,
         isMobileDevice && styles.rightActionsMobile
       ]}>
-        {/* Mute/Unmute Button - Only show on web for HTML5 video */}
-        {Platform.OS === 'web' && onMuteToggle && (
+        {/* Mute/Unmute Button - Show on all platforms */}
+        {onMuteToggle && (
           <TouchableOpacity 
             style={[
               styles.actionButton, 
@@ -394,7 +379,10 @@ export default function MusicPlayerTabBar({
                 styles.soundIcon,
                 Platform.OS === 'web' && !isMobileDevice && styles.soundIconWeb,
                 isMobileDevice && styles.soundIconMobile,
-                { opacity: currentVideo ? 1 : 0.4 }
+                { 
+                  opacity: currentVideo ? 1 : 0.4,
+                  tintColor: currentVideo ? undefined : '#666666' // Video oynarken tint yok, sadece video yokken gri
+                }
               ]}
               contentFit="contain"
             />
@@ -419,7 +407,7 @@ const styles = StyleSheet.create({
       left: 0,
       right: 0,
     }),
-    height: 300, // Daha yukarı doğru uzat (250 → 300)
+    height: 300, // Siyah alanı daha yukarı taşı
     zIndex: 1001, // Container'dan (1000) yüksek
   },
   container: {
@@ -588,12 +576,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     width: 56, // Daha da büyütüldü (50 → 56)
     height: 56, // Daha da büyütüldü (50 → 56)
-    marginRight: 25, // Daha da sola kaydırıldı (15 → 25)
+    marginRight: 10, // Sağa kaydırıldı (25 → 10)
   },
   muteButtonMobile: {
     width: 48, // Mobilde daha da büyütüldü (44 → 48)
     height: 48, // Mobilde daha da büyütüldü (44 → 48)
-    marginRight: 15, // Daha da sola kaydırıldı (5 → 15)
+    marginRight: 5, // Sağa kaydırıldı (15 → 5)
   },
   soundIcon: {
     width: 28, // Daha da büyütüldü (24 → 28)

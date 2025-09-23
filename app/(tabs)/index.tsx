@@ -14,20 +14,26 @@ import { VimeoPlayerNative } from '@/components/VimeoPlayerNative';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVimeo } from '@/contexts/VimeoContext';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
+import { useNativeMediaSession } from '@/hooks/useNativeMediaSession';
 import { autoSyncService } from '@/services/autoSyncService';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
+import { hybridVimeoService } from '@/services/hybridVimeoService';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
 import { logger } from '@/utils/logger';
-import { Video } from 'expo-av';
+// Video component now handled by expo-video in VimeoPlayerNative
 import { Image as ExpoImage } from 'expo-image';
+import { useVideoPlayer, VideoView, VideoSource } from 'expo-video';
+import { useEvent } from 'expo';
+// import * as VideoThumbnails from 'expo-video-thumbnails'; // Artık kullanmıyoruz - Vimeo thumbnail'ları kullanıyoruz
+// Background audio handled by expo-video SDK 54
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, DeviceEventEmitter, Dimensions, Image, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, DeviceEventEmitter, Dimensions, Easing, Image, Modal, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Background video imports
 const backgroundVideo = require('@/assets/videos/NLA6.mp4'); // Desktop/web için
-const mobileBackgroundVideo = require('@/assets/videos/NLA_mobil.mp4'); // Mobil web için
+const mobileBackgroundVideo = require('@/assets/videos/NLA_mobil.mp4'); // Native mobile için
 const heartImage = require('@/assets/hearto.png');
 
 // Integration Testing Infrastructure
@@ -73,20 +79,62 @@ const debugLog = {
 
 const { width } = Dimensions.get('window');
 
-// Mobile web detection - telefon üzerinden web'e giriş yapanları tespit et
+// Safe mobile web detection - only check on web platform
 const isMobileWeb = Platform.OS === 'web' && 
   width <= 768 && 
-  typeof navigator !== 'undefined' && 
-  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' ? 
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) : 
+    false);
 
 export default function HomeScreen() {
   const { videos, isConfigured, isLoading, refreshVideos } = useVimeo();
   const { isConfigured: isBackgroundAudioConfigured } = useBackgroundAudio();
   const { isAuthenticated, user } = useAuth();
   
-  // Disable scroll on web
+  // Background video player for native
+  const backgroundVideoPlayer = useVideoPlayer(mobileBackgroundVideo, player => {
+    player.loop = true;
+    player.muted = true;
+    player.play();
+  });
+
+  // Background video control - pause when main video is playing
   useEffect(() => {
-    if (Platform.OS === 'web') {
+    if (backgroundVideoPlayer) {
+      if (currentVideo) {
+        // Main video var, background'u duraklat
+        backgroundVideoPlayer.pause();
+        console.log('🎬 Background video paused - main video playing');
+      } else {
+        // Main video yok, background'u başlat
+        backgroundVideoPlayer.play();
+        console.log('🎬 Background video resumed - no main video');
+      }
+    }
+  }, [currentVideo, backgroundVideoPlayer]);
+
+
+  
+  // Web-specific DOM setup
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      // Set body background and styles
+      document.body.style.backgroundColor = '#000000';
+      document.documentElement.style.backgroundColor = '#000000';
+      
+      // Add CSS for safe areas
+      document.body.style.cssText += `
+        background-color: #000000 !important;
+        margin: 0 !important;
+        padding-top: env(safe-area-inset-top, 0) !important;
+        padding-bottom: env(safe-area-inset-bottom, 0) !important;
+        padding-left: env(safe-area-inset-left, 0) !important;
+        padding-right: env(safe-area-inset-right, 0) !important;
+      `;
+      document.documentElement.style.cssText += `
+        background-color: #000000 !important;
+      `;
+      
       // Disable scroll
       document.body.style.overflow = 'hidden';
       document.documentElement.style.overflow = 'hidden';
@@ -104,7 +152,7 @@ export default function HomeScreen() {
     console.log('📱 Mobile Web Detection:', {
       isMobileWeb,
       width,
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'N/A',
+      userAgent: Platform.OS === 'web' && typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' ? navigator.userAgent : 'N/A',
       selectedVideo: isMobileWeb ? 'NLA_mobil.mp4 (Mobile)' : 'NLA6.mp4 (Desktop)'
     });
   }, []);
@@ -139,6 +187,633 @@ export default function HomeScreen() {
   const [currentPlaylistContext, setCurrentPlaylistContext] = useState<{playlistId: string, playlistName: string} | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentVideoIndex, setCurrentVideoIndex] = useState<number>(-1);
+  const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
+  const [currentMetadata, setCurrentMetadata] = useState<any>(null);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+  
+  // Loading overlay heartbeat animation
+  const loadingHeartScale = useRef(new Animated.Value(1)).current;
+  
+  // Loading heartbeat animation function
+  const startLoadingHeartbeat = useCallback(() => {
+    // Sadece loading durumunda çalışsın
+    if (!currentVideo || isVideoReady) {
+      return;
+    }
+    
+    const animationRef = Animated.loop(
+      Animated.sequence([
+        // First beat
+        Animated.timing(loadingHeartScale, {
+          toValue: 1.3,
+          duration: 250,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(loadingHeartScale, {
+          toValue: 0.9,
+          duration: 150,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        // Second beat
+        Animated.timing(loadingHeartScale, {
+          toValue: 1.2,
+          duration: 150,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(loadingHeartScale, {
+          toValue: 1,
+          duration: 200,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        // Pause between beats
+        Animated.timing(loadingHeartScale, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    
+    animationRef.start();
+    
+    // Cleanup function
+    return () => {
+      animationRef.stop();
+    };
+  }, [loadingHeartScale, currentVideo, isVideoReady]);
+
+  // Animation reference to control it
+  const loadingAnimationRef = useRef<any>(null);
+
+  // Start loading heartbeat when video is loading
+  useEffect(() => {
+    // Stop any existing animation first
+    if (loadingAnimationRef.current) {
+      loadingAnimationRef.current.stop();
+      loadingAnimationRef.current = null;
+    }
+    
+    if (currentVideo && !isVideoReady) {
+      // Start animation only when loading overlay is visible
+      const cleanup = startLoadingHeartbeat();
+      if (cleanup) {
+        loadingAnimationRef.current = { stop: cleanup };
+      }
+    } else {
+      // Reset scale when not loading
+      loadingHeartScale.stopAnimation();
+      loadingHeartScale.setValue(1);
+    }
+    
+    return () => {
+      if (loadingAnimationRef.current) {
+        loadingAnimationRef.current.stop();
+        loadingAnimationRef.current = null;
+      }
+    };
+  }, [currentVideo, isVideoReady, startLoadingHeartbeat, loadingHeartScale]);
+
+  // Background audio handled by expo-video SDK 54 automatically
+
+  // Media session handled by expo-video SDK 54 automatically
+  const { setMediaMetadata, updatePlaybackState } = useNativeMediaSession();
+
+
+  // Ana video için player - currentVideo'dan sonra tanımla
+  const mainVideoPlayer = useVideoPlayer('', player => {
+    player.loop = false;
+    player.muted = false; // Normal ses çıkışı
+    
+    // Background audio ve media session için ayarlar
+    if (Platform.OS !== 'web') {
+      try {
+        // Audio session category ayarla - background audio için
+        player.audioMixingMode = 'duckOthers'; // Background'da çalmaya devam et
+        
+        // Media session için metadata ayarla
+        player.showNowPlayingNotification = true; // Lock screen kontrolleri
+        
+        // Background playback için ek ayarlar
+        player.staysActiveInBackground = true; // Background'da aktif kal
+        
+        // iOS Remote Command Center için - API kontrolü
+        console.log('🎵 🎛️ Configuring lock screen controls...');
+        
+        // Multiple attempts to disable skip commands
+        if (typeof player.setRemoteCommandsEnabled === 'function') {
+          try {
+            player.setRemoteCommandsEnabled({
+              nextTrack: true, // ⏭️ Next şarkı (sağ ok)
+              previousTrack: true, // ⏮️ Previous şarkı (sol ok)
+              skipForward: false, // ❌ 10s ileri kapatıldı
+              skipBackward: false, // ❌ 10s geri kapatıldı
+              seekForward: false, // ❌ Seek forward kapatıldı
+              seekBackward: false, // ❌ Seek backward kapatıldı
+              seek: false, // ❌ Seek bar kapatıldı (skip'i önlemek için)
+              play: true, // ▶️ Play
+              pause: true // ⏸️ Pause
+            });
+            console.log('🎵 ✅ Lock screen: All skip/seek disabled, only track change enabled');
+          } catch (error) {
+            console.log('🎵 ❌ Remote commands setup error:', error);
+          }
+        }
+        
+        // Alternative API attempts - More aggressive
+        if (typeof player.disableRemoteCommand === 'function') {
+          try {
+            player.disableRemoteCommand('skipForward');
+            player.disableRemoteCommand('skipBackward');
+            player.disableRemoteCommand('seekForward');
+            player.disableRemoteCommand('seekBackward');
+            player.disableRemoteCommand('changePlaybackPosition');
+            player.enableRemoteCommand('nextTrack');
+            player.enableRemoteCommand('previousTrack');
+            console.log('🎵 ✅ Alternative API: All skip/seek commands disabled');
+          } catch (error) {
+            console.log('🎵 ❌ Alternative API error:', error);
+          }
+        }
+        
+        // Try to set skip intervals to empty
+        try {
+          if (typeof player.setSkipIntervals === 'function') {
+            player.setSkipIntervals([]);
+            console.log('🎵 ✅ Skip intervals cleared');
+          }
+          
+          if (typeof player.setPreferredSkipIntervals === 'function') {
+            player.setPreferredSkipIntervals([]);
+            console.log('🎵 ✅ Preferred skip intervals cleared');
+          }
+          
+          // Additional properties to try
+          if (player.skipForwardInterval !== undefined) {
+            player.skipForwardInterval = 0;
+            console.log('🎵 ✅ Skip forward interval set to 0');
+          }
+          
+          if (player.skipBackwardInterval !== undefined) {
+            player.skipBackwardInterval = 0;
+            console.log('🎵 ✅ Skip backward interval set to 0');
+          }
+          
+        } catch (error) {
+          console.log('🎵 ⚠️ Additional skip config error:', error);
+        }
+        
+        // iOS-specific remote command center
+        if (typeof player.configureRemoteCommandCenter === 'function') {
+          try {
+            player.configureRemoteCommandCenter({
+              skipForwardCommand: { enabled: false },
+              skipBackwardCommand: { enabled: false },
+              nextTrackCommand: { enabled: true },
+              previousTrackCommand: { enabled: true }
+            });
+            console.log('🎵 ✅ iOS Remote Command Center configured');
+          } catch (error) {
+            console.log('🎵 ❌ iOS Remote Command Center error:', error);
+          }
+        }
+        
+        if (!player.setRemoteCommandsEnabled && !player.disableRemoteCommand && !player.configureRemoteCommandCenter) {
+          console.log('🎵 ⚠️ No remote command APIs available - relying on app.json config');
+        }
+        
+        // iOS Media Session için ek ayarlar
+        if (player.allowsExternalPlayback !== undefined) {
+          player.allowsExternalPlayback = true; // AirPlay desteği
+        }
+        
+        console.log('🎵 Background audio and media session configured');
+      } catch (error) {
+        console.log('🎵 Audio/Media session setup error:', error);
+      }
+    }
+  });
+
+  // Video player events - Component'in en üst seviyesinde
+  useEvent(mainVideoPlayer, 'statusChange', (event) => {
+    if (Platform.OS !== 'web' && event && currentVideo) {
+      console.log('🎵 Video status changed:', typeof event, event);
+      
+      const status = event.status || event;
+      if (status === 'readyToPlay' || status === 'loaded') {
+        console.log('🎵 ✅ Video ready via event - setting isVideoReady: true');
+        setIsVideoReady(true);
+      } else if (status === 'loading') {
+        console.log('🎵 🔄 Video loading - setting isVideoReady: false');
+        setIsVideoReady(false);
+      }
+    }
+  });
+
+  useEvent(mainVideoPlayer, 'playingChange', (isPlaying) => {
+    if (Platform.OS !== 'web' && currentVideo) {
+      console.log('🎵 Playing changed:', isPlaying);
+      
+      // Video durduysa ve sonuna gelmiş olabilir
+      if (!isPlaying && mainVideoPlayer.currentTime > 0) {
+        const currentTime = mainVideoPlayer.currentTime;
+        const duration = mainVideoPlayer.duration;
+        
+        // Video sonuna %95'i geçmişse sonraki şarkıya geç
+        if (duration > 0 && (currentTime / duration) >= 0.95) {
+          console.log('🎵 🔚 Video near end detected - playing next video', {
+            currentTime: currentTime.toFixed(2),
+            duration: duration.toFixed(2),
+            percentage: ((currentTime / duration) * 100).toFixed(1) + '%'
+          });
+          playNextVideo();
+        }
+      }
+    }
+  });
+
+  // Optimized video end detection - Adaptive timer
+  useEffect(() => {
+    if (Platform.OS !== 'web' && currentVideo && mainVideoPlayer) {
+      let interval: NodeJS.Timeout;
+      let hasReachedNearEnd = false;
+      
+      const checkVideoEnd = () => {
+        try {
+          const currentTime = mainVideoPlayer.currentTime || 0;
+          const duration = mainVideoPlayer.duration || 0;
+          
+          if (duration > 0 && currentTime > 0) {
+            const percentage = (currentTime / duration) * 100;
+            
+            // Video %90'a geldiğinde daha sık kontrol et
+            if (percentage >= 90 && !hasReachedNearEnd) {
+              hasReachedNearEnd = true;
+              clearInterval(interval);
+              // Son %10'da her 500ms kontrol et
+              interval = setInterval(checkVideoEnd, 500);
+              console.log('🎵 ⚡ Switched to fast checking mode at 90%');
+            }
+            
+            // Video %98'ine geldiğinde sonraki şarkıya geç
+            if (percentage >= 98) {
+              console.log('🎵 🔚 Video end detected - playing next video', {
+                percentage: percentage.toFixed(1) + '%'
+              });
+              clearInterval(interval);
+              playNextVideo();
+            }
+          }
+        } catch (error) {
+          // Silent error - performans için log azaltıldı
+        }
+      };
+      
+      // İlk %90'a kadar her 3 saniyede kontrol et (performans optimizasyonu)
+      interval = setInterval(checkVideoEnd, 3000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [currentVideo, mainVideoPlayer]);
+
+  // Event-based detection (backup) - Silent mode
+  useEvent(mainVideoPlayer, 'playbackStatusUpdate', (status) => {
+    if (Platform.OS !== 'web' && currentVideo && status) {
+      if (status.didJustFinish || status.isLoaded === false) {
+        console.log('🎵 🔚 Video ended via event - playing next video');
+        playNextVideo();
+      }
+    }
+  });
+
+  // Remote command event - Lock screen controls
+  useEvent(mainVideoPlayer, 'remoteCommand', (command) => {
+    if (Platform.OS !== 'web' && command) {
+      console.log('🎵 🎛️ Lock screen command received:', command.type || 'unknown');
+      
+      switch (command.type) {
+        case 'nextTrack':
+          console.log('🎵 ⏭️ Next track from lock screen → Playing next video');
+          playNextVideo();
+          break;
+          
+        case 'previousTrack':
+          console.log('🎵 ⏮️ Previous track from lock screen → Playing previous video');
+          playPreviousVideo();
+          break;
+          
+        case 'skipForward':
+          console.log('🎵 ⏩ Skip forward disabled - using next track instead');
+          playNextVideo();
+          break;
+          
+        case 'skipBackward':
+          console.log('🎵 ⏪ Skip backward disabled - using previous track instead');
+          playPreviousVideo();
+          break;
+          
+        case 'play':
+          console.log('🎵 ▶️ Play command from lock screen');
+          handlePlayPause();
+          break;
+          
+        case 'pause':
+          console.log('🎵 ⏸️ Pause command from lock screen');
+          handlePlayPause();
+          break;
+          
+        default:
+          console.log('🎵 ❓ Unhandled remote command:', command.type || 'undefined');
+      }
+    } else if (Platform.OS !== 'web') {
+      console.log('🎵 ⚠️ Empty remote command received');
+    }
+  });
+
+  // Ana video source'unu güncelle - Debug ile - Double loading önle
+  useEffect(() => {
+    console.log('🎬 useEffect triggered - currentVideo:', currentVideo?.name, 'mainVideoPlayer:', !!mainVideoPlayer);
+    
+    if (currentVideo && mainVideoPlayer) {
+      console.log('🎬 ✅ Both currentVideo and mainVideoPlayer available');
+      console.log('🎬 Loading main video:', currentVideo.name || currentVideo.title, 'ID:', currentVideo.id);
+      
+      // Video değiştiğinde ready state'ini resetle
+      console.log('🎵 🔄 New video loading - setting isVideoReady: false');
+      setIsVideoReady(false);
+      
+      // Double loading önlemek için loading state kontrol et - Daha güçlü kontrol
+      if (mainVideoPlayer.source && typeof mainVideoPlayer.source === 'object' && 
+          mainVideoPlayer.source.uri) {
+        
+        // Video ID'yi URI'den çıkar ve karşılaştır
+        const currentSourceId = mainVideoPlayer.source.uri.match(/\/(\d+)[\/?]/)?.[1];
+        const newVideoId = currentVideo.id.toString();
+        
+        if (currentSourceId === newVideoId) {
+          console.log('🎬 ⚠️ SAME VIDEO - Skipping reload to prevent restart');
+          console.log('🎬 Current source ID:', currentSourceId, 'New video ID:', newVideoId);
+          console.log('🎵 ✅ Video already ready - setting isVideoReady: true');
+          setIsVideoReady(true); // Zaten yüklüyse ready
+          
+          // Eğer video duraklatılmışsa devam ettir
+          if (isPaused && mainVideoPlayer.currentTime > 0) {
+            console.log('🎵 ▶️ Resuming paused video from:', mainVideoPlayer.currentTime);
+            mainVideoPlayer.play().catch(error => {
+              console.log('🎵 Resume play error:', error);
+            });
+          }
+          
+          return;
+        } else {
+          console.log('🎬 🆕 DIFFERENT VIDEO - Current:', currentSourceId, 'New:', newVideoId);
+        }
+      }
+      
+      console.log('🎬 🆕 Loading new video - ID:', currentVideo.id);
+      console.log('🎬 Current source:', mainVideoPlayer.source ? 'EXISTS' : 'NULL');
+      
+      // Direkt gerçek video loading
+      const loadMainVideo = async () => {
+        try {
+          console.log('🎬 🔄 Loading real video directly...');
+          const token = await hybridVimeoService.getCurrentToken();
+          
+          // Alternative API endpoint - daha güvenilir
+          console.log('🎬 🎯 Using alternative API for video:', currentVideo.id);
+          const altResponse = await fetch(`https://api.vimeo.com/videos/${currentVideo.id}?fields=files,pictures`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (altResponse.ok) {
+            const altData = await altResponse.json();
+            console.log('🎬 📦 Alternative API response received');
+            const files = altData?.files || [];
+            const mp4Files = files.filter((file: any) => file.type === 'video/mp4');
+            const bestFile = mp4Files.find((file: any) => file.quality === 'hd') || mp4Files[0];
+            
+            if (bestFile?.link) {
+              console.log('🎬 🎯 Loading video URL:', bestFile.link.substring(0, 50) + '...');
+              
+              // Get Vimeo thumbnail first - iOS can handle URLs directly
+              let vimeoThumbnail = null;
+              try {
+                if (Platform.OS !== 'web' && altData.pictures?.sizes) {
+                  // Use Vimeo's own thumbnail - no conversion needed
+                  const sizes = altData.pictures.sizes.sort((a: any, b: any) => b.width - a.width);
+                  const mediumSize = sizes.find((size: any) => size.width >= 640 && size.width <= 800);
+                  vimeoThumbnail = mediumSize?.link || sizes[Math.floor(sizes.length / 2)]?.link || sizes[0]?.link;
+                  
+                  if (vimeoThumbnail) {
+                    console.log('🎵 🖼️ Using Vimeo thumbnail (instant!):', vimeoThumbnail.substring(0, 50) + '...');
+                    setVideoThumbnail(vimeoThumbnail);
+                  } else {
+                    console.log('🎵 ⚠️ No Vimeo thumbnail found in pictures array');
+                  }
+                } else {
+                  console.log('🎵 ⚠️ No pictures data in Vimeo response');
+                }
+              } catch (error) {
+                console.log('🎵 ❌ Vimeo thumbnail extraction error:', error);
+                vimeoThumbnail = null;
+              }
+              
+              // VideoSource with Vimeo thumbnail directly in metadata
+              const videoSourceWithThumbnail: VideoSource = {
+                uri: bestFile.link,
+                metadata: {
+                  title: currentVideo.name || currentVideo.title || 'Naber LA Music',
+                  artist: 'Naber LA',
+                  album: 'Naber LA Collection',
+                  ...(vimeoThumbnail && { artwork: vimeoThumbnail })
+                }
+              };
+              
+              console.log('🎵 VideoSource with Vimeo thumbnail:', {
+                title: videoSourceWithThumbnail.metadata?.title,
+                artist: videoSourceWithThumbnail.metadata?.artist,
+                artwork: vimeoThumbnail ? 'YES (Vimeo URL)' : 'NO'
+              });
+              await mainVideoPlayer.replaceAsync(videoSourceWithThumbnail);
+              
+              // Media session metadata'sını player'a ayarla
+              if (Platform.OS !== 'web') {
+                try {
+                  // Player'a metadata ayarla - Vimeo thumbnail ile
+                  const metadata = {
+                    title: currentVideo.name || currentVideo.title || 'Naber LA Music',
+                    artist: 'Naber LA',
+                    album: 'Naber LA Collection', // iOS için album
+                    albumTitle: 'Naber LA Collection', // Fallback
+                    ...(vimeoThumbnail && { 
+                      artwork: vimeoThumbnail, // Primary
+                      artworkUri: vimeoThumbnail, // iOS fallback
+                      artworkUrl: vimeoThumbnail // Additional fallback
+                    }),
+                    duration: 180, // Default 3 dakika
+                    playbackRate: 1.0,
+                    elapsedTime: 0
+                  };
+                  
+                  // SDK 54'te farklı API kullanılıyor olabilir - tüm yöntemleri dene
+                  let metadataSet = false;
+                  
+                  // Yöntem 1: setNowPlayingInfo
+                  if (typeof mainVideoPlayer.setNowPlayingInfo === 'function') {
+                    try {
+                      mainVideoPlayer.setNowPlayingInfo(metadata);
+                      metadataSet = true;
+                      console.log('🎵 Metadata set via setNowPlayingInfo');
+                    } catch (error) {
+                      console.log('🎵 setNowPlayingInfo failed:', error);
+                    }
+                  }
+                  
+                  // Yöntem 2: nowPlayingInfo property - Daha detaylı
+                  if (!metadataSet && mainVideoPlayer.nowPlayingInfo !== undefined) {
+                    try {
+                      // iOS için daha spesifik format
+                      const iosMetadata = {
+                        title: metadata.title,
+                        artist: metadata.artist,
+                        albumTitle: metadata.albumTitle || metadata.album,
+                        artwork: metadata.artwork, // Vimeo thumbnail URL
+                        duration: metadata.duration,
+                        playbackRate: metadata.playbackRate,
+                        elapsedTime: metadata.elapsedTime
+                      };
+                      
+                      mainVideoPlayer.nowPlayingInfo = iosMetadata;
+                      metadataSet = true;
+                      console.log('🎵 ✅ Metadata set via nowPlayingInfo property with artwork:', {
+                        title: iosMetadata.title,
+                        artwork: iosMetadata.artwork ? 'YES' : 'NO'
+                      });
+                    } catch (error) {
+                      console.log('🎵 nowPlayingInfo property failed:', error);
+                    }
+                  }
+                  
+                  // Yöntem 3: VideoView metadata prop (fallback)
+                  if (!metadataSet) {
+                    console.log('🎵 Using VideoView metadata prop as fallback');
+                  }
+                  
+                  // Metadata'yı state'e kaydet VideoView için
+                  setCurrentMetadata(metadata);
+                  
+                  // Native iOS Media Session'a da gönder
+                  setMediaMetadata(metadata);
+                  
+                  console.log('🎵 Now playing info set:', {
+                    title: metadata.title,
+                    artist: metadata.artist,
+                    artwork: metadata.artwork ? 'YES (Vimeo URL)' : 'NO',
+                    artworkUrl: metadata.artwork ? metadata.artwork.substring(0, 60) + '...' : 'NONE',
+                    method: metadataSet ? 'Player API' : 'VideoView Prop'
+                  });
+                } catch (error) {
+                  console.log('🎵 Now playing info error:', error);
+                }
+              }
+              
+              // Video play etmeden önce current time kontrol et
+              const currentTime = mainVideoPlayer.currentTime || 0;
+              console.log('🎵 ⏰ Video current time before play:', currentTime);
+              
+              await mainVideoPlayer.play();
+              
+              // Video başarıyla yüklendi ve oynatılıyor - ready state'ini ayarla
+                      console.log('🎵 ✅ Video loaded and playing - setting isVideoReady: true');
+                      setIsVideoReady(true);
+                      
+                      
+                      // Play state'ini media session'a bildir
+                      if (Platform.OS !== 'web') {
+                try {
+                  // Playing state'ini güncelle
+                  mainVideoPlayer.nowPlayingInfo = {
+                    ...mainVideoPlayer.nowPlayingInfo,
+                    playbackRate: 1.0, // Çalıyor
+                    elapsedTime: 0
+                  };
+                  
+                  // Native media session'a da bildir
+                  updatePlaybackState(true, 0);
+                  
+                  console.log('🎵 Media session play state updated');
+                } catch (error) {
+                  console.log('🎵 Play state update error:', error);
+                }
+              }
+              
+              console.log('🎬 ✅ Video loaded and playing successfully!');
+            } else {
+              console.log('🎬 ❌ No suitable video file found in API response');
+            }
+          } else {
+            console.error('🎬 ❌ Alternative API failed with status:', altResponse.status);
+          }
+        } catch (error) {
+          console.error('❌ Video load error:', error);
+        }
+      };
+      
+      loadMainVideo();
+    } else {
+      console.log('🎬 ❌ Missing requirements - currentVideo:', !!currentVideo, 'mainVideoPlayer:', !!mainVideoPlayer);
+    }
+  }, [currentVideo, mainVideoPlayer]);
+
+  // Metadata güncelleme artık gereksiz - Vimeo thumbnail direkt video yüklenirken alınıyor
+  // useEffect(() => {
+  //   if (Platform.OS !== 'web' && currentVideo && mainVideoPlayer && videoThumbnail) {
+  //     console.log('🎵 Updating metadata with thumbnail - Video:', currentVideo.name, 'Thumbnail:', videoThumbnail ? 'YES' : 'NO');
+  //     
+  //     const metadata = {
+  //       title: currentVideo.name || currentVideo.title || 'Naber LA Music',
+  //       artist: 'Naber LA',
+  //       albumTitle: 'Naber LA Collection', // iOS için albumTitle
+  //       artworkUri: videoThumbnail, // iOS için artworkUri
+  //       artwork: videoThumbnail // Fallback
+  //     };
+  //     
+  //     try {
+  //       // VideoView metadata'sını güncelle
+  //       setCurrentMetadata(metadata);
+  //       
+  //       // Player metadata'sını güncelle
+  //       if (mainVideoPlayer.nowPlayingInfo !== undefined) {
+  //         mainVideoPlayer.nowPlayingInfo = metadata;
+  //         console.log('🎵 Final metadata update with thumbnail:', {
+  //           title: metadata.title,
+  //           artist: metadata.artist,
+  //           artwork: metadata.artwork ? 'YES' : 'NO',
+  //           thumbnailPath: metadata.artwork ? metadata.artwork.substring(0, 60) + '...' : 'NONE'
+  //         });
+  //       }
+  //       
+  //       // VideoView metadata debug
+  //       console.log('🎵 📱 VideoView metadata updated:', {
+  //         title: metadata.title,
+  //         artist: metadata.artist,
+  //         artwork: metadata.artwork ? 'YES' : 'NO',
+  //         artworkPath: metadata.artwork || 'NONE'
+  //       });
+  //       
+  //       // Native media session'a da gönder
+  //       setMediaMetadata(metadata);
+  //       
+  //     } catch (error) {
+  //       console.log('🎵 Final metadata update error:', error);
+  //     }
+  //   }
+  // }, [currentVideo, videoThumbnail, mainVideoPlayer]);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
@@ -168,7 +843,7 @@ export default function HomeScreen() {
   const [createPlaylistVideoId, setCreatePlaylistVideoId] = useState<string>('');
   const [createPlaylistVideoTitle, setCreatePlaylistVideoTitle] = useState<string>('');
   const [playlistRefreshTrigger, setPlaylistRefreshTrigger] = useState(0);
-  const videoHeightAnimation = useRef(new Animated.Value(Platform.OS === 'web' ? 0.7 : 0)).current;
+  const videoHeightAnimation = useRef(new Animated.Value(Platform.OS === 'web' ? 0.7 : 1)).current;
   const [pendingAutoPlay, setPendingAutoPlay] = useState(false);
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
   const [expandedPlaylists, setExpandedPlaylists] = useState<Set<string>>(new Set());
@@ -223,23 +898,6 @@ export default function HomeScreen() {
     return () => subscription?.remove();
   }, []);
 
-  // Set web body background to black immediately - before component mounts
-  if (Platform.OS === 'web' && typeof document !== 'undefined') {
-    document.body.style.backgroundColor = '#000000';
-    document.documentElement.style.backgroundColor = '#000000';
-    // Add CSS for safe areas
-    document.body.style.cssText += `
-      background-color: #000000 !important;
-      margin: 0 !important;
-      padding-top: env(safe-area-inset-top, 0) !important;
-      padding-bottom: env(safe-area-inset-bottom, 0) !important;
-      padding-left: env(safe-area-inset-left, 0) !important;
-      padding-right: env(safe-area-inset-right, 0) !important;
-    `;
-    document.documentElement.style.cssText += `
-      background-color: #000000 !important;
-    `;
-  }
 
 
   // Page animations on mount
@@ -270,10 +928,14 @@ export default function HomeScreen() {
         // Stop loading when video is found and loaded
         setIsSharedVideoLoading(false);
         // Clear the URL param after playing
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('v');
-          window.history.replaceState({}, '', url.toString());
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location && window.history) {
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('v');
+            window.history.replaceState({}, '', url.toString());
+          } catch (error) {
+            console.warn('Failed to update URL:', error);
+          }
         }
       } else {
         console.log('🔗 Shared video not found in current videos');
@@ -447,19 +1109,9 @@ export default function HomeScreen() {
     debugLog.main('PLAYING NEW VIDEO:', `${video.title || video.name || 'Unknown'} at index: ${videoIndex}`);
     
     // FORCE STOP ALL AUDIO BEFORE PLAYING NEW VIDEO
-    try {
-      const { Audio } = require('expo-av');
-      
-      // Try to access and stop any global audio instances
-      if (Audio._instances) {
-        Audio._instances.forEach((instance: any) => {
-          try {
-            if (instance.unloadAsync) instance.unloadAsync();
-            if (instance.stopAsync) instance.stopAsync();
-          } catch (e) {}
-        });
-      }
-    } catch (e) {
+    // SDK 54: expo-video handles audio cleanup automatically
+    if (__DEV__) {
+      console.log('🔇 SDK 54: Audio cleanup handled by expo-video');
     }
     
     // Check if new video is liked
@@ -665,10 +1317,61 @@ export default function HomeScreen() {
     
     console.log('❤️ Heart pressed - isAuthenticated:', isAuthenticated, 'user:', user, 'isGoogleUser:', isGoogleUser);
     
-    // Check if user is logged in with Google
-    if (!isGoogleUser) {
-      console.log('❌ Not Google user - opening MainPlaylistModal with profile view for sign in');
-      setIsFromLikeButton(true); // Like butonundan geldiğini işaretle
+    if (Platform.OS === 'web') {
+      // Web'de heart icon davranışı - MainPlaylistModal aç
+      if (!isGoogleUser) {
+        console.log('❌ Not Google user - opening MainPlaylistModal with profile view for sign in');
+        setIsFromLikeButton(true); // Like butonundan geldiğini işaretle
+        
+        // Modal'ı her zaman kapat ve yeniden aç - state reset için
+        setShowMainPlaylistModal(false);
+        // Reset MainPlaylistModal internal state
+        if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
+          mainPlaylistModalRef.current.resetToMain();
+        }
+        setTimeout(() => {
+          setMainPlaylistInitialView('profile');
+          setShowMainPlaylistModal(true);
+        }, 100);
+        return;
+      }
+      
+      // User is logged in - this is not from like button context anymore
+      setIsFromLikeButton(false);
+      
+      // User is logged in - proceed with like functionality
+      try {
+        console.log('❤️ Heart pressed for video:', currentVideo.name);
+        const newLikedState = await hybridPlaylistService.toggleLikedSong(currentVideo);
+        setIsHeartFavorited(newLikedState);
+        
+        // Update playlists state immediately for better UX - force refresh to avoid cache issues
+        try {
+          // Wait for Firestore to process the change
+          console.log('⏳ Waiting for Firestore to process the change...');
+          await new Promise(resolve => setTimeout(resolve, 800));
+          
+          // Clear cache again to ensure fresh data
+          await hybridPlaylistService.clearPlaylistCache();
+          console.log('🗑️ Cache cleared again before refresh');
+          
+          const updatedPlaylists = await hybridPlaylistService.getPlaylists(true); // Force refresh to clear cache
+          const uniquePlaylists = updatedPlaylists.filter((playlist, index, self) => 
+            index === self.findIndex(p => p.id === playlist.id)
+          );
+          setUserPlaylists(uniquePlaylists);
+        } catch (error) {
+          console.error('Error updating playlists after heart toggle:', error);
+        }
+        
+        console.log(`${newLikedState ? '❤️ Added to' : '💔 Removed from'} Liked Songs:`, currentVideo.name);
+      } catch (error) {
+        console.error('Error toggling liked song:', error);
+      }
+    } else {
+      // iOS'da heart icon davranışı - MainPlaylistModal aç (web'deki gibi)
+      console.log('📱 iOS Heart pressed - opening MainPlaylistModal with main view');
+      setIsFromLikeButton(false); // Like butonundan gelmediğini işaretle
       
       // Modal'ı her zaman kapat ve yeniden aç - state reset için
       setShowMainPlaylistModal(false);
@@ -677,43 +1380,9 @@ export default function HomeScreen() {
         mainPlaylistModalRef.current.resetToMain();
       }
       setTimeout(() => {
-        setMainPlaylistInitialView('profile');
+        setMainPlaylistInitialView('main');
         setShowMainPlaylistModal(true);
       }, 100);
-      return;
-    }
-    
-    // User is logged in - this is not from like button context anymore
-    setIsFromLikeButton(false);
-    
-    // User is logged in - proceed with like functionality
-    try {
-      console.log('❤️ Heart pressed for video:', currentVideo.name);
-      const newLikedState = await hybridPlaylistService.toggleLikedSong(currentVideo);
-      setIsHeartFavorited(newLikedState);
-      
-      // Update playlists state immediately for better UX - force refresh to avoid cache issues
-      try {
-        // Wait for Firestore to process the change
-        console.log('⏳ Waiting for Firestore to process the change...');
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Clear cache again to ensure fresh data
-        await hybridPlaylistService.clearPlaylistCache();
-        console.log('🗑️ Cache cleared again before refresh');
-        
-        const updatedPlaylists = await hybridPlaylistService.getPlaylists(true); // Force refresh to clear cache
-        const uniquePlaylists = updatedPlaylists.filter((playlist, index, self) => 
-          index === self.findIndex(p => p.id === playlist.id)
-        );
-        setUserPlaylists(uniquePlaylists);
-      } catch (error) {
-        console.error('Error updating playlists after heart toggle:', error);
-      }
-      
-      console.log(`${newLikedState ? '❤️ Added to' : '💔 Removed from'} Liked Songs:`, currentVideo.name);
-    } catch (error) {
-      console.error('Error toggling liked song:', error);
     }
     
     // Heart scale animation
@@ -739,11 +1408,11 @@ export default function HomeScreen() {
     }).start();
   };
 
-  const handlePlayStateChange = (isPausedFromPlayer: boolean) => {
+  const handlePlayStateChange = (isPlayingFromPlayer: boolean) => {
     const responseTime = Date.now() - commandStartTimeRef.current;
-    const newPausedState = isPausedFromPlayer;
+    const newPausedState = !isPlayingFromPlayer; // Convert isPlaying to isPaused
     
-    debugLog.player(`Play state change callback - isPausedFromPlayer: ${isPausedFromPlayer}, newPaused: ${newPausedState}`);
+    debugLog.player(`Play state change callback - isPlayingFromPlayer: ${isPlayingFromPlayer}, newPaused: ${newPausedState}`);
     debugLog.performance(`End-to-end response time: ${responseTime}ms`);
     
     // Track response times for performance analysis
@@ -788,7 +1457,7 @@ export default function HomeScreen() {
     setVideoDuration(duration);
   };
 
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
     const commandStartTime = Date.now();
     commandStartTimeRef.current = commandStartTime;
     
@@ -818,23 +1487,68 @@ export default function HomeScreen() {
     // Update main state
     setIsPaused(newPausedState);
     
-    // Send command to video player - DEBUG ENHANCED
-    if (vimeoPlayerRef.current) {
-      debugLog.main(`🎬 DEBUG: newPausedState=${newPausedState}, should send ${newPausedState ? 'PAUSE' : 'PLAY'}`);
-      if (newPausedState) {
-        debugLog.main('🎬 Sending PAUSE command to player');
-        vimeoPlayerRef.current.pause().catch(error => {
-          debugLog.error('❌ Player pause failed:', error);
-        });
-      } else {
-        debugLog.main('🎬 Sending PLAY command to player');
-        vimeoPlayerRef.current.play().catch(error => {
-          debugLog.error('❌ Player play failed:', error);
-        });
+      // Control mainVideoPlayer directly
+      if (mainVideoPlayer) {
+        if (newPausedState) {
+          mainVideoPlayer.pause();
+          console.log('🎬 Main video paused');
+          
+          // Media session state güncelle
+          if (Platform.OS !== 'web') {
+            try {
+              mainVideoPlayer.nowPlayingInfo = {
+                ...mainVideoPlayer.nowPlayingInfo,
+                playbackRate: 0.0 // Durdu
+              };
+              
+              // Native media session'a da bildir
+              updatePlaybackState(false);
+              
+              console.log('🎵 Media session paused');
+            } catch (error) {
+              console.log('🎵 Media session pause error:', error);
+            }
+          }
+        } else {
+          mainVideoPlayer.play();
+          console.log('🎬 Main video playing');
+          
+          // Media session state güncelle
+          if (Platform.OS !== 'web') {
+            try {
+              mainVideoPlayer.nowPlayingInfo = {
+                ...mainVideoPlayer.nowPlayingInfo,
+                playbackRate: 1.0 // Çalıyor
+              };
+              
+              // Native media session'a da bildir
+              updatePlaybackState(true);
+              
+              console.log('🎵 Media session playing');
+            } catch (error) {
+              console.log('🎵 Media session play error:', error);
+            }
+          }
+        }
       }
-    } else {
-      debugLog.error('❌ Player ref not available');
-    }
+    
+    // Eski VimeoPlayerNative tamamen devre dışı
+    // if (vimeoPlayerRef.current) {
+    //   debugLog.main(`🎬 DEBUG: newPausedState=${newPausedState}, should send ${newPausedState ? 'PAUSE' : 'PLAY'}`);
+    //   if (newPausedState) {
+    //     debugLog.main('🎬 Sending PAUSE command to player');
+    //     vimeoPlayerRef.current.pause().catch(error => {
+    //       debugLog.error('❌ Player pause failed:', error);
+    //     });
+    //   } else {
+    //     debugLog.main('🎬 Sending PLAY command to player');
+    //     vimeoPlayerRef.current.play().catch(error => {
+    //       debugLog.error('❌ Player play failed:', error);
+    //     });
+    //   }
+    // } else {
+    //   debugLog.error('❌ Player ref not available');
+    // }
     
     // Create state snapshot after change
     const afterSnapshot: StateSnapshot = {
@@ -860,12 +1574,12 @@ export default function HomeScreen() {
       // Update state immediately for UI responsiveness
       setIsMuted(newMutedState);
       
-      // Apply mute to video player
-      if (vimeoPlayerRef.current && vimeoPlayerRef.current.setMuted) {
-        await vimeoPlayerRef.current.setMuted(newMutedState);
-        console.log('🔇 Video player muted set to:', newMutedState);
+      // Apply mute to mainVideoPlayer
+      if (mainVideoPlayer) {
+        mainVideoPlayer.muted = newMutedState;
+        console.log('🔇 Main video player muted set to:', newMutedState);
       } else {
-        console.warn('⚠️ Video player ref or setMuted method not available');
+        console.warn('⚠️ Main video player not available');
       }
     } catch (error) {
       console.error('❌ Mute toggle error:', error);
@@ -928,6 +1642,7 @@ export default function HomeScreen() {
     if (Platform.OS === 'web') {
       // Web'de main playlist modal'ını main view ile aç (her zaman playlist göster)
       console.log('🎵 Heart icon pressed - opening MainPlaylistModal with main view');
+      console.log('🔍 Debug - isAuthenticated:', isAuthenticated, 'currentView will be: main');
       setIsFromLikeButton(false); // Like butonundan gelmediğini işaretle
       
       // Modal'ı her zaman kapat ve yeniden aç - state reset için
@@ -938,23 +1653,25 @@ export default function HomeScreen() {
       }
       setTimeout(() => {
         setMainPlaylistInitialView('main');
+        console.log('🔍 Debug - Setting MainPlaylistModal visible with initialView: main');
         setShowMainPlaylistModal(true);
       }, 100);
     } else {
-      // Mobile'da playlist oluşturma
-      if (!isAuthenticated) {
-        router.push('/guest-signin');
-        return;
-      }
+      // iOS'da da MainPlaylistModal aç (web'deki gibi)
+      console.log('📱 iOS Heart icon pressed - opening MainPlaylistModal with main view');
+      setIsFromLikeButton(false); // Like butonundan gelmediğini işaretle
       
-      // Playlist oluşturma sayfasına git
-      router.push({
-        pathname: '/create-playlist',
-        params: { 
-          videoId: currentVideo?.id || '', 
-          videoTitle: currentVideo?.name || currentVideo?.title || '' 
-        }
-      });
+      // Modal'ı her zaman kapat ve yeniden aç - state reset için
+      setShowMainPlaylistModal(false);
+      // Reset MainPlaylistModal internal state
+      if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
+        mainPlaylistModalRef.current.resetToMain();
+      }
+      setTimeout(() => {
+        setMainPlaylistInitialView('main');
+        console.log('🔍 Debug - iOS Setting MainPlaylistModal visible with initialView: main');
+        setShowMainPlaylistModal(true);
+      }, 100);
     }
   };
 
@@ -1442,13 +2159,122 @@ export default function HomeScreen() {
   }
 
   return (
-    <Animated.View style={[
-      styles.container, 
-      styles.darkContainer, 
-      Platform.OS === 'web' ? { justifyContent: 'flex-end', paddingBottom: 34 } : {},
-      { opacity: pageOpacity }
-    ]}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <Animated.View style={[
+        styles.container, 
+        styles.darkContainer, 
+        Platform.OS === 'web' ? { justifyContent: 'flex-end', paddingBottom: 34 } : {},
+        { opacity: pageOpacity }
+      ]}>
+        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        
+        {/* Background Video - Only when no main video */}
+        {backgroundVideoPlayer && !currentVideo && (
+          <VideoView
+            player={backgroundVideoPlayer}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100%',
+              height: '100%',
+            }}
+            contentFit="cover"
+            nativeControls={false}
+          />
+        )}
+        
+        {/* Main container content */}
+
+      {/* Main Video - Full Screen - Completely Independent */}
+      {currentVideo && Platform.OS !== 'web' && (
+        <View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'transparent',
+        }}>
+          {/* Unified VideoView - TÜM PLATFORMLAR İÇİN */}
+          {mainVideoPlayer && currentVideo && (
+            <VideoView
+              player={mainVideoPlayer}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100%',
+                height: '100%',
+                backgroundColor: 'transparent', // Video background
+                zIndex: -500, // Background'da ama görünür
+              }}
+              allowsFullscreen={false}
+              allowsPictureInPicture={Platform.OS !== 'web'} // Sadece mobile'da PiP
+              allowsExternalPlayback={true}
+              contentFit="cover"
+              nativeControls={false}
+              requiresLinearPlayback={false}
+              showNowPlayingNotification={true} // iOS lock screen için gerekli
+              startPlaybackAutomatically={false}
+              // Tüm UI kontrollerini kapat
+              showsPlaybackControls={false}
+              // VideoView metadata prop - Enhanced for iOS lock screen
+              metadata={currentMetadata ? {
+                ...currentMetadata,
+                // iOS lock screen için ek properties
+                albumTitle: currentMetadata.albumTitle || currentMetadata.album || 'Naber LA Collection',
+                duration: currentMetadata.duration || 180
+              } : {
+                title: currentVideo?.name || currentVideo?.title || 'Naber LA Music',
+                artist: 'Naber LA',
+                albumTitle: 'Naber LA Collection'
+              }}
+            />
+          )}
+
+          {/* Video Loading Overlay - Ana video için */}
+          {currentVideo && !isVideoReady && (
+            <View style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 9999, // En üstte - video controls'ün üstünde
+              elevation: 999, // Android için
+            }}>
+              <Animated.View
+                style={{
+                  transform: [{ scale: loadingHeartScale }],
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <Image 
+                  source={require('@/assets/images/load.png')} 
+                  style={{ 
+                    width: 60, 
+                    height: 60,
+                    opacity: 1.0,
+                  }}
+                  resizeMode="contain"
+                />
+              </Animated.View>
+            </View>
+          )}
+
+          {/* VimeoPlayerNative tamamen devre dışı */}
+        </View>
+      )}
       
       {/* Safe Area for Camera Notch */}
       <ThemedView style={styles.safeAreaTop} />
@@ -1463,100 +2289,22 @@ export default function HomeScreen() {
             inputRange: [0.7, 1],
             outputRange: ['70vh', '100vh']
           })
+        },
+        Platform.OS !== 'web' && {
+          height: '100%', // Mobile'da her zaman tam ekran
+          width: '100%'
         }
       ]}>
         {currentVideo ? (
           <>
-            {/* Video Player Container with Interaction Handlers */}
-            {Platform.OS === 'web' ? (
-              <div 
-                style={{ width: '100%', height: '100%' }}
-                onMouseEnter={handleVideoHover}
-                onClick={handleVideoTap}
-                onMouseLeave={() => {
-                  // Optional: Hide overlay on mouse leave if you want immediate hiding
-                }}
-              >
-                <VimeoPlayerNative
-                  ref={vimeoPlayerRef}
-                  video={currentVideo}
-                  isFullscreen={isFullscreen}
-                  playerHeight={300}
-                  onFullscreenToggle={toggleFullscreen}
-                  onNext={playNextVideo}
-                  onReady={handleVideoReady}
-                  onError={(error) => {
-                    debugLog.error('Video player error:', error);
-                    setTestState(prev => ({
-                      ...prev,
-                      failedCommands: prev.failedCommands + 1
-                    }));
-                    
-                    // If video has 401 error, add to private list and skip to next video
-                    if (error.includes('401') && currentVideo) {
-                      console.log(`🔄 Video ${currentVideo.id} has domain restrictions, adding to private list and skipping...`);
-                      // Add to private video list for future filtering
-                      import('@/services/vimeoService').then(({ vimeoService }) => {
-                        vimeoService.addToPrivateList(currentVideo.id);
-                      });
-                      
-                      showToast('Video has domain restrictions, skipped', 'info');
-                      setTimeout(() => {
-                        playNextVideo();
-                      }, 1000);
-                    } else {
-                      showToast(error, 'error');
-                    }
-                  }}
-                  onVideoEnd={playNextVideo}
-                  isPaused={isPaused}
-                  onPlayStateChange={handlePlayStateChange}
-                  onTimeUpdate={handleTimeUpdate}
-                />
-              </div>
-            ) : (
-              <View style={{ width: '100%', height: '100%', position: 'relative' }}>
-                <VimeoPlayerNative
-                  ref={vimeoPlayerRef}
-                  video={currentVideo}
-                  isFullscreen={isFullscreen}
-                  playerHeight={300}
-                  onFullscreenToggle={toggleFullscreen}
-                  onNext={playNextVideo}
-                  onReady={handleVideoReady}
-                  onError={(error) => {
-                    debugLog.error('Video player error:', error);
-                    setTestState(prev => ({
-                      ...prev,
-                      failedCommands: prev.failedCommands + 1
-                    }));
-                    
-                    // If video has 401 error, add to private list and skip to next video
-                    if (error.includes('401') && currentVideo) {
-                      console.log(`🔄 Video ${currentVideo.id} has domain restrictions, adding to private list and skipping...`);
-                      // Add to private video list for future filtering
-                      import('@/services/vimeoService').then(({ vimeoService }) => {
-                        vimeoService.addToPrivateList(currentVideo.id);
-                      });
-                      
-                      showToast('Video has domain restrictions, skipped', 'info');
-                      setTimeout(() => {
-                        playNextVideo();
-                      }, 1000);
-                    } else {
-                      showToast(error, 'error');
-                    }
-                  }}
-                  onVideoEnd={playNextVideo}
-                  isPaused={isPaused}
-                  onPlayStateChange={handlePlayStateChange}
-                  onTimeUpdate={handleTimeUpdate}
-                />
-              </View>
-            )}
+            {/* Video Player Container - UNIFIED FOR ALL PLATFORMS */}
+            <View style={{ width: '100%', height: '100%', position: 'relative' }}>
+              {/* Artık tüm platformlarda mainVideoPlayer kullanılıyor */}
+              {/* VimeoPlayerNative tamamen kaldırıldı - media session conflict önlendi */}
+            </View>
 
             {/* Universal tap area - ALL PLATFORMS */}
-            {currentVideo && !isFullscreen && (
+            {currentVideo && !isFullscreen && isVideoReady && (
               <TouchableOpacity 
                 style={{
                   position: 'absolute',
@@ -1565,11 +2313,12 @@ export default function HomeScreen() {
                   right: 0,
                   bottom: 0,
                   backgroundColor: 'transparent',
-                  zIndex: 9999,
+                  zIndex: 100, // Loading overlay'inin altında
                 }}
                 onPress={() => {
-                  // Smooth overlay animation
-                  if (currentVideo) {
+                  // Smooth overlay animation - sadece video hazırken
+                  if (currentVideo && isVideoReady) {
+                    console.log('🎬 Video tap - showing overlay');
                     setShowVideoOverlay(true);
                     
                     // Animate in
@@ -1663,7 +2412,7 @@ export default function HomeScreen() {
                     position: 'absolute',
                     ...(Platform.OS === 'web'
                       ? { top: 25, right: 25 } // Hem desktop hem mobile web'de üstte
-                      : { bottom: 150, right: 25 } // Sadece native mobile'da altta
+                      : { top: 60, right: 25 } // Native mobile'da da üstte, şarkı hizasında
                     ),
                     opacity: overlayOpacity,
                     zIndex: 10001, // En yüksek z-index
@@ -1865,15 +2614,7 @@ export default function HomeScreen() {
               </Animated.View>
             )}
             
-            {/* Top Gradient Overlay - Hidden on web */}
-            {!isFullscreen && Platform.OS !== 'web' && (
-              <LinearGradient
-                colors={['rgba(0,0,0,1)', 'rgba(0,0,0,1)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.5)', 'transparent']}
-                style={styles.topGradientOverlay}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-              />
-            )}
+            {/* Top Gradient Overlay - REMOVED */}
           </>
         ) : (
           <View style={styles.noVideoContainer}>
@@ -1908,13 +2649,11 @@ export default function HomeScreen() {
                 </video>
               </div>
             ) : (
-              <Video
-                source={mobileBackgroundVideo} // Mobil native için de NLA.mp4 kullan
+              <VideoView
+                player={backgroundVideoPlayer}
                 style={styles.backgroundVideoMobile}
-                shouldPlay
-                isLooping
-                isMuted
-                resizeMode="cover"
+                contentFit="cover"
+                nativeControls={false}
               />
             )}
             
@@ -1956,33 +2695,10 @@ export default function HomeScreen() {
         </>
       )}
 
-      {/* Video Info Area - Hidden on web and landscape for cleaner look */}
-      {currentVideo && !isFullscreen && !isLandscape && Platform.OS !== 'web' && (
-        <ThemedView style={styles.videoInfoArea}>
-          <ThemedView style={styles.titleContainer}>
-            <ThemedView style={styles.titleTextContainer}>
-              <ThemedText style={styles.currentVideoTitle} numberOfLines={2}>
-                {currentVideo.name || currentVideo.title || 'Untitled Video'}
-              </ThemedText>
-            </ThemedView>
-            <View style={styles.headerActions}>
-              
-              {/* Add to Playlist Icon */}
-              <TouchableOpacity 
-                style={styles.addToPlaylistButton}
-                onPress={() => handleAddToPlaylist(currentVideo)}
-              >
-                <CustomIcon name="plus" size={16} color="#e0af92" />
-              </TouchableOpacity>
-            </View>
-          </ThemedView>
-          {/* Separator Line */}
-          <ThemedView style={styles.separatorLine} />
-        </ThemedView>
-      )}
+      {/* Video Info Area - REMOVED for cleaner look */}
 
-      {/* Playlist Area - Show only when expanded with smooth animation - Hidden on Web and Landscape */}
-      {!isFullscreen && !isLandscape && Platform.OS !== 'web' && (
+      {/* Playlist Area - REMOVED for cleaner video-focused UI */}
+      {false && !isFullscreen && !isLandscape && Platform.OS !== 'web' && (
         <Animated.View
           style={{
             opacity: playlistAnimation,
@@ -2296,6 +3012,53 @@ export default function HomeScreen() {
         </CustomModal>
       )}
 
+      {/* Main Playlist Modal for iOS - Native bottom sheet */}
+      {Platform.OS !== 'web' && (
+        <Modal
+          visible={showMainPlaylistModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => {
+            console.log('🔄 iOS MainPlaylistModal onClose - resetting states, isFromLikeButton:', isFromLikeButton);
+            setShowMainPlaylistModal(false);
+            // Sadece like butonundan gelmiyorsa main view'a reset et
+            if (!isFromLikeButton) {
+              setMainPlaylistInitialView('main'); // Reset to main when modal closes
+              // Reset MainPlaylistModal internal state if ref exists
+              if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
+                mainPlaylistModalRef.current.resetToMain();
+              }
+            }
+            // Like button flag'ini her zaman reset et
+            setIsFromLikeButton(false);
+          }}
+        >
+          <View style={{
+            flex: 1,
+            backgroundColor: '#000000',
+            paddingTop: 0, // Safe area padding'i kaldır
+          }}>
+            <MainPlaylistModal 
+              ref={mainPlaylistModalRef}
+              onClose={() => {
+                setShowMainPlaylistModal(false);
+                setMainPlaylistInitialView('main'); // Reset to main view when closing
+              }}
+              userPlaylists={userPlaylists}
+              expandedPlaylists={expandedPlaylists}
+              onTogglePlaylistExpansion={togglePlaylistExpansion}
+              onPlayVideo={playVideo}
+              currentVideo={currentVideo}
+              onRefresh={onRefresh}
+              refreshing={refreshing}
+              refreshTrigger={playlistRefreshTrigger}
+              initialView={mainPlaylistInitialView}
+              disableAutoSwitch={isFromLikeButton}
+            />
+          </View>
+        </Modal>
+      )}
+
           {/* Profile Modal for Web - Sağ alt köşeden açılır */}
           {Platform.OS === 'web' && (
             <CustomModal
@@ -2318,13 +3081,15 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: 'relative',
+    zIndex: 2000, // Video'nun çok üstünde görünsün
   },
   darkContainer: {
-    backgroundColor: Platform.OS === 'web' ? 'transparent' : '#000000',
+    backgroundColor: 'transparent', // Hem web'de hem iOS'ta transparent
   },
   safeAreaTop: {
     height: 0, // Video'yu en yukarı taşı
-    backgroundColor: Platform.OS === 'web' ? 'transparent' : '#000000',
+    backgroundColor: 'transparent', // Hem web'de hem iOS'ta transparent
   },
   
   // Setup Screen
@@ -2408,29 +3173,16 @@ const styles = StyleSheet.create({
 
   // Player Area
   playerArea: {
-    height: Platform.OS === 'web' ? '100vh' : 300, // Web'de tam ekran
-    maxHeight: Platform.OS === 'web' ? '100vh' : 300, // Tam ekran max height
-    minHeight: Platform.OS === 'web' ? '100vh' : 300, // Tam ekran minimum
-    width: '100%', // Prevent horizontal expansion
-    backgroundColor: Platform.OS === 'web' ? 'transparent' : '#000000', // Web'de transparent, mobile'da black
-    marginTop: Platform.OS === 'web' ? 0 : 5, // Web'de margin yok
-    position: Platform.OS === 'web' ? 'fixed' : 'relative', // Web'de fixed positioning
-    top: Platform.OS === 'web' ? 0 : 'auto', // Web'de en üstten başla
-    left: Platform.OS === 'web' ? 0 : 'auto', // Web'de en soldan başla
-    zIndex: Platform.OS === 'web' ? -1 : 'auto', // Web'de arka planda
-    overflow: 'hidden', // Prevent content from expanding beyond bounds
-    // Debug styling (commented out)
-    // borderWidth: 2,
-    // borderColor: '#ff0000',
-  },
-  topGradientOverlay: {
     position: 'absolute',
-    top: -10, // Gradient'i aşağı indir (was -30, now -10)
+    top: 0,
     left: 0,
     right: 0,
-    height: 150, // Gradient'i 150'ye çıkar (was 120, now 150)
-    zIndex: 20, // Daha yüksek z-index
-    pointerEvents: 'none', // Touch event'leri geçsin
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'transparent',
+    zIndex: -1, // Background video
+    overflow: 'hidden',
   },
   fullscreenPlayer: {
     height: '100%',
@@ -2655,7 +3407,7 @@ const styles = StyleSheet.create({
     bottom: -80, // Gradient'i daha da aşağı indir - kamera altına doğru
     left: 0,
     right: 0,
-    height: 180, // Aynı boyut
+    height: 220, // Yukarı doğru daha uzun (180'den 220'ye)
     zIndex: 1,
     pointerEvents: 'none', // Touch event'leri geçsin
   },
@@ -2878,7 +3630,7 @@ const styles = StyleSheet.create({
   },
   videoOverlayContent: {
     position: 'absolute',
-    top: Platform.OS === 'web' ? 20 : 15,
+    top: Platform.OS === 'web' ? 20 : 60, // Mobile'da top 60px
     left: 20,
     right: 20,
     flexDirection: 'row',
@@ -2895,16 +3647,16 @@ const styles = StyleSheet.create({
     lineHeight: Platform.OS === 'web' ? 36 : 18,
   },
   videoOverlayArtist: {
-    fontSize: Platform.OS === 'web' ? 28 : 13, // Sanatçı adı - mobilde 13px
+    fontSize: Platform.OS === 'web' ? 28 : 26, // %200 büyütüldü (13 * 2 = 26)
     fontWeight: 'bold',
     color: 'white',
-    lineHeight: Platform.OS === 'web' ? 32 : 16,
+    lineHeight: Platform.OS === 'web' ? 32 : 32, // Line height de büyütüldü
   },
   videoOverlaySong: {
-    fontSize: Platform.OS === 'web' ? 20 : 8, // Şarkı adı - mobilde 8px
+    fontSize: Platform.OS === 'web' ? 20 : 16, // %200 büyütüldü (8 * 2 = 16)
     fontWeight: '400', // Normal weight
     color: 'rgba(255,255,255,0.9)', // Biraz daha soluk
-    lineHeight: Platform.OS === 'web' ? 24 : 10,
+    lineHeight: Platform.OS === 'web' ? 24 : 20, // Line height de büyütüldü
   },
   // Landscape Player Area
   landscapePlayerArea: {

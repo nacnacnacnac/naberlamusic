@@ -37,7 +37,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
       onClose();
     } catch (error: any) {
       console.error('❌ Google sign-in error:', error);
-      if (Platform.OS === 'web') {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
         window.alert(error.message || 'Failed to sign in with Google');
       } else {
         Alert.alert('Google Sign In Failed', error.message || 'Failed to sign in with Google');
@@ -52,7 +52,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
       onClose();
     } catch (error: any) {
       console.error('❌ Apple sign-in error:', error);
-      if (Platform.OS === 'web') {
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
         window.alert(error.message || 'Failed to sign in with Apple');
       } else {
         Alert.alert('Apple Sign In Failed', error.message || 'Failed to sign in with Apple');

@@ -33,8 +33,36 @@
         "NSMicrophoneUsageDescription": "Bu uygulama ses kaydetmek için mikrofona erişim gerektirir.",
         "NSPhotoLibraryUsageDescription": "Bu uygulama fotoğraf ve videolara erişim gerektirir.",
         "UIBackgroundModes": [
-          "audio"
+          "audio",
+          "background-processing",
+          "background-fetch"
         ],
+        "AVAudioSessionCategory": "AVAudioSessionCategoryPlayback",
+        "AVAudioSessionCategoryOptions": [
+          "AVAudioSessionCategoryOptionMixWithOthers",
+          "AVAudioSessionCategoryOptionDuckOthers",
+          "AVAudioSessionCategoryOptionAllowBluetooth",
+          "AVAudioSessionCategoryOptionAllowBluetoothA2DP"
+        ],
+        "MPRemoteCommandCenterEnabled": true,
+        "MPNowPlayingInfoCenterEnabled": true,
+        "MPMediaItemPropertyArtworkEnabled": true,
+        "MPNowPlayingInfoPropertyIsLiveStream": false,
+        "MPRemoteCommandSkipForwardEnabled": false,
+        "MPRemoteCommandSkipBackwardEnabled": false,
+        "MPRemoteCommandSeekForwardEnabled": false,
+        "MPRemoteCommandSeekBackwardEnabled": false,
+        "MPRemoteCommandChangePlaybackPositionEnabled": false,
+        "MPRemoteCommandChangePlaybackRateEnabled": false,
+        "MPRemoteCommandNextTrackEnabled": true,
+        "MPRemoteCommandPreviousTrackEnabled": true,
+        "MPRemoteCommandPlayEnabled": true,
+        "MPRemoteCommandPauseEnabled": true,
+        "MPRemoteCommandTogglePlayPauseEnabled": true,
+        "MPRemoteCommandStopEnabled": false,
+        "MPNowPlayingInfoPropertyDefaultPlaybackRate": 1.0,
+        "MPNowPlayingInfoPropertyPlaybackQueueIndex": 0,
+        "MPNowPlayingInfoPropertyPlaybackQueueCount": 1,
         "ITSAppUsesNonExemptEncryption": false,
         "UIStatusBarHidden": false,
         "UIViewControllerBasedStatusBarAppearance": false,
@@ -111,7 +139,9 @@
         "expo-build-properties",
         {
           "ios": {
-            "useFrameworks": "static"
+            "xcodeProps": {
+              "CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES": "YES"
+            }
           }
         }
       ],
@@ -120,13 +150,6 @@
         {
           "enableNotificationControls": false,
           "enableVolumeManager": false
-        }
-      ],
-      [
-        "expo-av",
-        {
-          "microphonePermission": false,
-          "cameraPermission": false
         }
       ],
       [
@@ -139,7 +162,23 @@
         "expo-video",
         {
           "supportsBackgroundPlayback": true,
-          "supportsPictureInPicture": false
+          "supportsPictureInPicture": false,
+          "supportsAirPlay": true,
+          "supportsFullScreen": true,
+          "remoteCommands": {
+            "skipForward": false,
+            "skipBackward": false,
+            "nextTrack": true,
+            "previousTrack": true,
+            "play": true,
+            "pause": true,
+            "seek": false,
+            "seekForward": false,
+            "seekBackward": false,
+            "changePlaybackPosition": false
+          },
+          "skipIntervals": [],
+          "preferredSkipIntervals": []
         }
       ],
       "expo-apple-authentication"
