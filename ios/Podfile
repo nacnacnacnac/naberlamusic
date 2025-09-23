@@ -89,9 +89,8 @@ target 'naberla' do
         end
         
         # Folly coroutine fix for React Native 0.81.0
-        if target.name.include?('Folly') || target.name.include?('RCT-Folly')
-          config.build_settings['FOLLY_CFG_NO_COROUTINES'] = '1'
-        end
+        config.build_settings['FOLLY_CFG_NO_COROUTINES'] = '1'
+        config.build_settings['FOLLY_HAS_COROUTINES'] = '0'
       end
     end
   end
