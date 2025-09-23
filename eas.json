@@ -8,14 +8,21 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_USE_FAST_RESOLVER": "1"
+        "EXPO_USE_FAST_RESOLVER": "1",
+        "RCT_USE_PREBUILT_RNCORE": "0"
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "RCT_USE_PREBUILT_RNCORE": "0"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "RCT_USE_PREBUILT_RNCORE": "0"
+      }
     },
     "production-old": {
       "autoIncrement": true
