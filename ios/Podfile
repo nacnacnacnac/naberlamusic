@@ -87,6 +87,11 @@ target 'naberla' do
         if target.name.include?('React-RuntimeHermes') || target.name.include?('react_runtime')
           config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
         end
+        
+        # Folly coroutine fix for React Native 0.81.0
+        if target.name.include?('Folly') || target.name.include?('RCT-Folly')
+          config.build_settings['FOLLY_CFG_NO_COROUTINES'] = '1'
+        end
       end
     end
   end
