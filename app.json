@@ -33,9 +33,7 @@
         "NSMicrophoneUsageDescription": "Bu uygulama ses kaydetmek için mikrofona erişim gerektirir.",
         "NSPhotoLibraryUsageDescription": "Bu uygulama fotoğraf ve videolara erişim gerektirir.",
         "UIBackgroundModes": [
-          "audio",
-          "background-processing",
-          "background-fetch"
+          "audio"
         ],
         "AVAudioSessionCategory": "AVAudioSessionCategoryPlayback",
         "AVAudioSessionCategoryOptions": [
