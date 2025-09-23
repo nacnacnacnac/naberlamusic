@@ -30,6 +30,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, DeviceEventEmitter, Dimensions, Easing, Image, Modal, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
 // Background video imports
 const backgroundVideo = require('@/assets/videos/NLA6.mp4'); // Desktop/web için
@@ -1249,57 +1250,39 @@ export default function HomeScreen() {
     });
     
     try {
-      const shareUrl = Platform.OS === 'web' && typeof window !== 'undefined' 
-        ? `${window.location.origin}/?v=${currentVideo.id}`
-        : `naberla.music/?v=${currentVideo.id}`;
+      // Her platformda web URL'sini kullan
+      const shareUrl = `https://naber.la/?v=${currentVideo.id}`;
       
       console.log('🔗 Generated share URL:', shareUrl);
       
       if (Platform.OS === 'web' && navigator.clipboard) {
+        // Web: Navigator clipboard kullan
         await navigator.clipboard.writeText(shareUrl);
-        console.log('🔗 Link copied to clipboard:', shareUrl);
-        
-        // Show inline toast next to share button with animation
-        setShareToastVisible(true);
-        Animated.timing(shareToastOpacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-        
-        // Hide toast after 2 seconds with fade out
-        setTimeout(() => {
-          Animated.timing(shareToastOpacity, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            setShareToastVisible(false);
-          });
-        }, 2000);
+        console.log('🔗 Link copied to clipboard (web):', shareUrl);
       } else {
-        // Mobile: Show inline toast like web
-        console.log('🔗 Share URL:', shareUrl);
-        
-        // Show inline toast next to share button with animation
-        setShareToastVisible(true);
+        // iOS/Android: Expo clipboard kullan
+        await Clipboard.setStringAsync(shareUrl);
+        console.log('🔗 Link copied to clipboard (mobile):', shareUrl);
+      }
+      
+      // Show inline toast next to share button with animation (tüm platformlar)
+      setShareToastVisible(true);
+      Animated.timing(shareToastOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+      
+      // Hide toast after 2 seconds with fade out
+      setTimeout(() => {
         Animated.timing(shareToastOpacity, {
-          toValue: 1,
+          toValue: 0,
           duration: 300,
           useNativeDriver: true,
-        }).start();
-        
-        // Hide toast after 2 seconds with fade out
-        setTimeout(() => {
-          Animated.timing(shareToastOpacity, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            setShareToastVisible(false);
-          });
-        }, 2000);
-      }
+        }).start(() => {
+          setShareToastVisible(false);
+        });
+      }, 2000);
     } catch (error) {
       console.error('Error sharing video:', error);
       setToastMessage('Failed to copy link');
