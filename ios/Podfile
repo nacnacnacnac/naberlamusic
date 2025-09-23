@@ -1,5 +1,9 @@
 require File.join(File.dirname(`node --print "require.resolve('expo/package.json')"`), "scripts/autolinking")
-require File.join(File.dirname(`node --print "require.resolve('react-native/package.json')"`), "scripts/react_native_pods")
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
 
 require 'json'
 podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties.json'))) rescue {}
@@ -12,9 +16,35 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 
 prepare_react_native_project!
 
+# Firebase static frameworks configuration
+static_frameworks = [
+  'FirebaseAuthInterop',
+  'FirebaseAppCheckInterop', 
+  'FirebaseCore',
+  'FirebaseCoreExtension',
+  'GoogleUtilities',
+  'RecaptchaInterop',
+  'FirebaseCoreInternal',
+  'FirebaseInstallations',
+  'GoogleDataTransport',
+  'nanopb',
+  'FirebaseABTesting',
+  'FirebaseAuth'
+]
+
+pre_install do |installer|
+  installer.pod_targets.each do |pod|
+    if static_frameworks.include?(pod.name)
+      puts "Configuring #{pod.name} as static framework"
+      def pod.build_type
+        Pod::BuildType.new(:linkage => :static, :packaging => :framework)
+      end
+    end
+  end
+end
+
 target 'naberla' do
   use_expo_modules!
-  use_modular_headers!
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
@@ -49,5 +79,18 @@ target 'naberla' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => podfile_properties['apple.ccacheEnabled'] == 'true',
     )
+    
+    # Firebase ve tüm pod'lar için build settings
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        config.build_settings['DEFINES_MODULE'] = 'YES'
+        
+        # React Native module redefinition fix
+        if target.name.include?('React-RuntimeHermes') || target.name.include?('react_runtime')
+          config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        end
+      end
+    end
   end
 end
