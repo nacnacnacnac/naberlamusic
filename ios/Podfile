@@ -12,35 +12,9 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 
 prepare_react_native_project!
 
-# Firebase static framework configuration
-static_frameworks = [
-  'FirebaseAuthInterop',
-  'FirebaseAppCheckInterop',
-  'FirebaseCore',
-  'FirebaseCoreExtension',
-  'GoogleUtilities',
-  'RecaptchaInterop',
-  'FirebaseCore',
-  'FirebaseInstallations',
-  'GoogleDataTransport',
-  'nanopb',
-  'FirebaseABTesting',
-  'FirebaseAuth',
-]
-
-pre_install do |installer|
-  installer.pod_targets.each do |pod|
-    if static_frameworks.include?(pod.name)
-      puts "Configuring #{pod.name} as static framework"
-      def pod.build_type
-        Pod::BuildType.new(:linkage => :static, :packaging => :framework)
-      end
-    end
-  end
-end
-
 target 'naberla' do
   use_expo_modules!
+  use_modular_headers!
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
