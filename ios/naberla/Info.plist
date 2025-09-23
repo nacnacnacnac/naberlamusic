@@ -30,7 +30,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.6.9</string>
+    <string>1.6.2</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -51,7 +51,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>2</string>
+    <string>3</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -62,18 +62,40 @@
     <true/>
     <key>MPNowPlayingInfoCenterEnabled</key>
     <true/>
+    <key>MPNowPlayingInfoPropertyDefaultPlaybackRate</key>
+    <integer>1</integer>
     <key>MPNowPlayingInfoPropertyIsLiveStream</key>
     <false/>
+    <key>MPNowPlayingInfoPropertyPlaybackQueueCount</key>
+    <integer>1</integer>
+    <key>MPNowPlayingInfoPropertyPlaybackQueueIndex</key>
+    <integer>0</integer>
     <key>MPRemoteCommandCenterEnabled</key>
     <true/>
+    <key>MPRemoteCommandChangePlaybackPositionEnabled</key>
+    <false/>
+    <key>MPRemoteCommandChangePlaybackRateEnabled</key>
+    <false/>
     <key>MPRemoteCommandNextTrackEnabled</key>
+    <true/>
+    <key>MPRemoteCommandPauseEnabled</key>
+    <true/>
+    <key>MPRemoteCommandPlayEnabled</key>
     <true/>
     <key>MPRemoteCommandPreviousTrackEnabled</key>
     <true/>
+    <key>MPRemoteCommandSeekBackwardEnabled</key>
+    <false/>
+    <key>MPRemoteCommandSeekForwardEnabled</key>
+    <false/>
     <key>MPRemoteCommandSkipBackwardEnabled</key>
     <false/>
     <key>MPRemoteCommandSkipForwardEnabled</key>
     <false/>
+    <key>MPRemoteCommandStopEnabled</key>
+    <false/>
+    <key>MPRemoteCommandTogglePlayPauseEnabled</key>
+    <true/>
     <key>NSAppTransportSecurity</key>
     <dict>
       <key>NSAllowsArbitraryLoads</key>
