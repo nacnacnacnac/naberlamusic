@@ -16,14 +16,16 @@
       "distribution": "internal",
       "env": {
         "RCT_USE_PREBUILT_RNCORE": "0",
-        "RCT_USE_RN_DEP": "0"
+        "RCT_USE_RN_DEP": "0",
+        "REACT_NATIVE_OVERRIDE_VERSION": "0.79.5"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "RCT_USE_PREBUILT_RNCORE": "0",
-        "RCT_USE_RN_DEP": "0"
+        "RCT_USE_RN_DEP": "0",
+        "REACT_NATIVE_OVERRIDE_VERSION": "0.79.5"
       }
     },
     "production-old": {

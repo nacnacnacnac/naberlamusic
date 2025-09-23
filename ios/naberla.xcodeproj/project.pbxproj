@@ -7,31 +7,31 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0460EA5577487741A17C95B4 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD6F90FC1F6476B887548386 /* ExpoModulesProvider.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		245D77268AE1EE9287AB2933 /* libPods-naberla.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8079CA2E1D049168EFE2114E /* libPods-naberla.a */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		3FCB5FE0E5984AC98C9529F8 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 585307DD45DE4DAFB6C660FC /* GoogleService-Info.plist */; };
-		5764A2448142F31C510167A0 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 887D5BE9EA8E8C1DB8488993 /* PrivacyInfo.xcprivacy */; };
-		90D30CF2FF05522186A3F8D0 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24079DC4BBB7CA6C204A567 /* ExpoModulesProvider.swift */; };
+		46745BF2E53D641583FB69C6 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0967891214AAE04460983068 /* PrivacyInfo.xcprivacy */; };
+		619E2A782DC643C180832162 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 6B6A8AC602B844D596F528CB /* GoogleService-Info.plist */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		C9F7D215C343A650AC269790 /* libPods-naberla.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B794EE7D34BD074870FDE6F9 /* libPods-naberla.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0967891214AAE04460983068 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = naberla/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		0D33DE701D630F5BE268394F /* Pods-naberla.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-naberla.release.xcconfig"; path = "Target Support Files/Pods-naberla/Pods-naberla.release.xcconfig"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* naberla.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = naberla.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = naberla/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = naberla/Info.plist; sourceTree = "<group>"; };
-		3E19E2A597960F79851F47CC /* Pods-naberla.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-naberla.release.xcconfig"; path = "Target Support Files/Pods-naberla/Pods-naberla.release.xcconfig"; sourceTree = "<group>"; };
-		585307DD45DE4DAFB6C660FC /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "naberla/GoogleService-Info.plist"; sourceTree = "<group>"; };
-		887D5BE9EA8E8C1DB8488993 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = naberla/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		6B6A8AC602B844D596F528CB /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "naberla/GoogleService-Info.plist"; sourceTree = "<group>"; };
+		6CCE99FAA3B9CE2AFAD97E33 /* Pods-naberla.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-naberla.debug.xcconfig"; path = "Target Support Files/Pods-naberla/Pods-naberla.debug.xcconfig"; sourceTree = "<group>"; };
+		8079CA2E1D049168EFE2114E /* libPods-naberla.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-naberla.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = naberla/SplashScreen.storyboard; sourceTree = "<group>"; };
-		B37D15CCE2167364F081F027 /* Pods-naberla.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-naberla.debug.xcconfig"; path = "Target Support Files/Pods-naberla/Pods-naberla.debug.xcconfig"; sourceTree = "<group>"; };
-		B794EE7D34BD074870FDE6F9 /* libPods-naberla.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-naberla.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		C24079DC4BBB7CA6C204A567 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-naberla/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = naberla/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* naberla-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "naberla-Bridging-Header.h"; path = "naberla/naberla-Bridging-Header.h"; sourceTree = "<group>"; };
+		FD6F90FC1F6476B887548386 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-naberla/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -39,7 +39,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C9F7D215C343A650AC269790 /* libPods-naberla.a in Frameworks */,
+				245D77268AE1EE9287AB2933 /* libPods-naberla.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,8 +55,8 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				585307DD45DE4DAFB6C660FC /* GoogleService-Info.plist */,
-				887D5BE9EA8E8C1DB8488993 /* PrivacyInfo.xcprivacy */,
+				6B6A8AC602B844D596F528CB /* GoogleService-Info.plist */,
+				0967891214AAE04460983068 /* PrivacyInfo.xcprivacy */,
 			);
 			name = naberla;
 			sourceTree = "<group>";
@@ -65,7 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				B794EE7D34BD074870FDE6F9 /* libPods-naberla.a */,
+				8079CA2E1D049168EFE2114E /* libPods-naberla.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -84,8 +84,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				DDDC0E48BF1E28FCD50C6FE0 /* Pods */,
-				B5457431C74CCA5F267AB31F /* ExpoModulesProviders */,
+				DE823EECA368E455B94DE49C /* Pods */,
+				B7616FBF6BD5F1974F542EA0 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -100,10 +100,10 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		B5457431C74CCA5F267AB31F /* ExpoModulesProviders */ = {
+		B7616FBF6BD5F1974F542EA0 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				DA359C6BD9BDA3921FFD0C2D /* naberla */,
+				F2479CB77CE0F257DCD7923B /* naberla */,
 			);
 			name = ExpoModulesProviders;
 			sourceTree = "<group>";
@@ -117,22 +117,22 @@
 			path = naberla/Supporting;
 			sourceTree = "<group>";
 		};
-		DA359C6BD9BDA3921FFD0C2D /* naberla */ = {
+		DE823EECA368E455B94DE49C /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				C24079DC4BBB7CA6C204A567 /* ExpoModulesProvider.swift */,
-			);
-			name = naberla;
-			sourceTree = "<group>";
-		};
-		DDDC0E48BF1E28FCD50C6FE0 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				B37D15CCE2167364F081F027 /* Pods-naberla.debug.xcconfig */,
-				3E19E2A597960F79851F47CC /* Pods-naberla.release.xcconfig */,
+				6CCE99FAA3B9CE2AFAD97E33 /* Pods-naberla.debug.xcconfig */,
+				0D33DE701D630F5BE268394F /* Pods-naberla.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		F2479CB77CE0F257DCD7923B /* naberla */ = {
+			isa = PBXGroup;
+			children = (
+				FD6F90FC1F6476B887548386 /* ExpoModulesProvider.swift */,
+			);
+			name = naberla;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -143,14 +143,14 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "naberla" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				D52E1C76F6FFB06C05B6A40A /* [Expo] Configure project */,
+				E76CF44BE97BF3A9EB5B0834 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				D1113B52CA7CAA8EA8935DC7 /* [CP] Embed Pods Frameworks */,
-				6B522BDEC274DC254A341994 /* [CP-User] [RNFB] Core Configuration */,
+				24015642DC6218966BF4B261 /* [CP] Embed Pods Frameworks */,
+				50A93B5397B857A2CF6B6DF3 /* [CP-User] [RNFB] Core Configuration */,
 			);
 			buildRules = (
 			);
@@ -170,9 +170,7 @@
 				LastUpgradeCheck = 1130;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
-						DevelopmentTeam = X72PY484UM;
 						LastSwiftMigration = 1250;
-						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -202,8 +200,8 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				3FCB5FE0E5984AC98C9529F8 /* GoogleService-Info.plist in Resources */,
-				5764A2448142F31C510167A0 /* PrivacyInfo.xcprivacy in Resources */,
+				619E2A782DC643C180832162 /* GoogleService-Info.plist in Resources */,
+				46745BF2E53D641583FB69C6 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,7 +247,25 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		6B522BDEC274DC254A341994 /* [CP-User] [RNFB] Core Configuration */ = {
+		24015642DC6218966BF4B261 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-naberla/Pods-naberla-frameworks.sh",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-naberla/Pods-naberla-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+		50A93B5397B857A2CF6B6DF3 /* [CP-User] [RNFB] Core Configuration */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -328,25 +344,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-naberla/Pods-naberla-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		D1113B52CA7CAA8EA8935DC7 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-naberla/Pods-naberla-frameworks.sh",
-				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermes.framework/hermes",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputPaths = (
-				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermes.framework",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-naberla/Pods-naberla-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		D52E1C76F6FFB06C05B6A40A /* [Expo] Configure project */ = {
+		E76CF44BE97BF3A9EB5B0834 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -378,7 +376,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				90D30CF2FF05522186A3F8D0 /* ExpoModulesProvider.swift in Sources */,
+				0460EA5577487741A17C95B4 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -387,15 +385,12 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B37D15CCE2167364F081F027 /* Pods-naberla.debug.xcconfig */;
+			baseConfigurationReference = 6CCE99FAA3B9CE2AFAD97E33 /* Pods-naberla.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = naberla/naberla.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = X72PY484UM;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -426,15 +421,12 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3E19E2A597960F79851F47CC /* Pods-naberla.release.xcconfig */;
+			baseConfigurationReference = 0D33DE701D630F5BE268394F /* Pods-naberla.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = naberla/naberla.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = X72PY484UM;
 				INFOPLIST_FILE = naberla/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -512,10 +504,6 @@
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -570,10 +558,6 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
