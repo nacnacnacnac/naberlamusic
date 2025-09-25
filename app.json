@@ -2,8 +2,8 @@
   "expo": {
     "name": "naber-la",
     "slug": "naber-la",
-    "version": "1.6.2",
-    "orientation": "portrait",
+    "version": "1.6.3",
+    "orientation": "default",
     "icon": "./assets/images/icon-1024x1024.png",
     "backgroundColor": "#000000",
     "scheme": [
@@ -50,6 +50,8 @@
         "MPRemoteCommandSkipBackwardEnabled": false,
         "MPRemoteCommandSeekForwardEnabled": false,
         "MPRemoteCommandSeekBackwardEnabled": false,
+        "AVAudioSessionCategoryOptionAllowSkipping": false,
+        "MPNowPlayingInfoPropertyAvailableCommands": ["play", "pause", "nextTrack", "previousTrack"],
         "MPRemoteCommandChangePlaybackPositionEnabled": false,
         "MPRemoteCommandChangePlaybackRateEnabled": false,
         "MPRemoteCommandNextTrackEnabled": true,
@@ -160,7 +162,7 @@
         "expo-video",
         {
           "supportsBackgroundPlayback": true,
-          "supportsPictureInPicture": false,
+          "supportsPictureInPicture": true,
           "supportsAirPlay": true,
           "supportsFullScreen": true,
           "remoteCommands": {
