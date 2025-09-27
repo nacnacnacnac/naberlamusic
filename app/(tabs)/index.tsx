@@ -244,47 +244,24 @@ export default function HomeScreen() {
       useNativeDriver: true,
     }).start();
     
-    // Login'den geldiğinde MainPlaylistModal'ı aç (user guidance için)
+    // MainPlaylistModal'ı direkt aç - playlist loading sırasında da göster
     const openPlaylistModalForNewUsers = () => {
-      console.log('🎵 Checking MainPlaylistModal auto-open conditions:', {
-        isAuthenticated,
-        hasCurrentVideo: !!currentVideo,
-        playlistCount: userPlaylists.length,
-        shouldOpen: isAuthenticated && !currentVideo && userPlaylists.length > 0
-      });
+      console.log('🎵 Auto-opening MainPlaylistModal for user guidance');
       
-      if (isAuthenticated && !currentVideo && userPlaylists.length > 0) {
-        console.log('🎵 Opening MainPlaylistModal for user guidance');
+      if (!currentVideo) {
+        console.log('🎵 Opening MainPlaylistModal immediately - will show loading if needed');
         setTimeout(() => {
           setShowMainPlaylistModal(true);
-        }, 1500); // Page animation tamamlandıktan sonra
+        }, 1000); // Page animation tamamlandıktan sonra direkt aç
       } else {
-        console.log('🎵 MainPlaylistModal auto-open conditions not met');
+        console.log('🎵 MainPlaylistModal auto-open skipped - video already playing');
       }
     };
     
-    // Auth ve playlist'ler hazır olduğunda kontrol et
-    setTimeout(openPlaylistModalForNewUsers, 1000);
+    // Direkt aç - playlist yüklenme durumunu bekleme
+    setTimeout(openPlaylistModalForNewUsers, 800);
 
   }, []);
-
-  // Playlist'ler hazır olduğunda MainPlaylistModal'ı aç (auth gerekmez)
-  useEffect(() => {
-    console.log('🎵 Auto-open check:', {
-      hasCurrentVideo: !!currentVideo,
-      playlistCount: userPlaylists.length,
-      showMainPlaylistModal,
-      shouldOpen: !currentVideo && userPlaylists.length > 0 && !showMainPlaylistModal
-    });
-    
-    if (!currentVideo && userPlaylists.length > 0 && !showMainPlaylistModal) {
-      console.log('🎵 Playlists ready - opening MainPlaylistModal for user guidance (no auth required)');
-      setTimeout(() => {
-        setShowMainPlaylistModal(true);
-      }, 1500); // Biraz daha uzun delay - playlist'ler yüklensin
-    }
-  }, [userPlaylists.length, currentVideo, showMainPlaylistModal]); // Auth dependency kaldırıldı
-
 
   // Handle shared video from URL params
   useEffect(() => {
