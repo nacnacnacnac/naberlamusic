@@ -380,7 +380,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
             </>
           ) : (
             <>
-              {/* Guest Mode */}
+              {/* LA Bebe Mode */}
               <View style={styles.guestSection}>
                 <ExpoImage
                   source={require('@/assets/images/animation/heart.png')}
@@ -632,7 +632,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
           </View>
           <ThemedText style={[
             styles.welcomeText, 
-            { color: '#666666' } // Hem Guest hem de kullanıcı adı için koyu gri
+            { color: '#666666' } // Hem LA Bebe hem de kullanıcı adı için koyu gri
           ]}>
             {isAuthenticated && user ? (
               (() => {
@@ -652,7 +652,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                 
                 return 'User';
               })()
-            ) : 'Guest'}
+            ) : 'LA Bebe'}
           </ThemedText>
         </View>
         <View style={styles.profileRight}>
