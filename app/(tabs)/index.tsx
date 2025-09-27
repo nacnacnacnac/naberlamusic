@@ -13,7 +13,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import { VimeoPlayerNative } from '@/components/VimeoPlayerNative';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVimeo } from '@/contexts/VimeoContext';
-import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
+// Web-only - no background audio hook needed
 import { useNativeMediaSession } from '@/hooks/useNativeMediaSession';
 import { autoSyncService } from '@/services/autoSyncService';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
@@ -89,7 +89,7 @@ const isMobileWeb = Platform.OS === 'web' &&
 
 export default function HomeScreen() {
   const { videos, isConfigured, isLoading, refreshVideos } = useVimeo();
-  const { isConfigured: isBackgroundAudioConfigured } = useBackgroundAudio();
+  // Web-only - no background audio configuration needed
   const { isAuthenticated, user } = useAuth();
   
   // Background video player for native

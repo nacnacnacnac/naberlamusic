@@ -1,8 +1,6 @@
-import { auth, GoogleAuthProvider, GoogleSignin } from './firebaseConfig';
-import { signInWithCredential, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import * as AppleAuthentication from 'expo-apple-authentication';
+import { auth, GoogleAuthProvider } from './firebaseConfig';
+import { signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface User {
   uid: string;
@@ -220,7 +218,9 @@ class AuthService {
       console.log('🔥 Firebase sign out completed');
       
       // Clear stored user data
-      await AsyncStorage.removeItem('user');
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.removeItem('user');
+      }
       this.currentUser = null;
       console.log('✅ Sign out successful');
     } catch (error) {
@@ -266,16 +266,18 @@ class AuthService {
    */
   async loadUserFromStorage(): Promise<User | null> {
     try {
-      console.log('📖 [DEBUG] Loading user from AsyncStorage...');
-      const userData = await AsyncStorage.getItem('user');
-      console.log('📖 [DEBUG] Raw AsyncStorage data:', userData ? 'exists' : 'null');
-      
-      if (userData) {
-        this.currentUser = JSON.parse(userData);
-        console.log('✅ [DEBUG] User loaded from AsyncStorage:', this.currentUser.email);
-        return this.currentUser;
+      console.log('📖 [DEBUG] Loading user from localStorage...');
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        const userData = localStorage.getItem('user');
+        console.log('📖 [DEBUG] Raw localStorage data:', userData ? 'exists' : 'null');
+        
+        if (userData) {
+          this.currentUser = JSON.parse(userData);
+          console.log('✅ [DEBUG] User loaded from localStorage:', this.currentUser.email);
+          return this.currentUser;
+        }
       }
-      console.log('📖 [DEBUG] No user data in AsyncStorage');
+      console.log('📖 [DEBUG] No user data in localStorage');
       return null;
     } catch (error) {
       console.error('❌ Failed to load user from storage:', error);
@@ -288,9 +290,11 @@ class AuthService {
    */
   private async saveUserToStorage(user: User): Promise<void> {
     try {
-      console.log('💾 [DEBUG] Saving user to AsyncStorage:', user.email);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      console.log('✅ [DEBUG] User saved to AsyncStorage successfully');
+      console.log('💾 [DEBUG] Saving user to localStorage:', user.email);
+      if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+        localStorage.setItem('user', JSON.stringify(user));
+        console.log('✅ [DEBUG] User saved to localStorage successfully');
+      }
     } catch (error) {
       console.error('❌ Failed to save user to storage:', error);
     }
@@ -320,7 +324,9 @@ class AuthService {
         callback(user);
       } else {
         this.currentUser = null;
-        AsyncStorage.removeItem('user');
+        if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+          localStorage.removeItem('user');
+        }
         callback(null);
       }
     });

@@ -2,12 +2,10 @@ import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVimeo } from '@/contexts/VimeoContext';
-// Video component now handled by expo-video
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Dimensions, Easing, Platform, StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -270,10 +268,8 @@ export default function LoginScreen() {
   // Force hide home indicator for development
   useEffect(() => {
     const setupScreen = async () => {
-      if (Platform.OS === 'ios') {
-        // Lock orientation and hide home indicator
-        await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-      }
+      // Web-only setup - no orientation locking needed
+      console.log('🌐 Web login screen setup');
     };
     
     setupScreen();
