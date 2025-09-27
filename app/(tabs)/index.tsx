@@ -243,8 +243,47 @@ export default function HomeScreen() {
       duration: 800,
       useNativeDriver: true,
     }).start();
+    
+    // Login'den geldiğinde MainPlaylistModal'ı aç (user guidance için)
+    const openPlaylistModalForNewUsers = () => {
+      console.log('🎵 Checking MainPlaylistModal auto-open conditions:', {
+        isAuthenticated,
+        hasCurrentVideo: !!currentVideo,
+        playlistCount: userPlaylists.length,
+        shouldOpen: isAuthenticated && !currentVideo && userPlaylists.length > 0
+      });
+      
+      if (isAuthenticated && !currentVideo && userPlaylists.length > 0) {
+        console.log('🎵 Opening MainPlaylistModal for user guidance');
+        setTimeout(() => {
+          setShowMainPlaylistModal(true);
+        }, 1500); // Page animation tamamlandıktan sonra
+      } else {
+        console.log('🎵 MainPlaylistModal auto-open conditions not met');
+      }
+    };
+    
+    // Auth ve playlist'ler hazır olduğunda kontrol et
+    setTimeout(openPlaylistModalForNewUsers, 1000);
 
   }, []);
+
+  // Playlist'ler hazır olduğunda MainPlaylistModal'ı aç (auth gerekmez)
+  useEffect(() => {
+    console.log('🎵 Auto-open check:', {
+      hasCurrentVideo: !!currentVideo,
+      playlistCount: userPlaylists.length,
+      showMainPlaylistModal,
+      shouldOpen: !currentVideo && userPlaylists.length > 0 && !showMainPlaylistModal
+    });
+    
+    if (!currentVideo && userPlaylists.length > 0 && !showMainPlaylistModal) {
+      console.log('🎵 Playlists ready - opening MainPlaylistModal for user guidance (no auth required)');
+      setTimeout(() => {
+        setShowMainPlaylistModal(true);
+      }, 1500); // Biraz daha uzun delay - playlist'ler yüklensin
+    }
+  }, [userPlaylists.length, currentVideo, showMainPlaylistModal]); // Auth dependency kaldırıldı
 
 
   // Handle shared video from URL params
@@ -2240,6 +2279,7 @@ export default function HomeScreen() {
             refreshTrigger={playlistRefreshTrigger}
             initialView={mainPlaylistInitialView}
             disableAutoSwitch={isFromLikeButton}
+            autoCloseOnPlay={true}
           />
         </LeftModal>
       )}
