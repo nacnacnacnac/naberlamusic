@@ -2,7 +2,7 @@ module.exports = function (api) {
   api.cache(true);
   
   const plugins = [
-    'react-native-reanimated/plugin', // Must be last
+    'react-native-worklets/plugin', // Must be last
   ];
 
   // Production'da console.log'ları kaldır
