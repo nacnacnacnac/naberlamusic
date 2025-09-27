@@ -838,14 +838,11 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
             </View>
             
             {expandedPlaylists.has(playlist.id) && (
-              <ScrollView 
+              <View 
                 style={[
                   styles.userPlaylistScroll,
                   expandedPlaylists.size === 1 && styles.userPlaylistScrollExpanded
                 ]}
-                showsVerticalScrollIndicator={false}
-                scrollEnabled={true}
-                nestedScrollEnabled={true}
               >
                 {playlist.videos && playlist.videos.length > 0 ? (
                   <>
@@ -1089,7 +1086,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                     <ThemedText style={styles.emptyPlaylistText}>No videos in this playlist</ThemedText>
                   </View>
                 )}
-              </ScrollView>
+              </View>
             )}
           </View>
           );
@@ -1559,11 +1556,10 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   userPlaylistScroll: {
-    maxHeight: 500,
     backgroundColor: '#000000',
   },
   userPlaylistScrollExpanded: {
-    maxHeight: 600,
+    // No height restriction - let it expand naturally
   },
   playlistItem: {
     flexDirection: 'row',
