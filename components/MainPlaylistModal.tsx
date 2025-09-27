@@ -24,6 +24,7 @@ interface MainPlaylistModalProps {
   onCreatePlaylist?: (videoId?: string, videoTitle?: string) => void;
   initialView?: 'main' | 'selectPlaylist' | 'createPlaylist' | 'profile';
   disableAutoSwitch?: boolean;
+  autoCloseOnPlay?: boolean; // Şarkı çalınca modal'ı otomatik kapat
 }
 
 const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
@@ -38,7 +39,8 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   refreshTrigger,
   onCreatePlaylist,
   initialView = 'main',
-  disableAutoSwitch = false
+  disableAutoSwitch = false,
+  autoCloseOnPlay = false
 }, ref) => {
   const { user, displayName, signOut, signIn, isAuthenticated } = useAuth();
   const playlistScrollRef = useRef<ScrollView>(null);
@@ -963,6 +965,14 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                               playlistId: playlist.id,
                               playlistName: playlist.name
                             });
+                            
+                            // Auto-close modal if enabled
+                            if (autoCloseOnPlay) {
+                              console.log('🎵 Auto-closing MainPlaylistModal after song selection');
+                              setTimeout(() => {
+                                onClose();
+                              }, 500); // Kısa delay - video yüklenmeye başlayana kadar
+                            }
                           }}
                           activeOpacity={0.7}
                         >

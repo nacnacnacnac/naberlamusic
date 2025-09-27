@@ -202,7 +202,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
 
             {/* App Info */}
             <View style={styles.appInfo}>
-              <ThemedText style={styles.appInfoText}>Naber LA v1.6.3</ThemedText>
+              <ThemedText style={styles.appInfoText}>Naber LA v1.6.0</ThemedText>
               <View style={styles.madeWithContainer}>
                 <ThemedText style={styles.madeWithText}>Made with </ThemedText>
                 <ExpoImage
