@@ -16,100 +16,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
-    "newArchEnabled": true,
     "jsEngine": "hermes",
-    "ios": {
-      "buildNumber": "3",
-      "googleServicesFile": "./GoogleService-Info.plist",
-      "splash": {
-        "image": "./assets/images/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#000000"
-      },
-      "supportsTablet": true,
-      "usesAppleSignIn": true,
-      "infoPlist": {
-        "NSCameraUsageDescription": "Bu uygulama video çekmek için kameraya erişim gerektirir.",
-        "NSMicrophoneUsageDescription": "Bu uygulama ses kaydetmek için mikrofona erişim gerektirir.",
-        "NSPhotoLibraryUsageDescription": "Bu uygulama fotoğraf ve videolara erişim gerektirir.",
-        "UIBackgroundModes": [
-          "audio"
-        ],
-        "AVAudioSessionCategory": "AVAudioSessionCategoryPlayback",
-        "AVAudioSessionCategoryOptions": [
-          "AVAudioSessionCategoryOptionMixWithOthers",
-          "AVAudioSessionCategoryOptionDuckOthers",
-          "AVAudioSessionCategoryOptionAllowBluetooth",
-          "AVAudioSessionCategoryOptionAllowBluetoothA2DP"
-        ],
-        "MPRemoteCommandCenterEnabled": true,
-        "MPNowPlayingInfoCenterEnabled": true,
-        "MPMediaItemPropertyArtworkEnabled": true,
-        "MPNowPlayingInfoPropertyIsLiveStream": false,
-        "MPRemoteCommandSkipForwardEnabled": false,
-        "MPRemoteCommandSkipBackwardEnabled": false,
-        "MPRemoteCommandSeekForwardEnabled": false,
-        "MPRemoteCommandSeekBackwardEnabled": false,
-        "AVAudioSessionCategoryOptionAllowSkipping": false,
-        "MPNowPlayingInfoPropertyAvailableCommands": ["play", "pause", "nextTrack", "previousTrack"],
-        "MPRemoteCommandChangePlaybackPositionEnabled": false,
-        "MPRemoteCommandChangePlaybackRateEnabled": false,
-        "MPRemoteCommandNextTrackEnabled": true,
-        "MPRemoteCommandPreviousTrackEnabled": true,
-        "MPRemoteCommandPlayEnabled": true,
-        "MPRemoteCommandPauseEnabled": true,
-        "MPRemoteCommandTogglePlayPauseEnabled": true,
-        "MPRemoteCommandStopEnabled": false,
-        "MPNowPlayingInfoPropertyDefaultPlaybackRate": 1,
-        "MPNowPlayingInfoPropertyPlaybackQueueIndex": 0,
-        "MPNowPlayingInfoPropertyPlaybackQueueCount": 1,
-        "ITSAppUsesNonExemptEncryption": false,
-        "UIStatusBarHidden": false,
-        "UIViewControllerBasedStatusBarAppearance": false,
-        "UIHomeIndicatorAutoHidden": true,
-        "UIRequiresFullScreen": true,
-        "UIPrefersHomeIndicatorAutoHidden": true,
-        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
-      },
-      "bundleIdentifier": "com.nacnac.naberla"
-    },
-    "android": {
-      "versionCode": 9,
-      "package": "com.naberla",
-      "googleServicesFile": "./google-services.json",
-      "splash": {
-        "image": "./assets/images/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#000000"
-      },
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon-playstore.png",
-        "backgroundColor": "#000000"
-      },
-      "edgeToEdgeEnabled": true,
-      "navigationBar": {
-        "visible": false,
-        "behavior": "overlay-swipe",
-        "backgroundColor": "transparent"
-      },
-      "permissions": [
-        "android.permission.INTERNET",
-        "android.permission.WAKE_LOCK",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
-      ],
-      "blockedPermissions": [
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.ACCESS_MEDIA_LOCATION",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
-      ]
-    },
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -127,79 +34,18 @@
     },
     "plugins": [
       "expo-router",
-      "@react-native-firebase/app",
-      "@react-native-firebase/auth",
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.127637606270-kluqqf4t7pbanr138cvj1bq2b2bhb8jb"
-        }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "xcodeProps": {
-              "CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES": "YES"
-            }
-          }
-        }
-      ],
-      [
-        "react-native-video",
-        {
-          "enableNotificationControls": false,
-          "enableVolumeManager": false
-        }
-      ],
-      [
-        "expo-document-picker",
-        {
-          "iCloudContainerEnvironment": "Production"
-        }
-      ],
-      [
-        "expo-video",
-        {
-          "supportsBackgroundPlayback": true,
-          "supportsPictureInPicture": true,
-          "supportsAirPlay": true,
-          "supportsFullScreen": true,
-          "remoteCommands": {
-            "skipForward": false,
-            "skipBackward": false,
-            "nextTrack": true,
-            "previousTrack": true,
-            "play": true,
-            "pause": true,
-            "seek": false,
-            "seekForward": false,
-            "seekBackward": false,
-            "changePlaybackPosition": false
-          },
-          "skipIntervals": [],
-          "preferredSkipIntervals": []
-        }
-      ],
-      "expo-apple-authentication",
       "expo-font",
       "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
     },
-    "developmentClient": {
-      "silentLaunch": true
-    },
     "extra": {
       "router": {},
-      "eas": {
-        "projectId": "8316266b-416f-49cc-b9a5-56082e2914d8"
-      },
       "EXPO_PUBLIC_VIMEO_ACCESS_TOKEN": "f0e1fe38a2b99765df33777ff57e3aaa",
       "EXPO_PUBLIC_USE_BACKEND_TOKENS": "true",
       "EXPO_PUBLIC_BACKEND_URL": "https://api.naberla.org",
-      "EXPO_PUBLIC_APP_ID": "naber-la-mobile",
+      "EXPO_PUBLIC_APP_ID": "naber-la-web",
       "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "naber-la",
       "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "127637606270-bn9m33t2gqfrhrqa7r9t4prrgdievflf.apps.googleusercontent.com"
     },
