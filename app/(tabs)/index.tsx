@@ -3012,7 +3012,7 @@ export default function HomeScreen() {
       )}
 
       {/* Share and Heart Icons */}
-      {currentVideo && !isFullscreen && (
+      {currentVideo && !isFullscreen && !isLandscape && (
         <Animated.View 
           style={[
             {
