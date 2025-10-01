@@ -27,15 +27,23 @@ class AdminApiService {
 
   /**
    * Get all playlists from admin panel
+   * @param includeVideos - If false, skip fetching videos for faster load (default: true)
    */
-  async getPlaylists(): Promise<Playlist[]> {
+  async getPlaylists(includeVideos: boolean = true): Promise<Playlist[]> {
     try {
       console.log('🔄 Fetching playlists from admin API...');
       
-      // Web'de farklı endpoint kullan
-      const apiUrl = typeof window !== 'undefined' 
-        ? `${this.baseUrl}/api/playlists?web=true` // Web parametresi ekle
-        : `${this.baseUrl}/api/playlists`;
+      // Build API URL with parameters
+      const params = new URLSearchParams();
+      if (typeof window !== 'undefined') {
+        params.append('web', 'true');
+      }
+      if (!includeVideos) {
+        params.append('videos', 'false');
+        console.log('⚡ Fast mode: Skipping videos for initial load');
+      }
+      
+      const apiUrl = `${this.baseUrl}/api/playlists?${params.toString()}`;
       
       console.log('🌐 API URL:', apiUrl);
       
@@ -172,6 +180,50 @@ class AdminApiService {
       return playlist;
     } catch (error) {
       console.error(`❌ Error fetching playlist ${id} from admin API:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get videos for a specific playlist (lazy loading)
+   * @param playlistId - The playlist ID
+   */
+  async getPlaylistVideos(playlistId: string): Promise<PlaylistVideo[]> {
+    try {
+      console.log(`🔄 Fetching videos for playlist ${playlistId}...`);
+      
+      const response = await fetch(`${this.baseUrl}/api/playlists/${playlistId}/videos`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        mode: 'cors',
+        credentials: 'omit',
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch playlist videos');
+      }
+
+      const videos: PlaylistVideo[] = (result.videos || []).map((video: any) => ({
+        id: video.id,
+        title: video.title,
+        duration: video.duration,
+        thumbnail: video.thumbnail,
+        addedAt: video.addedAt,
+        vimeo_id: video.vimeo_id,
+      }));
+
+      console.log(`✅ Fetched ${videos.length} videos for playlist ${playlistId}`);
+      return videos;
+    } catch (error) {
+      console.error('❌ Error fetching playlist videos:', error);
       throw error;
     }
   }

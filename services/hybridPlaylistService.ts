@@ -144,8 +144,9 @@ class HybridPlaylistService {
       
       // No cache, fetch from API (first time)
       console.log('🌐 No cache found, fetching from API...');
-      const adminPlaylists = await adminApiService.getPlaylists();
-      console.log('📡 Fetched admin playlists:', adminPlaylists.length);
+      // ✅ Fast initial load: Skip videos (videos will be loaded on expand)
+      const adminPlaylists = await adminApiService.getPlaylists(false);
+      console.log('📡 Fetched admin playlists (metadata only):', adminPlaylists.length);
       
       // Cache for next time
       await this.cacheAdminPlaylistsLocally(adminPlaylists);
@@ -1109,6 +1110,27 @@ class HybridPlaylistService {
    */
   getPlaylistDuration(playlist: Playlist): number {
     return playlist.videos.reduce((total, video) => total + video.duration, 0);
+  }
+
+  /**
+   * Lazy load videos for a specific playlist (when expanded)
+   * @param playlistId - The playlist ID (with or without prefix)
+   */
+  async loadPlaylistVideos(playlistId: string): Promise<PlaylistVideo[]> {
+    try {
+      // Remove 'admin_' or 'user_' prefix if present
+      const cleanId = playlistId.replace(/^(admin_|user_)/, '');
+      
+      console.log(`📹 Lazy loading videos for playlist ${cleanId}...`);
+      
+      // Fetch videos from admin API
+      const videos = await adminApiService.getPlaylistVideos(cleanId);
+      
+      return videos;
+    } catch (error) {
+      console.error('Error loading playlist videos:', error);
+      return [];
+    }
   }
 
   /**

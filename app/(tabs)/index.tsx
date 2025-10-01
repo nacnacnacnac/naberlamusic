@@ -1261,8 +1261,8 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  // Toggle user playlist expansion
-  const togglePlaylistExpansion = (playlistId: string) => {
+  // Toggle user playlist expansion (with lazy video loading)
+  const togglePlaylistExpansion = async (playlistId: string) => {
     // Toggle playlist expansion
     const newExpanded = new Set(expandedPlaylists);
     const isExpanding = !newExpanded.has(playlistId);
@@ -1273,6 +1273,22 @@ export default function HomeScreen() {
       // Close all other playlists when opening a new one
       newExpanded.clear();
       newExpanded.add(playlistId);
+      
+      // ✅ LAZY LOAD: Fetch videos when playlist is expanded (if not already loaded)
+      const playlist = userPlaylists.find(p => p.id === playlistId);
+      if (playlist && (!playlist.videos || playlist.videos.length === 0)) {
+        console.log(`⚡ Lazy loading videos for playlist: ${playlist.name}`);
+        try {
+          const videos = await hybridPlaylistService.loadPlaylistVideos(playlistId);
+          // Update playlist with loaded videos
+          setUserPlaylists(prev => prev.map(p => 
+            p.id === playlistId ? { ...p, videos } : p
+          ));
+          console.log(`✅ Loaded ${videos.length} videos for ${playlist.name}`);
+        } catch (error) {
+          console.error('Failed to load playlist videos:', error);
+        }
+      }
       
       // Scroll to top when expanding a playlist
       playlistScrollRef.current?.scrollTo({ y: 0, animated: true });
