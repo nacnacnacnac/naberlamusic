@@ -2989,7 +2989,7 @@ export default function HomeScreen() {
               justifyContent: 'flex-start',
               alignSelf: 'flex-start',
               paddingVertical: 10,
-              paddingLeft: Platform.OS === 'web' ? 18 : 20,
+              paddingLeft: Platform.OS === 'web' ? 10 : 12, // Daha sola
             }
           ]}>
             {/* Sanatçı adı */}
