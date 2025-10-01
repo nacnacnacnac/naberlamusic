@@ -1243,6 +1243,9 @@ export default function HomeScreen() {
           setExpandedPlaylists(new Set([naberLAAIPlaylist.id]));
           console.log('🎵 Auto-expanded "Naber LA - AI" playlist');
           
+          // ✅ SET LOADING STATE BEFORE FETCH
+          setLoadingPlaylistVideos(new Set([naberLAAIPlaylist.id]));
+          
           // ✅ AUTO-LOAD: AWAIT videos before continuing (critical for swipe to work)
           console.log('⚡ Auto-loading videos for "Naber LA - AI"... (current videos:', naberLAAIPlaylist.videos?.length || 0, ')');
           try {
@@ -1258,6 +1261,9 @@ export default function HomeScreen() {
             );
           } catch (err) {
             console.error('❌ Failed to auto-load videos:', err);
+          } finally {
+            // ✅ CLEAR LOADING STATE AFTER FETCH
+            setLoadingPlaylistVideos(new Set());
           }
         } else {
           setExpandedPlaylists(new Set());
