@@ -287,8 +287,12 @@ export default function MusicPlayerTabBar({
       <View style={styles.leftLogo}>
         <TouchableOpacity 
           onPress={() => {
+            console.log('🎵 Logo button pressed - calling onPlaylistToggle immediately');
             onPlaylistToggle?.();
           }}
+          activeOpacity={0.7}
+          delayPressIn={0}
+          delayPressOut={0}
         >
           <View style={styles.logoContainer}>
             {/* Main Logo */}

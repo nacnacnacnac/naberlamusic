@@ -15,7 +15,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useVimeo } from '@/contexts/VimeoContext';
 import { useBackgroundAudio } from '@/hooks/useBackgroundAudio';
 import { useNativeMediaSession } from '@/hooks/useNativeMediaSession';
-import { autoSyncService } from '@/services/autoSyncService';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { hybridVimeoService } from '@/services/hybridVimeoService';
 import { SimplifiedVimeoVideo } from '@/types/vimeo';
@@ -1218,25 +1217,10 @@ export default function HomeScreen() {
       }
     };
     
-    const initializeAutoSync = async () => {
-      try {
-        // Set callback for automatic refresh when sync notifications are received
-        autoSyncService.setOnSyncCallback(() => {
-          // Auto-refreshing playlists due to admin sync
-          refreshPlaylists();
-        });
-        
-        await autoSyncService.initialize();
-      } catch (error) {
-        console.error('Error initializing auto sync:', error);
-      }
-    };
-    
     loadPlaylists();
-    // Only initialize auto sync for Google users
-    if (isGoogleUser) {
-      initializeAutoSync();
-    }
+    
+    // ✅ REMOVED AutoSync: Playlists refresh manually (app open + pull-to-refresh)
+    // No more 10-minute polling in background → Better battery life
   }, [isGoogleUser]); // Re-run when Google user status changes
 
   // Manual refresh function for pull-to-refresh and admin sync

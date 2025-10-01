@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "naber-la",
+    "name": "Naber LA",
     "slug": "naber-la",
-    "version": "1.6.3",
+    "version": "1.6.4",
     "orientation": "default",
     "icon": "./assets/images/icon-1024x1024.png",
     "backgroundColor": "#000000",
@@ -19,7 +19,8 @@
     "newArchEnabled": true,
     "jsEngine": "hermes",
     "ios": {
-      "buildNumber": "3",
+      "buildNumber": "4",
+      "orientation": "default",
       "googleServicesFile": "./GoogleService-Info.plist",
       "splash": {
         "image": "./assets/images/splash-icon.png",
@@ -74,7 +75,7 @@
       "bundleIdentifier": "com.nacnac.naberla"
     },
     "android": {
-      "versionCode": 9,
+      "versionCode": 10,
       "package": "com.naberla",
       "googleServicesFile": "./google-services.json",
       "splash": {
@@ -177,11 +178,12 @@
             "seekBackward": false,
             "changePlaybackPosition": false
           },
-          "skipIntervals": [],
-          "preferredSkipIntervals": []
+          "skipIntervals": null,
+          "preferredSkipIntervals": null
         }
       ],
       "expo-apple-authentication",
+      "expo-screen-orientation",
       "expo-font",
       "expo-web-browser"
     ],
