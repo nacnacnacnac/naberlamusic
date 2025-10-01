@@ -3096,7 +3096,7 @@ export default function HomeScreen() {
           style={{
             position: 'absolute',
             top: screenHeight / 2 - 60, // Center vertically (approximate height: 120px)
-            left: width / 2 - 125, // Slightly more to the left
+            left: width / 2 - 115, // Centered
             transform: [
               { scale: doubleTapToastOpacity.interpolate({
                 inputRange: [0, 1],
