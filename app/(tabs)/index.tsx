@@ -1662,27 +1662,9 @@ export default function HomeScreen() {
           newLikedState
         );
         
-        // Update playlists state immediately for better UX
-        try {
-          // Wait for Firestore to process the change
-          console.log('⏳ Waiting for Firestore to process the change...');
-          await new Promise(resolve => setTimeout(resolve, 800));
-          
-          // Clear cache and refresh playlists
-          await hybridPlaylistService.clearPlaylistCache();
-          console.log('🗑️ Cache cleared before refresh');
-          
-          const updatedPlaylists = await hybridPlaylistService.getPlaylists(true);
-          const uniquePlaylists = updatedPlaylists.filter((playlist, index, self) => 
-            index === self.findIndex(p => p.id === playlist.id)
-          );
-          setUserPlaylists(uniquePlaylists);
-          
-          // Keep current expanded state after refresh - don't auto-expand
-          // setExpandedPlaylists remains unchanged
-        } catch (error) {
-          console.error('Error updating playlists after heart toggle:', error);
-        }
+        // ✅ NO PLAYLIST REFRESH: Just update the heart state
+        // Playlist refresh would clear lazy-loaded videos and break navigation
+        // The Liked Songs playlist will refresh when user opens the playlist modal
       } catch (error) {
         console.error('Error toggling liked song on iOS:', error);
       }
