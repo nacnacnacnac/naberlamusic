@@ -2989,7 +2989,6 @@ export default function HomeScreen() {
               justifyContent: 'flex-start',
               alignSelf: 'flex-start',
               paddingVertical: 10,
-              paddingLeft: Platform.OS === 'web' ? 10 : 12, // Daha sola
             }
           ]}>
             {/* Sanatçı adı */}
@@ -4267,7 +4266,7 @@ const styles = StyleSheet.create({
   videoOverlayContent: {
     position: 'absolute',
     top: Platform.OS === 'web' ? 20 : 60, // Mobile'da top 60px
-    left: 20,
+    left: Platform.OS === 'web' ? 10 : 12, // Daha sola
     right: 20,
     flexDirection: 'row',
     alignItems: 'center',
