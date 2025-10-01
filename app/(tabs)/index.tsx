@@ -543,29 +543,39 @@ export default function HomeScreen() {
     }
   });
 
-  // ✅ PiP mode - Keep playing when returning from background
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      console.log('📱 AppState changed:', nextAppState, '| isPaused:', isPaused, '| hasVideo:', !!currentVideo);
+  // ✅ PiP mode - Keep playing when returning from background (AGGRESSIVE)
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'web') return;
       
-      // Uygulama background'dan foreground'a geçtiğinde
-      if (nextAppState === 'active' && currentVideo && !isPaused) {
-        console.log('📱 App became active - checking if video needs to resume');
-        
-        // Video durmuşsa tekrar başlat
-        setTimeout(() => {
-          if (mainVideoPlayer && !mainVideoPlayer.playing) {
-            console.log('📱 🎵 Resuming video after returning from background/PiP');
+      console.log('📱 Screen focused - checking video state');
+      console.log('📱 Current state:', {
+        hasVideo: !!currentVideo,
+        isPaused,
+        isPlaying: mainVideoPlayer?.playing,
+        currentTime: mainVideoPlayer?.currentTime
+      });
+      
+      // Screen focus kazandığında video durmuşsa tekrar başlat
+      if (currentVideo && !isPaused && mainVideoPlayer) {
+        const checkAndResume = () => {
+          if (!mainVideoPlayer.playing) {
+            console.log('📱 🎵 FORCE RESUMING video after PiP/background');
             mainVideoPlayer.play();
+            setIsPaused(false); // State'i de güncelle
+          } else {
+            console.log('📱 ✅ Video already playing');
           }
-        }, 300); // Biraz daha uzun delay - state stabilize olsun
+        };
+        
+        // Hemen kontrol et
+        checkAndResume();
+        
+        // 500ms sonra bir daha kontrol et (double-check)
+        setTimeout(checkAndResume, 500);
       }
-    });
-
-    return () => subscription.remove();
-  }, [currentVideo, isPaused, mainVideoPlayer]);
+    }, [currentVideo, isPaused, mainVideoPlayer])
+  );
 
   // ✅ FALLBACK: Clear loading if video is playing (in case playingChange event is missed)
   useEffect(() => {
