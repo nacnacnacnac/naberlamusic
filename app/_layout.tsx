@@ -33,12 +33,8 @@ export default function RootLayout() {
   // Hide splash screen when fonts are loaded
   useEffect(() => {
     if (loaded) {
-      const hideSplash = async () => {
-        // Small delay to prevent white flash (Stack Overflow solution)
-        await new Promise(resolve => setTimeout(resolve, 300));
-        await SplashScreen.hideAsync();
-      };
-      hideSplash();
+      // Hide splash immediately (no delay)
+      SplashScreen.hideAsync();
     }
   }, [loaded]);
 
