@@ -1173,7 +1173,8 @@ export default function HomeScreen() {
       try {
         setPlaylistsLoading(true);
         
-        const playlists = await hybridPlaylistService.getPlaylists();
+        // ✅ ALWAYS fetch fresh data on app start (bypass 5-minute cache)
+        const playlists = await hybridPlaylistService.getPlaylists(true);
         
         // ✅ REMOVED: Unnecessary 1-second delay - playlists load instantly now!
         // await new Promise(resolve => setTimeout(resolve, 1000));
