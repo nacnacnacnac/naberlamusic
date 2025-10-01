@@ -1611,26 +1611,11 @@ export default function HomeScreen() {
         const newLikedState = await hybridPlaylistService.toggleLikedSong(currentVideo);
         setIsHeartFavorited(newLikedState);
         
-        // Update playlists state immediately for better UX - force refresh to avoid cache issues
-        try {
-          // Wait for Firestore to process the change
-          console.log('⏳ Waiting for Firestore to process the change...');
-          await new Promise(resolve => setTimeout(resolve, 800));
-          
-          // Clear cache again to ensure fresh data
-          await hybridPlaylistService.clearPlaylistCache();
-          console.log('🗑️ Cache cleared again before refresh');
-          
-          const updatedPlaylists = await hybridPlaylistService.getPlaylists(true); // Force refresh to clear cache
-          const uniquePlaylists = updatedPlaylists.filter((playlist, index, self) => 
-            index === self.findIndex(p => p.id === playlist.id)
-          );
-          setUserPlaylists(uniquePlaylists);
-        } catch (error) {
-          console.error('Error updating playlists after heart toggle:', error);
-        }
-        
         console.log(`${newLikedState ? '❤️ Added to' : '💔 Removed from'} Liked Songs:`, currentVideo.name);
+        
+        // ✅ NO PLAYLIST REFRESH: Just update the heart state
+        // Playlist refresh would clear lazy-loaded videos and break navigation
+        // The Liked Songs playlist will refresh when user opens the playlist modal
       } catch (error) {
         console.error('Error toggling liked song:', error);
       }
