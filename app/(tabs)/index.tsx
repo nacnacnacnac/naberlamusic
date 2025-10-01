@@ -1209,21 +1209,10 @@ export default function HomeScreen() {
         
         logger.system('Initial playlists loaded:', filteredPlaylists.length, 'playlists for', isGoogleUser ? 'Google user' : 'non-Google user');
         
-        // Debug: Clear cache if web-only playlists appear on mobile
-        if (Platform.OS !== 'web') {
-          const webOnlyPlaylists = uniquePlaylists.filter(p => p.isWebOnlyPlaylist);
-          if (webOnlyPlaylists.length > 0) {
-            logger.system('🚨 Found web-only playlists on mobile, clearing cache...');
-            await hybridPlaylistService.clearCache();
-            // Reload playlists after cache clear
-            const freshPlaylists = await hybridPlaylistService.getPlaylists(true);
-            const filteredPlaylists = freshPlaylists.filter((playlist, index, self) => 
-              index === self.findIndex(p => p.id === playlist.id)
-            );
-            setUserPlaylists(filteredPlaylists);
-            logger.system('✅ Cache cleared, reloaded:', filteredPlaylists.length, 'playlists');
-          }
-        }
+        // ✅ REMOVED: Unnecessary web-only check - service already filters at 3 layers:
+        // 1. webOnlyPlaylistService only runs on web
+        // 2. Cache layer filters isWebOnlyPlaylist
+        // 3. Admin API filters 🌐 prefix and [WEB_ONLY] tag
       } catch (error) {
         console.error('Error loading playlists:', error);
       } finally {
