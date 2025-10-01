@@ -238,6 +238,124 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
     }
   };
 
+  // Handle playlist deletion
+  const handleDeletePlaylist = async (playlistId: string, playlistName: string) => {
+    try {
+      console.log('🗑️ Deleting playlist:', playlistId, playlistName);
+      
+      // Show deleting state
+      setDeletingPlaylistId(playlistId);
+      
+      await hybridPlaylistService.deletePlaylist(playlistId);
+      
+      // Immediately hide from UI
+      setDeletedPlaylistIds(prev => {
+        const newSet = new Set([...prev, playlistId]);
+        console.log('🔍 Updated deletedPlaylistIds:', Array.from(newSet));
+        return newSet;
+      });
+      setDeletingPlaylistId(null);
+      
+      // Force refresh with cache bypass
+      setTimeout(async () => {
+        try {
+          // Force a complete refresh by calling the service directly
+          const currentUser = authService.getCurrentUser();
+          if (currentUser?.uid) {
+            await firestoreService.getUserPlaylists(currentUser.uid);
+          }
+        } catch (error) {
+          console.error('❌ Error in forced refresh:', error);
+        }
+        // Clear deleted IDs before refresh to show fresh data
+        setDeletedPlaylistIds(new Set());
+        
+        // Force clear any cached data that might contain the deleted playlist
+        await hybridPlaylistService.clearAllCaches();
+        
+        onRefresh();
+      }, 500); // Increased delay to ensure Firestore consistency
+      
+    } catch (error) {
+      console.error('❌ Error deleting playlist:', error);
+      setDeletingPlaylistId(null);
+      if (Platform.OS === 'web') {
+        window.alert(`Failed to delete playlist: ${error.message}`);
+      }
+    }
+  };
+
+  // ✅ STEP 3: Preload thumbnails for expanded playlists (batch)
+  React.useEffect(() => {
+    if (expandedPlaylists.size === 0) return;
+    
+    console.log('🖼️ Batch preloading thumbnails for expanded playlists...');
+    const thumbnailUrls: string[] = [];
+    
+    // Collect all thumbnail URLs from expanded playlists
+    userPlaylists.forEach(playlist => {
+      if (expandedPlaylists.has(playlist.id) && playlist.videos) {
+        playlist.videos.forEach((video: any) => {
+          if (video.thumbnail) {
+            thumbnailUrls.push(video.thumbnail);
+          }
+        });
+      }
+    });
+    
+    // Batch preload (max 10 at a time to avoid overwhelming)
+    const batchSize = 10;
+    for (let i = 0; i < Math.min(thumbnailUrls.length, batchSize); i++) {
+      ExpoImage.prefetch([thumbnailUrls[i]], { cachePolicy: 'disk' }).catch(() => {
+        // Silent fail - not critical
+      });
+    }
+  }, [expandedPlaylists, userPlaylists]);
+
+  // ✅ STEP 2: Memoize expensive filtering and sorting
+  const filteredAndSortedPlaylists = useMemo(() => {
+    console.log('🔄 Recalculating filtered playlists...');
+    return userPlaylists.filter(playlist => {
+      const isDeleted = deletedPlaylistIds.has(playlist.id);
+      if (isDeleted) {
+        console.log('🔍 Filtering out deleted playlist:', playlist.id, playlist.name);
+      }
+      return !isDeleted;
+    }).filter(playlist => {
+      // Web-only playlist'leri filtrele - "Naber LA" ile başlayanları kabul et
+      if (playlist.isWebOnly) {
+        return playlist.name.startsWith('Naber LA') || playlist.name.startsWith('NABER LA');
+      }
+      
+      // Admin playlist'leri de kontrol et - "Naber LA" ile başlayanları kabul et
+      if (playlist.isAdminPlaylist) {
+        // "Naber LA" ile başlayan admin playlist'lerini göster (Naber LA 2025, Naber LA Best, etc.)
+        return playlist.name.startsWith('Naber LA') || playlist.name.startsWith('NABER LA');
+      }
+      
+      return true; // User playlist'leri gösterilsin
+    }).sort((a, b) => {
+      // "Liked Songs" always comes first
+      if (a.name === 'Liked Songs' && b.name !== 'Liked Songs') return -1;
+      if (b.name === 'Liked Songs' && a.name !== 'Liked Songs') return 1;
+      
+      // User playlists come second (after Liked Songs, before Naber LA)
+      const aIsUserPlaylist = !a.isAdminPlaylist && !a.isWebOnly && a.name !== 'Liked Songs';
+      const bIsUserPlaylist = !b.isAdminPlaylist && !b.isWebOnly && b.name !== 'Liked Songs';
+      
+      // "Naber LA" admin playlists come last
+      const aIsNaberLA = a.name.startsWith('Naber LA') || a.name.startsWith('NABER LA');
+      const bIsNaberLA = b.name.startsWith('Naber LA') || b.name.startsWith('NABER LA');
+      
+      // User playlists before Naber LA playlists
+      if (aIsUserPlaylist && bIsNaberLA) return -1;
+      if (bIsUserPlaylist && aIsNaberLA) return 1;
+      
+      // Keep original order within same category
+      return 0;
+    });
+  }, [userPlaylists, deletedPlaylistIds]);
+
   // Profile View
   if (currentView === 'profile') {
     return (
@@ -568,124 +686,6 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
       </View>
     );
   }
-
-  // Handle playlist deletion
-  const handleDeletePlaylist = async (playlistId: string, playlistName: string) => {
-    try {
-      console.log('🗑️ Deleting playlist:', playlistId, playlistName);
-      
-      // Show deleting state
-      setDeletingPlaylistId(playlistId);
-      
-      await hybridPlaylistService.deletePlaylist(playlistId);
-      
-      // Immediately hide from UI
-      setDeletedPlaylistIds(prev => {
-        const newSet = new Set([...prev, playlistId]);
-        console.log('🔍 Updated deletedPlaylistIds:', Array.from(newSet));
-        return newSet;
-      });
-      setDeletingPlaylistId(null);
-      
-      // Force refresh with cache bypass
-      setTimeout(async () => {
-        try {
-          // Force a complete refresh by calling the service directly
-          const currentUser = authService.getCurrentUser();
-          if (currentUser?.uid) {
-            await firestoreService.getUserPlaylists(currentUser.uid);
-          }
-        } catch (error) {
-          console.error('❌ Error in forced refresh:', error);
-        }
-        // Clear deleted IDs before refresh to show fresh data
-        setDeletedPlaylistIds(new Set());
-        
-        // Force clear any cached data that might contain the deleted playlist
-        await hybridPlaylistService.clearAllCaches();
-        
-        onRefresh();
-      }, 500); // Increased delay to ensure Firestore consistency
-      
-    } catch (error) {
-      console.error('❌ Error deleting playlist:', error);
-      setDeletingPlaylistId(null);
-      if (Platform.OS === 'web') {
-        window.alert(`Failed to delete playlist: ${error.message}`);
-      }
-    }
-  };
-
-  // ✅ STEP 3: Preload thumbnails for expanded playlists (batch)
-  React.useEffect(() => {
-    if (expandedPlaylists.size === 0) return;
-    
-    console.log('🖼️ Batch preloading thumbnails for expanded playlists...');
-    const thumbnailUrls: string[] = [];
-    
-    // Collect all thumbnail URLs from expanded playlists
-    userPlaylists.forEach(playlist => {
-      if (expandedPlaylists.has(playlist.id) && playlist.videos) {
-        playlist.videos.forEach((video: any) => {
-          if (video.thumbnail) {
-            thumbnailUrls.push(video.thumbnail);
-          }
-        });
-      }
-    });
-    
-    // Batch preload (max 10 at a time to avoid overwhelming)
-    const batchSize = 10;
-    for (let i = 0; i < Math.min(thumbnailUrls.length, batchSize); i++) {
-      ExpoImage.prefetch([thumbnailUrls[i]], { cachePolicy: 'disk' }).catch(() => {
-        // Silent fail - not critical
-      });
-    }
-  }, [expandedPlaylists, userPlaylists]);
-
-  // ✅ STEP 2: Memoize expensive filtering and sorting
-  const filteredAndSortedPlaylists = useMemo(() => {
-    console.log('🔄 Recalculating filtered playlists...');
-    return userPlaylists.filter(playlist => {
-      const isDeleted = deletedPlaylistIds.has(playlist.id);
-      if (isDeleted) {
-        console.log('🔍 Filtering out deleted playlist:', playlist.id, playlist.name);
-      }
-      return !isDeleted;
-    }).filter(playlist => {
-      // Web-only playlist'leri filtrele - "Naber LA" ile başlayanları kabul et
-      if (playlist.isWebOnly) {
-        return playlist.name.startsWith('Naber LA') || playlist.name.startsWith('NABER LA');
-      }
-      
-      // Admin playlist'leri de kontrol et - "Naber LA" ile başlayanları kabul et
-      if (playlist.isAdminPlaylist) {
-        // "Naber LA" ile başlayan admin playlist'lerini göster (Naber LA 2025, Naber LA Best, etc.)
-        return playlist.name.startsWith('Naber LA') || playlist.name.startsWith('NABER LA');
-      }
-      
-      return true; // User playlist'leri gösterilsin
-    }).sort((a, b) => {
-      // "Liked Songs" always comes first
-      if (a.name === 'Liked Songs' && b.name !== 'Liked Songs') return -1;
-      if (b.name === 'Liked Songs' && a.name !== 'Liked Songs') return 1;
-      
-      // User playlists come second (after Liked Songs, before Naber LA)
-      const aIsUserPlaylist = !a.isAdminPlaylist && !a.isWebOnly && a.name !== 'Liked Songs';
-      const bIsUserPlaylist = !b.isAdminPlaylist && !b.isWebOnly && b.name !== 'Liked Songs';
-      
-      // "Naber LA" admin playlists come last
-      const aIsNaberLA = a.name.startsWith('Naber LA') || a.name.startsWith('NABER LA');
-      const bIsNaberLA = b.name.startsWith('Naber LA') || b.name.startsWith('NABER LA');
-      
-      // User playlists before Naber LA playlists
-      if (aIsUserPlaylist && bIsNaberLA) return -1;
-      if (bIsUserPlaylist && aIsNaberLA) return 1;
-      
-      // Keep original order within same category
-      return 0;
-    });
-  }, [userPlaylists, deletedPlaylistIds]);
 
   // Main Playlist View (default)
   console.log('🔍 MainPlaylistModal - Rendering Main View, currentView:', currentView);
