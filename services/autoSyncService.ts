@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, Platform } from 'react-native';
 import { hybridPlaylistService } from './hybridPlaylistService';
 
 const ADMIN_API_BASE_URL = 'https://naberla.org';
@@ -10,6 +11,8 @@ class AutoSyncService {
   private syncInterval: NodeJS.Timeout | null = null;
   private isRunning = false;
   private onSyncCallback: (() => void) | null = null;
+  private appStateSubscription: any = null;
+  private isInBackground = false;
 
   /**
    * Set callback for when sync notification is received
@@ -26,13 +29,37 @@ class AutoSyncService {
       // Get or create device ID
       this.deviceId = await this.getOrCreateDeviceId();
       
-      // Start auto sync
-      this.startAutoSync();
+      // ✅ BATTERY FIX: Setup AppState listener
+      this.setupAppStateListener();
+      
+      // Start auto sync (only if app is active)
+      if (!this.isInBackground) {
+        this.startAutoSync();
+      }
       
       console.log('🤫 Silent AutoSyncService initialized', { deviceId: this.deviceId });
     } catch (error) {
       console.error('❌ Failed to initialize AutoSyncService:', error);
     }
+  }
+
+  /**
+   * Setup AppState listener to stop sync in background
+   */
+  private setupAppStateListener(): void {
+    if (Platform.OS === 'web') return;
+    
+    this.appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        console.log('🔋 App going to background - stopping AutoSync');
+        this.isInBackground = true;
+        this.stopAutoSync();
+      } else if (nextAppState === 'active') {
+        console.log('🔋 App became active - resuming AutoSync');
+        this.isInBackground = false;
+        this.startAutoSync();
+      }
+    });
   }
 
   /**
@@ -64,10 +91,22 @@ class AutoSyncService {
     }
 
     this.isRunning = false;
+    console.log('🔋 AutoSync stopped - saving battery');
 
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
+    }
+  }
+
+  /**
+   * Cleanup resources
+   */
+  cleanup(): void {
+    this.stopAutoSync();
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
     }
   }
 
