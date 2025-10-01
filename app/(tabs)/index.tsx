@@ -29,7 +29,7 @@ import { useEvent, useEventListener } from 'expo';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, DeviceEventEmitter, Dimensions, Easing, Image as RNImage, Modal, Platform, Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, AppState, DeviceEventEmitter, Dimensions, Easing, Image as RNImage, Modal, Platform, Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Image } from 'expo-image'; // Use Expo Image for better caching and performance
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -543,19 +543,29 @@ export default function HomeScreen() {
     }
   });
 
-  // ✅ PiP mode event listener - Keep playing when PiP stops
-  useEventListener(mainVideoPlayer, 'pictureInPictureStop', () => {
-    if (Platform.OS !== 'web') {
-      console.log('📱 PiP stopped - ensuring video continues playing');
-      // PiP kapandığında video pause olabilir, tekrar play et
-      if (mainVideoPlayer && !isPaused) {
+  // ✅ PiP mode - Keep playing when returning from background
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      console.log('📱 AppState changed:', nextAppState, '| isPaused:', isPaused, '| hasVideo:', !!currentVideo);
+      
+      // Uygulama background'dan foreground'a geçtiğinde
+      if (nextAppState === 'active' && currentVideo && !isPaused) {
+        console.log('📱 App became active - checking if video needs to resume');
+        
+        // Video durmuşsa tekrar başlat
         setTimeout(() => {
-          mainVideoPlayer.play();
-          console.log('📱 ✅ Video resumed after PiP stop');
-        }, 100); // Short delay to ensure state is stable
+          if (mainVideoPlayer && !mainVideoPlayer.playing) {
+            console.log('📱 🎵 Resuming video after returning from background/PiP');
+            mainVideoPlayer.play();
+          }
+        }, 300); // Biraz daha uzun delay - state stabilize olsun
       }
-    }
-  });
+    });
+
+    return () => subscription.remove();
+  }, [currentVideo, isPaused, mainVideoPlayer]);
 
   // ✅ FALLBACK: Clear loading if video is playing (in case playingChange event is missed)
   useEffect(() => {
