@@ -1007,11 +1007,14 @@ export default function HomeScreen() {
   const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [doubleTapToastVisible, setDoubleTapToastVisible] = useState(false);
   const [doubleTapToastMessage, setDoubleTapToastMessage] = useState('');
+  const [doubleTapIsAdded, setDoubleTapIsAdded] = useState(true);
   const doubleTapToastOpacity = useRef(new Animated.Value(0)).current;
   
   // Show double tap toast message
-  const showDoubleTapToast = (message: string) => {
+  const showDoubleTapToast = (message: string, isAdded: boolean) => {
+    console.log('🍞 Showing toast:', message, 'isAdded:', isAdded);
     setDoubleTapToastMessage(message);
+    setDoubleTapIsAdded(isAdded);
     setDoubleTapToastVisible(true);
     
     Animated.sequence([
@@ -1653,6 +1656,14 @@ export default function HomeScreen() {
         const newLikedState = await hybridPlaylistService.toggleLikedSong(currentVideo);
         setIsHeartFavorited(newLikedState);
         
+        console.log(`${newLikedState ? '❤️ Added to' : '💔 Removed from'} Liked Songs:`, currentVideo.name);
+        
+        // Show toast message IMMEDIATELY (before Firestore wait)
+        showDoubleTapToast(
+          newLikedState ? 'Added to Liked Songs' : 'Removed from Liked Songs',
+          newLikedState
+        );
+        
         // Update playlists state immediately for better UX
         try {
           // Wait for Firestore to process the change
@@ -1674,11 +1685,6 @@ export default function HomeScreen() {
         } catch (error) {
           console.error('Error updating playlists after heart toggle:', error);
         }
-        
-        console.log(`${newLikedState ? '❤️ Added to' : '💔 Removed from'} Liked Songs:`, currentVideo.name);
-        
-        // Show toast message
-        showDoubleTapToast(newLikedState ? 'Added to Liked Songs' : 'Removed from Liked Songs');
       } catch (error) {
         console.error('Error toggling liked song on iOS:', error);
       }
@@ -3100,12 +3106,14 @@ export default function HomeScreen() {
             left: '50%',
             transform: [{ translateX: -100 }, { translateY: -20 }],
             opacity: doubleTapToastOpacity,
-            zIndex: 100000,
+            zIndex: 999999, // Very high to ensure visibility
             backgroundColor: 'rgba(0, 0, 0, 0.85)',
             paddingHorizontal: 20,
             paddingVertical: 12,
             borderRadius: 25,
             minWidth: 200,
+            borderWidth: 2,
+            borderColor: doubleTapIsAdded ? '#e0af92' : '#555555', // Added = vurgu rengi, Removed = koyu gri
           }}
           pointerEvents="none"
         >
