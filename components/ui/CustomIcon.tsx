@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, View, Image } from 'react-native';
-import { IconSymbol } from './IconSymbol';
+import { IconSymbol } from '@/components/ui/IconSymbol';
 
 interface CustomIconProps {
   name: 'play' | 'pause' | 'skip-next' | 'skip-previous' | 'volume-up' | 'playlist' | 'chevron-up' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'minus' | 'rewind' | 'fast-forward' | 'keyboard-arrow-down' | 'heart' | 'delete' | 'share' | 'logout' | 'trash' | 'apple';
