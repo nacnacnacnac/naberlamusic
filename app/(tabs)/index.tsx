@@ -3030,8 +3030,8 @@ export default function HomeScreen() {
             {
               position: 'absolute',
               ...(Platform.OS === 'web'
-                ? { top: 25, right: 15 }
-                : { top: 60, right: 15 }
+                ? { top: 25, right: 8 }
+                : { top: 60, right: 8 }
               ),
               opacity: overlayOpacity,
               zIndex: 99999,
