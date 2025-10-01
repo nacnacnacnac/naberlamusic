@@ -15,6 +15,7 @@ interface MainPlaylistModalProps {
   onClose: () => void;
   userPlaylists: any[];
   expandedPlaylists: Set<string>;
+  loadingPlaylistVideos?: Set<string>; // Track which playlists are loading videos
   onTogglePlaylistExpansion: (playlistId: string) => void;
   onPlayVideo: (video: any, playlistContext?: {playlistId: string, playlistName: string}) => void;
   currentVideo: any;
@@ -31,6 +32,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   onClose,
   userPlaylists,
   expandedPlaylists,
+  loadingPlaylistVideos = new Set(),
   onTogglePlaylistExpansion,
   onPlayVideo,
   currentVideo,
@@ -920,6 +922,15 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                     >
                       <ThemedText style={styles.minusText}>−</ThemedText>
                     </TouchableOpacity>
+                  )}
+                  
+                  {/* Loading Indicator - Show when loading videos */}
+                  {loadingPlaylistVideos.has(playlist.id) && (
+                    <ActivityIndicator 
+                      size="small" 
+                      color="#e0af92" 
+                      style={{ marginRight: 8 }}
+                    />
                   )}
                   
                   <Image 

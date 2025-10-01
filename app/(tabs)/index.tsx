@@ -990,6 +990,7 @@ export default function HomeScreen() {
   const [pendingAutoPlay, setPendingAutoPlay] = useState(false);
   const [userPlaylists, setUserPlaylists] = useState<any[]>([]);
   const [expandedPlaylists, setExpandedPlaylists] = useState<Set<string>>(new Set());
+  const [loadingPlaylistVideos, setLoadingPlaylistVideos] = useState<Set<string>>(new Set()); // Track which playlists are loading
   const [refreshing, setRefreshing] = useState(false);
   const [playlistsLoading, setPlaylistsLoading] = useState(true);
   const playlistScrollRef = useRef<ScrollView>(null);
@@ -1200,6 +1201,19 @@ export default function HomeScreen() {
         if (naberLAAIPlaylist) {
           setExpandedPlaylists(new Set([naberLAAIPlaylist.id]));
           console.log('🎵 Auto-expanded only "Naber LA - AI" playlist for better performance');
+          
+          // ✅ AUTO-LOAD: Fetch videos for auto-expanded playlist
+          if (!naberLAAIPlaylist.videos || naberLAAIPlaylist.videos.length === 0) {
+            console.log('⚡ Auto-loading videos for "Naber LA - AI"...');
+            hybridPlaylistService.loadPlaylistVideos(naberLAAIPlaylist.id)
+              .then(videos => {
+                setUserPlaylists(prev => prev.map(p => 
+                  p.id === naberLAAIPlaylist.id ? { ...p, videos } : p
+                ));
+                console.log(`✅ Auto-loaded ${videos.length} videos for "Naber LA - AI"`);
+              })
+              .catch(err => console.error('Failed to auto-load videos:', err));
+          }
         } else {
           setExpandedPlaylists(new Set());
           console.log('🎵 "Naber LA - AI" playlist not found - all playlists start closed');
@@ -1278,6 +1292,10 @@ export default function HomeScreen() {
       const playlist = userPlaylists.find(p => p.id === playlistId);
       if (playlist && (!playlist.videos || playlist.videos.length === 0)) {
         console.log(`⚡ Lazy loading videos for playlist: ${playlist.name}`);
+        
+        // Show loading indicator
+        setLoadingPlaylistVideos(prev => new Set(prev).add(playlistId));
+        
         try {
           const videos = await hybridPlaylistService.loadPlaylistVideos(playlistId);
           // Update playlist with loaded videos
@@ -1287,6 +1305,13 @@ export default function HomeScreen() {
           console.log(`✅ Loaded ${videos.length} videos for ${playlist.name}`);
         } catch (error) {
           console.error('Failed to load playlist videos:', error);
+        } finally {
+          // Hide loading indicator
+          setLoadingPlaylistVideos(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(playlistId);
+            return newSet;
+          });
         }
       }
       
@@ -3656,6 +3681,7 @@ export default function HomeScreen() {
               }}
               userPlaylists={userPlaylists}
               expandedPlaylists={expandedPlaylists}
+              loadingPlaylistVideos={loadingPlaylistVideos}
               onTogglePlaylistExpansion={togglePlaylistExpansion}
               onPlayVideo={playVideo}
               currentVideo={currentVideo}
