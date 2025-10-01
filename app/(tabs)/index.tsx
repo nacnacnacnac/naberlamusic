@@ -81,7 +81,7 @@ const debugLog = {
   performance: log('⚡ [PERF] ')
 };
 
-const { width } = Dimensions.get('screen');
+const { width, height: screenHeight } = Dimensions.get('screen');
 
 // Safe mobile web detection - only check on web platform
 const isMobileWeb = Platform.OS === 'web' && 
