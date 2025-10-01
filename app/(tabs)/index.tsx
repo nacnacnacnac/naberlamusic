@@ -3095,11 +3095,9 @@ export default function HomeScreen() {
         <Animated.View
           style={{
             position: 'absolute',
-            top: '50%',
-            left: '50%',
+            top: screenHeight / 2 - 60, // Center vertically (approximate height: 120px)
+            left: width / 2 - 100, // Center horizontally (approximate width: 200px)
             transform: [
-              { translateX: -100 }, // Center the container (wider for text)
-              { translateY: -50 },
               { scale: doubleTapToastOpacity.interpolate({
                 inputRange: [0, 1],
                 outputRange: [0.8, 1], // Subtle scale
