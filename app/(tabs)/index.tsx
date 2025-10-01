@@ -1010,23 +1010,28 @@ export default function HomeScreen() {
   const [doubleTapIsAdded, setDoubleTapIsAdded] = useState(true);
   const doubleTapToastOpacity = useRef(new Animated.Value(0)).current;
   
-  // Show double tap toast message
+  // Show double tap heart icon
   const showDoubleTapToast = (message: string, isAdded: boolean) => {
-    console.log('🍞 Showing toast:', message, 'isAdded:', isAdded);
+    console.log('❤️ Showing heart icon:', isAdded ? 'Added' : 'Removed');
     setDoubleTapToastMessage(message);
     setDoubleTapIsAdded(isAdded);
     setDoubleTapToastVisible(true);
     
+    // Reset animation value
+    doubleTapToastOpacity.setValue(0);
+    
+    // Animate: fade in + scale up → hold → fade out + scale down
     Animated.sequence([
-      Animated.timing(doubleTapToastOpacity, {
+      Animated.spring(doubleTapToastOpacity, {
         toValue: 1,
-        duration: 200,
+        tension: 100,
+        friction: 5,
         useNativeDriver: true,
       }),
-      Animated.delay(1500),
+      Animated.delay(800), // Show for 800ms
       Animated.timing(doubleTapToastOpacity, {
         toValue: 0,
-        duration: 200,
+        duration: 300,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -3090,34 +3095,38 @@ export default function HomeScreen() {
         </Animated.View>
       )}
 
-      {/* Double Tap Toast - Center of screen */}
+      {/* Double Tap Heart Icon - Center of screen */}
       {doubleTapToastVisible && (
         <Animated.View
           style={{
             position: 'absolute',
             top: '50%',
             left: '50%',
-            transform: [{ translateX: -100 }, { translateY: -20 }],
+            transform: [
+              { translateX: -30 }, // Center the 60x60 icon
+              { translateY: -30 },
+              { scale: doubleTapToastOpacity.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.5, 1.2], // Start small, grow larger
+              })},
+            ],
             opacity: doubleTapToastOpacity,
-            zIndex: 999999, // Very high to ensure visibility
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            paddingHorizontal: 20,
-            paddingVertical: 12,
-            borderRadius: 25,
-            minWidth: 200,
-            borderWidth: 2,
-            borderColor: doubleTapIsAdded ? '#e0af92' : '#555555', // Added = vurgu rengi, Removed = koyu gri
+            zIndex: 999999,
           }}
           pointerEvents="none"
         >
-          <Text style={{
-            color: '#FFFFFF',
-            fontSize: 15,
-            fontWeight: '500',
-            textAlign: 'center',
-          }}>
-            {doubleTapToastMessage}
-          </Text>
+          <Image 
+            source={doubleTapIsAdded 
+              ? require('@/assets/images/heart.png')  // Filled heart for added
+              : require('@/assets/images/hearto.png') // Outline heart for removed
+            }
+            style={{ 
+              width: 60, 
+              height: 60,
+              tintColor: doubleTapIsAdded ? '#e0af92' : '#888888', // Brand color for added, gray for removed
+            }}
+            resizeMode="contain"
+          />
         </Animated.View>
       )}
 
