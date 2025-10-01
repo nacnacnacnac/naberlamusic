@@ -6,7 +6,7 @@ import { authService } from '@/services/authService';
 import { firestoreService } from '@/services/firestoreService';
 import { hybridPlaylistService } from '@/services/hybridPlaylistService';
 import { Image as ExpoImage } from 'expo-image';
-import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useMemo, useCallback, memo } from 'react';
 import { ActivityIndicator, Animated, Image, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 // CSS animasyonunu kaldırdık - React Animated kullanıyoruz
@@ -24,6 +24,7 @@ interface MainPlaylistModalProps {
   onCreatePlaylist?: (videoId?: string, videoTitle?: string) => void;
   initialView?: 'main' | 'selectPlaylist' | 'createPlaylist' | 'profile';
   disableAutoSwitch?: boolean;
+  autoCloseOnPlay?: boolean;
 }
 
 const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
@@ -38,7 +39,8 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
   refreshTrigger,
   onCreatePlaylist,
   initialView = 'main',
-  disableAutoSwitch = false
+  disableAutoSwitch = false,
+  autoCloseOnPlay = true
 }, ref) => {
   const { user, displayName, signOut, signIn, isAuthenticated } = useAuth();
   const playlistScrollRef = useRef<ScrollView>(null);
@@ -614,6 +616,77 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
     }
   };
 
+  // ✅ STEP 3: Preload thumbnails for expanded playlists (batch)
+  React.useEffect(() => {
+    if (expandedPlaylists.size === 0) return;
+    
+    console.log('🖼️ Batch preloading thumbnails for expanded playlists...');
+    const thumbnailUrls: string[] = [];
+    
+    // Collect all thumbnail URLs from expanded playlists
+    userPlaylists.forEach(playlist => {
+      if (expandedPlaylists.has(playlist.id) && playlist.videos) {
+        playlist.videos.forEach((video: any) => {
+          if (video.thumbnail) {
+            thumbnailUrls.push(video.thumbnail);
+          }
+        });
+      }
+    });
+    
+    // Batch preload (max 10 at a time to avoid overwhelming)
+    const batchSize = 10;
+    for (let i = 0; i < Math.min(thumbnailUrls.length, batchSize); i++) {
+      ExpoImage.prefetch([thumbnailUrls[i]], { cachePolicy: 'disk' }).catch(() => {
+        // Silent fail - not critical
+      });
+    }
+  }, [expandedPlaylists, userPlaylists]);
+
+  // ✅ STEP 2: Memoize expensive filtering and sorting
+  const filteredAndSortedPlaylists = useMemo(() => {
+    console.log('🔄 Recalculating filtered playlists...');
+    return userPlaylists.filter(playlist => {
+      const isDeleted = deletedPlaylistIds.has(playlist.id);
+      if (isDeleted) {
+        console.log('🔍 Filtering out deleted playlist:', playlist.id, playlist.name);
+      }
+      return !isDeleted;
+    }).filter(playlist => {
+      // Web-only playlist'leri filtrele - "Naber LA" ile başlayanları kabul et
+      if (playlist.isWebOnly) {
+        return playlist.name.startsWith('Naber LA') || playlist.name.startsWith('NABER LA');
+      }
+      
+      // Admin playlist'leri de kontrol et - "Naber LA" ile başlayanları kabul et
+      if (playlist.isAdminPlaylist) {
+        // "Naber LA" ile başlayan admin playlist'lerini göster (Naber LA 2025, Naber LA Best, etc.)
+        return playlist.name.startsWith('Naber LA') || playlist.name.startsWith('NABER LA');
+      }
+      
+      return true; // User playlist'leri gösterilsin
+    }).sort((a, b) => {
+      // "Liked Songs" always comes first
+      if (a.name === 'Liked Songs' && b.name !== 'Liked Songs') return -1;
+      if (b.name === 'Liked Songs' && a.name !== 'Liked Songs') return 1;
+      
+      // User playlists come second (after Liked Songs, before Naber LA)
+      const aIsUserPlaylist = !a.isAdminPlaylist && !a.isWebOnly && a.name !== 'Liked Songs';
+      const bIsUserPlaylist = !b.isAdminPlaylist && !b.isWebOnly && b.name !== 'Liked Songs';
+      
+      // "Naber LA" admin playlists come last
+      const aIsNaberLA = a.name.startsWith('Naber LA') || a.name.startsWith('NABER LA');
+      const bIsNaberLA = b.name.startsWith('Naber LA') || b.name.startsWith('NABER LA');
+      
+      // User playlists before Naber LA playlists
+      if (aIsUserPlaylist && bIsNaberLA) return -1;
+      if (bIsUserPlaylist && aIsNaberLA) return 1;
+      
+      // Keep original order within same category
+      return 0;
+    });
+  }, [userPlaylists, deletedPlaylistIds]);
+
   // Main Playlist View (default)
   console.log('🔍 MainPlaylistModal - Rendering Main View, currentView:', currentView);
   return (
@@ -731,6 +804,10 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
         showsVerticalScrollIndicator={false}
         scrollEnabled={true}
         nestedScrollEnabled={true}
+        removeClippedSubviews={true} // ✅ STEP 5: Remove off-screen views
+        maxToRenderPerBatch={5} // ✅ Render 5 items at a time
+        updateCellsBatchingPeriod={50} // ✅ Update every 50ms
+        windowSize={10} // ✅ Keep 10 screens of content in memory
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -787,40 +864,8 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
           </View>
         )}
 
-        {/* Admin Panel Playlists */}
-        {userPlaylists.filter(playlist => {
-          const isDeleted = deletedPlaylistIds.has(playlist.id);
-          if (isDeleted) {
-            console.log('🔍 Filtering out deleted playlist:', playlist.id, playlist.name);
-          }
-          return !isDeleted;
-        }).filter(playlist => {
-          // Web-only playlist'leri filtrele - sadece "Naber LA - AI" kalacak
-          if (playlist.isWebOnly) {
-            return playlist.name === 'Naber LA - AI' || playlist.name === 'NABER LA AI';
-          }
-          
-          // Admin playlist'leri de kontrol et (2015-2025 playlist'leri muhtemelen admin)
-          if (playlist.isAdminPlaylist) {
-            // Sadece "NABER LA AI" admin playlist'ini göster
-            return playlist.name === 'NABER LA AI' || playlist.name === 'Naber LA - AI';
-          }
-          
-          return true; // User playlist'leri gösterilsin
-        }).sort((a, b) => {
-          // "Liked Songs" always comes first
-          if (a.name === 'Liked Songs' && b.name !== 'Liked Songs') return -1;
-          if (b.name === 'Liked Songs' && a.name !== 'Liked Songs') return 1;
-          
-          // "NABER LA AI" or "Naber LA - AI" comes second
-          if ((a.name === 'NABER LA AI' || a.name === 'Naber LA - AI') && 
-              (b.name !== 'NABER LA AI' && b.name !== 'Naber LA - AI')) return -1;
-          if ((b.name === 'NABER LA AI' || b.name === 'Naber LA - AI') && 
-              (a.name !== 'NABER LA AI' && a.name !== 'Naber LA - AI')) return 1;
-          
-          // Keep original order for other playlists
-          return 0;
-        }).map((playlist, playlistIndex) => {
+        {/* Admin Panel Playlists - Using memoized playlists ✅ */}
+        {filteredAndSortedPlaylists.map((playlist, playlistIndex) => {
           const isLastPlaylist = playlistIndex === userPlaylists.length - 1;
           return (
           <View key={playlist.id} style={styles.userPlaylistContainer}>
@@ -894,18 +939,17 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
             </View>
             
             {expandedPlaylists.has(playlist.id) && (
-              <ScrollView 
+              <View 
                 style={[
                   styles.userPlaylistScroll,
                   expandedPlaylists.size === 1 && styles.userPlaylistScrollExpanded
                 ]}
-                showsVerticalScrollIndicator={false}
-                scrollEnabled={true}
-                nestedScrollEnabled={true}
               >
+                {/* ✅ STEP 4: Lazy loading - Only render when expanded */}
                 {playlist.videos && playlist.videos.length > 0 ? (
                   <>
-                    {playlist.videos.map((playlistVideo: any, index: number) => {
+                    {/* Render only first 20 videos initially for large playlists */}
+                    {playlist.videos.slice(0, 20).map((playlistVideo: any, index: number) => {
                       const videoKey = `${playlist.id}-${playlistVideo.vimeo_id || playlistVideo.id}`;
                       
                       // Don't render videos that are being deleted
@@ -963,6 +1007,14 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                               playlistId: playlist.id,
                               playlistName: playlist.name
                             });
+                            
+                            // Auto-close modal after playing video
+                            if (autoCloseOnPlay) {
+                              console.log('🎵 Auto-closing MainPlaylistModal after song selection');
+                              setTimeout(() => {
+                                onClose();
+                              }, 500);
+                            }
                           }}
                           activeOpacity={0.7}
                         >
@@ -1128,13 +1180,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                                 color="#e0af92" 
                               />
                             ) : (
-                              <ThemedText style={{
-                                fontSize: 20,
-                                fontWeight: 'bold',
-                                color: '#333333',
-                                textAlign: 'center',
-                                lineHeight: 16,
-                              }}>
+                              <ThemedText style={styles.videoRemoveText}>
                                 −
                               </ThemedText>
                             )}
@@ -1152,7 +1198,7 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                     <ThemedText style={styles.emptyPlaylistText}>No videos in this playlist</ThemedText>
                   </View>
                 )}
-              </ScrollView>
+              </View>
             )}
           </View>
           );
@@ -1585,21 +1631,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deletePlaylistButtonCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'transparent',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(102, 102, 102, 0.1)',
     borderWidth: 1,
-    borderColor: '#333333',
+    borderColor: '#444444',
     justifyContent: 'center',
     alignItems: 'center',
   },
   minusText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#666666',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#888888',
     textAlign: 'center',
-    lineHeight: 16,
+    includeFontPadding: false, // Android için
+    marginTop: -3, // Yukarı taşı
   },
   expandButtonCircle: {
     width: 24,
@@ -1648,11 +1695,11 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   userPlaylistScroll: {
-    maxHeight: 500,
     backgroundColor: '#000000',
+    // Removed maxHeight for single scroll experience
   },
   userPlaylistScrollExpanded: {
-    maxHeight: 600,
+    // Removed maxHeight for single scroll experience
   },
   playlistItem: {
     flexDirection: 'row',
@@ -1674,9 +1721,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#333333', // Koyu gri çerçeve
+    backgroundColor: 'rgba(102, 102, 102, 0.1)',
+    borderWidth: 1,
+    borderColor: '#444444', // Daha açık gri çerçeve
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12, // Sol taraftan boşluk
@@ -1685,6 +1732,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  videoRemoveText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#888888',
+    textAlign: 'center',
+    includeFontPadding: false, // Android için
+    marginTop: -3, // Yukarı taşı
   },
   currentPlaylistItem: {
     backgroundColor: '#000000',

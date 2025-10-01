@@ -23,19 +23,23 @@ import { logger } from '@/utils/logger';
 // Video component now handled by expo-video in VimeoPlayerNative
 import { Image as ExpoImage } from 'expo-image';
 import { useVideoPlayer, VideoView, VideoSource } from 'expo-video';
-import { useEvent } from 'expo';
+import { useEvent, useEventListener } from 'expo';
 // import * as VideoThumbnails from 'expo-video-thumbnails'; // Artık kullanmıyoruz - Vimeo thumbnail'ları kullanıyoruz
 // Background audio handled by expo-video SDK 54
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, DeviceEventEmitter, Dimensions, Easing, Image, Modal, Platform, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, DeviceEventEmitter, Dimensions, Easing, Image as RNImage, Modal, Platform, Pressable, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image'; // Use Expo Image for better caching and performance
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import * as Clipboard from 'expo-clipboard';
 
 // Background video imports
 const backgroundVideo = require('@/assets/videos/NLA6.mp4'); // Desktop/web için
 const mobileBackgroundVideo = require('@/assets/videos/NLA_mobil.mp4'); // Native mobile için
 const heartImage = require('@/assets/hearto.png');
+const loadingHeartImage = require('@/assets/images/animation/heart.png'); // Animated heart for loading
 
 // Integration Testing Infrastructure
 interface IntegrationTestState {
@@ -78,7 +82,7 @@ const debugLog = {
   performance: log('⚡ [PERF] ')
 };
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get('screen');
 
 // Safe mobile web detection - only check on web platform
 const isMobileWeb = Platform.OS === 'web' && 
@@ -191,6 +195,16 @@ export default function HomeScreen() {
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
   const [currentMetadata, setCurrentMetadata] = useState<any>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false); // Track if video is actually playing
+  const [isTransitioning, setIsTransitioning] = useState(false); // Hide video during swipe
+  const [transitionDirection, setTransitionDirection] = useState<'next' | 'prev' | null>(null); // Track swipe direction
+  const transitionThumbnailRef = useRef<string | null>(null); // Store thumbnail BEFORE state changes
+  
+  // Swipeable video states
+  const [nextVideoThumbnail, setNextVideoThumbnail] = useState<string | null>(null);
+  const [prevVideoThumbnail, setPrevVideoThumbnail] = useState<string | null>(null);
+  const swipeTranslateY = useRef(new Animated.Value(0)).current;
+  const thumbnailOpacity = useRef(new Animated.Value(0)).current;
   
   // Loading overlay heartbeat animation
   const loadingHeartScale = useRef(new Animated.Value(1)).current;
@@ -277,6 +291,12 @@ export default function HomeScreen() {
       }
     };
   }, [currentVideo, isVideoReady, startLoadingHeartbeat, loadingHeartScale]);
+
+  // Thumbnail visibility state tracking (removed verbose logging)
+  useEffect(() => {
+    const shouldShowNext = (isTransitioning && transitionDirection === 'next') || (transitionDirection === 'next' && !isVideoPlaying);
+    // Removed: THUMBNAIL STATE log (too verbose)
+  }, [isTransitioning, transitionDirection, isVideoPlaying, isVideoReady]);
 
   // Background audio handled by expo-video SDK 54 automatically
 
@@ -398,15 +418,88 @@ export default function HomeScreen() {
     }
   });
 
+  // 🎬 Instagram Style: Single VideoView + Thumbnails
+  // Stack state tracking - Only thumbnails, no extra players
+  const [prevVideo, setPrevVideo] = useState<any>(null);
+  const [nextVideo, setNextVideo] = useState<any>(null);
+  const isRotatingRef = useRef(false); // Prevent concurrent rotations
+
+  // Aggressive thumbnail preloading - preload next 5 videos
+  useEffect(() => {
+    if (!currentVideo || !currentPlaylistContext) return;
+
+    const playlist = userPlaylists.find(p => p.id === currentPlaylistContext.playlistId);
+    if (!playlist?.videos) return;
+
+    const currentIndex = playlist.videos.findIndex(v => 
+      v.id === currentVideo.id || v.vimeo_id === currentVideo.id
+    );
+    
+    if (currentIndex === -1) return;
+
+    // Preload next 5 videos' thumbnails
+    const videosToPreload = [];
+    for (let i = 1; i <= 5; i++) {
+      const nextIndex = (currentIndex + i) % playlist.videos.length;
+      const video = playlist.videos[nextIndex];
+      if (video?.thumbnail) {
+        videosToPreload.push(video);
+      }
+    }
+
+    // Preload previous video
+    const prevIndex = (currentIndex - 1 + playlist.videos.length) % playlist.videos.length;
+    const prevVid = playlist.videos[prevIndex];
+    if (prevVid?.thumbnail) {
+      videosToPreload.unshift(prevVid);
+    }
+
+    // Start preloading with expo-image (better caching!)
+    videosToPreload.forEach((video) => {
+      const url = getHighResolutionThumbnail(video.thumbnail);
+      // expo-image prefetch with disk cache (memory + disk)
+      Image.prefetch([url], { cachePolicy: 'disk' }).catch(() => {
+        // Silent fail - not critical
+      });
+    });
+  }, [currentVideo?.id, currentPlaylistContext?.playlistId, userPlaylists]);
+
   // Video player events - Component'in en üst seviyesinde
-  useEvent(mainVideoPlayer, 'statusChange', (event) => {
-    if (Platform.OS !== 'web' && event && currentVideo) {
-      console.log('🎵 Video status changed:', typeof event, event);
+  // Use useEventListener (not useEvent!) for VideoPlayer events
+  useEventListener(mainVideoPlayer, 'statusChange', (event) => {
+    console.log('🎵 📡 statusChange EVENT FIRED!!! Platform:', Platform.OS, 'Event:', event);
+    if (Platform.OS !== 'web' && event) {
+      console.log('🎵 📡 statusChange event details - Type:', typeof event, 'Event:', event);
       
       const status = event.status || event;
       if (status === 'readyToPlay' || status === 'loaded') {
         console.log('🎵 ✅ Video ready via event - setting isVideoReady: true');
         setIsVideoReady(true);
+        
+        // AUTO PLAY when video is ready!
+        console.log('🎵 🎬 Auto-playing video now that it\'s ready...');
+        try {
+          const playResult = mainVideoPlayer.play();
+          if (playResult && typeof playResult.then === 'function') {
+            playResult.then(() => {
+              console.log('🎵 ✅ Video playing successfully!');
+            }).catch(error => {
+              console.log('🎵 ❌ Play error:', error);
+            });
+          } else {
+            console.log('🎵 ✅ Video play() called (no promise)');
+          }
+        } catch (error) {
+          console.log('🎵 ❌ Play error:', error);
+        }
+        
+        // Clear transition state when video is ready (but keep transitionDirection until playing)
+        if (isTransitioning) {
+          setTimeout(() => {
+            setIsTransitioning(false);
+            // DON'T clear transitionDirection yet - wait until video is playing
+          }, 100);
+        }
       } else if (status === 'loading') {
         console.log('🎵 🔄 Video loading - setting isVideoReady: false');
         setIsVideoReady(false);
@@ -414,9 +507,23 @@ export default function HomeScreen() {
     }
   });
 
-  useEvent(mainVideoPlayer, 'playingChange', (isPlaying) => {
-    if (Platform.OS !== 'web' && currentVideo) {
-      console.log('🎵 Playing changed:', isPlaying);
+  useEventListener(mainVideoPlayer, 'playingChange', ({ isPlaying }) => {
+    if (Platform.OS !== 'web') { // ✅ REMOVED currentVideo check - allow loading to clear
+      console.log('🎵 🔴 playingChange EVENT:', {
+        isPlaying,
+        hasCurrentVideo: !!currentVideo,
+        hasTransitionDirection: !!transitionDirection,
+        transitionDirection
+      });
+      
+      setIsVideoPlaying(isPlaying); // Update playing state
+      
+      // Clear transition direction when video starts playing (NO DELAY for playlist loading!)
+      if (isPlaying) {
+        console.log('🎵 ✅ Video is playing - clearing loading overlay!');
+        setTransitionDirection(null);
+        transitionThumbnailRef.current = null;
+      }
       
       // Video durduysa ve sonuna gelmiş olabilir
       if (!isPlaying && mainVideoPlayer.currentTime > 0) {
@@ -435,6 +542,16 @@ export default function HomeScreen() {
       }
     }
   });
+
+  // ✅ FALLBACK: Clear loading if video is playing (in case playingChange event is missed)
+  useEffect(() => {
+    if (mainVideoPlayer && mainVideoPlayer.playing && transitionDirection) {
+      console.log('🎵 ⚠️ FALLBACK: Video is playing but loading still visible - force clearing!');
+      setIsVideoPlaying(true);
+      setTransitionDirection(null);
+      transitionThumbnailRef.current = null;
+    }
+  }, [mainVideoPlayer?.playing, transitionDirection]);
 
   // Optimized video end detection - Adaptive timer
   useEffect(() => {
@@ -642,6 +759,8 @@ export default function HomeScreen() {
               });
               await mainVideoPlayer.replaceAsync(videoSourceWithThumbnail);
               
+              console.log('🎵 🔄 replaceAsync completed - source:', mainVideoPlayer.currentSource ? 'SET' : 'NULL');
+              
               // Media session metadata'sını player'a ayarla
               if (Platform.OS !== 'web') {
                 try {
@@ -723,16 +842,15 @@ export default function HomeScreen() {
                 }
               }
               
-              // Video play etmeden önce current time kontrol et
-              const currentTime = mainVideoPlayer.currentTime || 0;
-              console.log('🎵 ⏰ Video current time before play:', currentTime);
+              // DON'T call play() here - let statusChange event handle it!
+              console.log('🎵 ⏰ Waiting for video to be ready... Status:', mainVideoPlayer.status);
+              console.log('🎵 🎬 Player state after replaceAsync:', {
+                status: mainVideoPlayer.status,
+                playing: mainVideoPlayer.playing,
+                source: mainVideoPlayer.currentSource ? 'SET' : 'NULL'
+              });
               
-              await mainVideoPlayer.play();
-              
-              // Video başarıyla yüklendi ve oynatılıyor - ready state'ini ayarla
-                      console.log('🎵 ✅ Video loaded and playing - setting isVideoReady: true');
-                      setIsVideoReady(true);
-                      
+              // Video will auto-play when statusChange event fires with 'readyToPlay'
                       
                       // Play state'ini media session'a bildir
                       if (Platform.OS !== 'web') {
@@ -887,19 +1005,54 @@ export default function HomeScreen() {
   // Videos will be available in playlist, but no auto-selection
   // This way select.mp4 will show until user clicks a video
 
-  // Orientation detection
+
+
+
+
+  // Unlock orientation ve detection
   useEffect(() => {
+    let lastWidth = 0;
+    
+    // Unlock all orientations
+    ScreenOrientation.unlockAsync().then(() => {
+      console.log('✅ Orientation unlocked!');
+    }).catch(err => {
+      console.log('❌ Orientation unlock error:', err);
+    });
+    
     const checkOrientation = () => {
-      const { width, height } = Dimensions.get('window');
-      setIsLandscape(width > height);
+      const screen = Dimensions.get('screen');
+      const isLandscapeNow = screen.width > screen.height;
+      
+      if (screen.width !== lastWidth) {
+        console.log('🔄 SCREEN CHANGED!', screen.width, 'x', screen.height, isLandscapeNow ? 'LANDSCAPE' : 'PORTRAIT');
+        lastWidth = screen.width;
+      }
+      
+      setIsLandscape(isLandscapeNow);
     };
 
+    // İlk kontrol
     checkOrientation();
-    const subscription = Dimensions.addEventListener('change', checkOrientation);
-    return () => subscription?.remove();
+    
+    // ScreenOrientation listener
+    const orientationSubscription = ScreenOrientation.addOrientationChangeListener(() => {
+      console.log('📱 Native orientation changed!');
+      checkOrientation();
+    });
+    
+    // Dimensions listener
+    const dimensionsSubscription = Dimensions.addEventListener('change', checkOrientation);
+    
+    // Backup polling (her 2 saniye)
+    const interval = setInterval(checkOrientation, 2000);
+    
+    return () => {
+      ScreenOrientation.removeOrientationChangeListener(orientationSubscription);
+      dimensionsSubscription?.remove();
+      clearInterval(interval);
+    };
   }, []);
-
-
 
   // Page animations on mount
   useEffect(() => {
@@ -908,7 +1061,23 @@ export default function HomeScreen() {
       toValue: 1,
       duration: 800,
       useNativeDriver: true,
-    }).start();
+    }).start(() => {
+      // After page animation completes, auto-open playlist modal for new users
+      const autoOpenPlaylistModal = () => {
+        console.log('🎵 Auto-opening MainPlaylistModal for user guidance after page load');
+        if (!currentVideo && Platform.OS !== 'web') {
+          console.log('🎵 Opening MainPlaylistModal with smooth animation - will show loading if needed');
+          setTimeout(() => {
+            setShowMainPlaylistModal(true);
+          }, 500); // Small delay for smooth transition
+        } else {
+          console.log('🎵 MainPlaylistModal auto-open skipped - video already playing or on web');
+        }
+      };
+      
+      // Auto-open after page animation completes
+      autoOpenPlaylistModal();
+    });
 
   }, []);
 
@@ -1000,6 +1169,20 @@ export default function HomeScreen() {
         }
         
         setUserPlaylists(filteredPlaylists);
+        
+        // Auto-expand only "Naber LA - AI" playlist
+        const naberLAAIPlaylist = filteredPlaylists.find(playlist => 
+          playlist.name === 'Naber LA - AI' || playlist.name === 'NABER LA AI'
+        );
+        
+        if (naberLAAIPlaylist) {
+          setExpandedPlaylists(new Set([naberLAAIPlaylist.id]));
+          console.log('🎵 Auto-expanded only "Naber LA - AI" playlist for better performance');
+        } else {
+          setExpandedPlaylists(new Set());
+          console.log('🎵 "Naber LA - AI" playlist not found - all playlists start closed');
+        }
+        
         logger.system('Initial playlists loaded:', filteredPlaylists.length, 'playlists for', isGoogleUser ? 'Google user' : 'non-Google user');
         
         // Debug: Clear cache if web-only playlists appear on mobile
@@ -1109,6 +1292,20 @@ export default function HomeScreen() {
     
     debugLog.main('PLAYING NEW VIDEO:', `${video.title || video.name || 'Unknown'} at index: ${videoIndex}`);
     
+    // 🖼️ CAPTURE THUMBNAIL FOR LOADING (when coming from playlist)
+    if (playlistContext && video.thumbnail) {
+      console.log('🖼️ Capturing thumbnail for playlist video:', video.thumbnail);
+      transitionThumbnailRef.current = video.thumbnail;
+    }
+    
+    // ✅ START LOADING ANIMATION (from playlist selection)
+    if (playlistContext) {
+      console.log('🎵 Starting loading animation for playlist video');
+      setIsVideoPlaying(false); // Hide current video
+      setTransitionDirection('next'); // Trigger loading overlay
+      startLoadingHeartbeat(); // Start pulse animation
+    }
+    
     // FORCE STOP ALL AUDIO BEFORE PLAYING NEW VIDEO
     // SDK 54: expo-video handles audio cleanup automatically
     if (__DEV__) {
@@ -1127,6 +1324,8 @@ export default function HomeScreen() {
     setCurrentVideo(video);
     setCurrentVideoIndex(videoIndex);
     setIsPaused(isSharedVideo); // Shared video: paused, normal video: play immediately
+    
+    // playVideo completed
     
     // Close playlist smoothly when video starts playing
     Animated.parallel([
@@ -1170,6 +1369,9 @@ export default function HomeScreen() {
 
   // Video Overlay Functions
   const showVideoOverlayWithTimer = () => {
+    console.log('🎬 showVideoOverlayWithTimer called - animating overlay to visible');
+    console.log('🎬 Conditions - currentVideo:', currentVideo?.title || 'null', 
+                'isFullscreen:', isFullscreen, 'isLandscape:', isLandscape);
     
     // Clear any existing timeout first
     if (overlayTimeout.current) {
@@ -1179,13 +1381,22 @@ export default function HomeScreen() {
 
     // Show overlay
     setShowVideoOverlay(true);
+    console.log('🎬 setShowVideoOverlay(true) - state updated');
+    
+    // DEBUG: Log current opacity value
+    // @ts-ignore - accessing internal value for debugging
+    console.log('🎬 Current overlayOpacity value:', overlayOpacity._value);
     
     // Animate in
     Animated.timing(overlayOpacity, {
       toValue: 1,
       duration: 300,
       useNativeDriver: true,
-    }).start();
+    }).start((result?: { finished: boolean }) => {
+      console.log('🎬 Overlay animation completed - finished:', result?.finished);
+      // @ts-ignore - accessing internal value for debugging
+      console.log('🎬 Final overlayOpacity value:', overlayOpacity._value);
+    });
 
     // Hide after 4 seconds
     overlayTimeout.current = setTimeout(() => {
@@ -1194,12 +1405,14 @@ export default function HomeScreen() {
   };
 
   const hideVideoOverlay = () => {
+    console.log('🎬 hideVideoOverlay called - animating to 0');
     // Just animate out, don't change showVideoOverlay state
     Animated.timing(overlayOpacity, {
       toValue: 0,
       duration: 300,
       useNativeDriver: true,
     }).start(() => {
+      console.log('🎬 Hide animation completed');
     });
 
     // Clear timeout
@@ -1312,10 +1525,8 @@ export default function HomeScreen() {
         if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
           mainPlaylistModalRef.current.resetToMain();
         }
-        setTimeout(() => {
-          setMainPlaylistInitialView('profile');
-          setShowMainPlaylistModal(true);
-        }, 100);
+        setMainPlaylistInitialView('profile');
+        setShowMainPlaylistModal(true);
         return;
       }
       
@@ -1352,20 +1563,56 @@ export default function HomeScreen() {
         console.error('Error toggling liked song:', error);
       }
     } else {
-      // iOS'da heart icon davranışı - MainPlaylistModal aç (web'deki gibi)
-      console.log('📱 iOS Heart pressed - opening MainPlaylistModal with main view');
-      setIsFromLikeButton(false); // Like butonundan gelmediğini işaretle
-      
-      // Modal'ı her zaman kapat ve yeniden aç - state reset için
-      setShowMainPlaylistModal(false);
-      // Reset MainPlaylistModal internal state
-      if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
-        mainPlaylistModalRef.current.resetToMain();
-      }
-      setTimeout(() => {
-        setMainPlaylistInitialView('main');
+      // iOS'da heart icon davranışı
+      if (!isGoogleUser) {
+        console.log('❌ Not Google user on iOS - opening MainPlaylistModal with profile view for sign in');
+        setIsFromLikeButton(true); // Like butonundan geldiğini işaretle
+        
+        // Modal'ı her zaman kapat ve yeniden aç - state reset için
+        setShowMainPlaylistModal(false);
+        // Reset MainPlaylistModal internal state
+        if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
+          mainPlaylistModalRef.current.resetToMain();
+        }
+        setMainPlaylistInitialView('profile');
         setShowMainPlaylistModal(true);
-      }, 100);
+        return;
+      }
+      
+      // User is logged in - proceed with like functionality on iOS
+      setIsFromLikeButton(false);
+      
+      try {
+        console.log('❤️ iOS Heart pressed for video:', currentVideo.name);
+        const newLikedState = await hybridPlaylistService.toggleLikedSong(currentVideo);
+        setIsHeartFavorited(newLikedState);
+        
+        // Update playlists state immediately for better UX
+        try {
+          // Wait for Firestore to process the change
+          console.log('⏳ Waiting for Firestore to process the change...');
+          await new Promise(resolve => setTimeout(resolve, 800));
+          
+          // Clear cache and refresh playlists
+          await hybridPlaylistService.clearPlaylistCache();
+          console.log('🗑️ Cache cleared before refresh');
+          
+          const updatedPlaylists = await hybridPlaylistService.getPlaylists(true);
+          const uniquePlaylists = updatedPlaylists.filter((playlist, index, self) => 
+            index === self.findIndex(p => p.id === playlist.id)
+          );
+          setUserPlaylists(uniquePlaylists);
+          
+          // Keep current expanded state after refresh - don't auto-expand
+          // setExpandedPlaylists remains unchanged
+        } catch (error) {
+          console.error('Error updating playlists after heart toggle:', error);
+        }
+        
+        console.log(`${newLikedState ? '❤️ Added to' : '💔 Removed from'} Liked Songs:`, currentVideo.name);
+      } catch (error) {
+        console.error('Error toggling liked song on iOS:', error);
+      }
     }
     
     // Heart scale animation
@@ -1622,39 +1869,18 @@ export default function HomeScreen() {
 
   // Handle heart icon press - create playlist for mobile, show main playlist modal for web
   const handleHeartIconPress = () => {
-    if (Platform.OS === 'web') {
-      // Web'de main playlist modal'ını main view ile aç (her zaman playlist göster)
-      console.log('🎵 Heart icon pressed - opening MainPlaylistModal with main view');
-      console.log('🔍 Debug - isAuthenticated:', isAuthenticated, 'currentView will be: main');
-      setIsFromLikeButton(false); // Like butonundan gelmediğini işaretle
-      
-      // Modal'ı her zaman kapat ve yeniden aç - state reset için
-      setShowMainPlaylistModal(false);
-      // Reset MainPlaylistModal internal state
-      if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
-        mainPlaylistModalRef.current.resetToMain();
-      }
-      setTimeout(() => {
-        setMainPlaylistInitialView('main');
-        console.log('🔍 Debug - Setting MainPlaylistModal visible with initialView: main');
-        setShowMainPlaylistModal(true);
-      }, 100);
-    } else {
-      // iOS'da da MainPlaylistModal aç (web'deki gibi)
-      console.log('📱 iOS Heart icon pressed - opening MainPlaylistModal with main view');
-      setIsFromLikeButton(false); // Like butonundan gelmediğini işaretle
-      
-      // Modal'ı her zaman kapat ve yeniden aç - state reset için
-      setShowMainPlaylistModal(false);
-      // Reset MainPlaylistModal internal state
-      if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
-        mainPlaylistModalRef.current.resetToMain();
-      }
-      setTimeout(() => {
-        setMainPlaylistInitialView('main');
-        console.log('🔍 Debug - iOS Setting MainPlaylistModal visible with initialView: main');
-        setShowMainPlaylistModal(true);
-      }, 100);
+    console.log('🎵 Heart icon pressed - IMMEDIATE response');
+    
+    // Set states immediately without any delays
+    setIsFromLikeButton(false);
+    setMainPlaylistInitialView('main');
+    setShowMainPlaylistModal(true);
+    
+    console.log('🔍 Debug - Modal state updated immediately');
+    
+    // Reset internal state if needed
+    if (mainPlaylistModalRef.current && mainPlaylistModalRef.current.resetToMain) {
+      mainPlaylistModalRef.current.resetToMain();
     }
   };
 
@@ -1801,6 +2027,18 @@ export default function HomeScreen() {
     
     console.log('🎵 Playing next video from playlist:', nextVideo.name, 'at playlist index:', nextIndex);
     
+    // 🖼️ Don't set isTransitioning here - let swipe handler do it
+    // Only capture thumbnail for potential use
+    if (nextPlaylistVideo?.thumbnail && currentVideo) {
+      transitionThumbnailRef.current = nextPlaylistVideo.thumbnail;
+      console.log('🖼️ ✅ [playNextVideo] Captured thumbnail for:', nextPlaylistVideo.title || nextPlaylistVideo.name, 
+                  'URL:', nextPlaylistVideo.thumbnail.substring(0, 60));
+    } else {
+      console.log('🖼️ ⚠️ [playNextVideo] No thumbnail - nextPlaylistVideo.thumbnail:', 
+                  nextPlaylistVideo?.thumbnail ? 'exists' : 'null', 
+                  'currentVideo:', currentVideo ? 'exists' : 'null');
+    }
+    
     // Use playVideo to properly set all states and maintain playlist context
     playVideo(nextVideo, currentPlaylistContext);
     
@@ -1912,6 +2150,18 @@ export default function HomeScreen() {
     
     console.log('🎵 Playing previous video from playlist:', prevVideo.name, 'at playlist index:', prevIndex);
     
+    // 🖼️ Don't set isTransitioning here - let swipe handler do it
+    // Only capture thumbnail for potential use
+    if (prevPlaylistVideo?.thumbnail && currentVideo) {
+      transitionThumbnailRef.current = prevPlaylistVideo.thumbnail;
+      console.log('🖼️ ✅ [playPreviousVideo] Captured thumbnail for:', prevPlaylistVideo.title || prevPlaylistVideo.name, 
+                  'URL:', prevPlaylistVideo.thumbnail.substring(0, 60));
+    } else {
+      console.log('🖼️ ⚠️ [playPreviousVideo] No thumbnail - prevPlaylistVideo.thumbnail:', 
+                  prevPlaylistVideo?.thumbnail ? 'exists' : 'null', 
+                  'currentVideo:', currentVideo ? 'exists' : 'null');
+    }
+    
     // Use playVideo to properly set all states and maintain playlist context
     playVideo(prevVideo, currentPlaylistContext);
     
@@ -1922,6 +2172,210 @@ export default function HomeScreen() {
     setToastMessage(message);
     setToastType(type);
     setToastVisible(true);
+  };
+
+  // 🎬 Instagram Style: Load prev/next thumbnails when current video changes
+  useEffect(() => {
+    if (!currentVideo || !currentPlaylistContext) return;
+
+    const currentPlaylist = userPlaylists.find(p => p.id === currentPlaylistContext.playlistId);
+    if (!currentPlaylist || !currentPlaylist.videos || currentPlaylist.videos.length === 0) return;
+
+    const videoIndex = currentPlaylist.videos.findIndex((v: any) => 
+      v.id === currentVideo.id || v.vimeo_id === currentVideo.id || v.id === currentVideo.vimeo_id
+    );
+
+    if (videoIndex !== -1) {
+      // Next video
+      const nextIndex = videoIndex < currentPlaylist.videos.length - 1 ? videoIndex + 1 : 0;
+      const nextVideoData = currentPlaylist.videos[nextIndex];
+      
+      // Previous video
+      const prevIndex = videoIndex > 0 ? videoIndex - 1 : currentPlaylist.videos.length - 1;
+      const prevVideoData = currentPlaylist.videos[prevIndex];
+
+      console.log('🎬 Loading thumbnails - Prev:', prevVideoData?.title, 'Next:', nextVideoData?.title);
+
+      // Update state (only thumbnails needed)
+      setPrevVideo(prevVideoData || null);
+      setNextVideo(nextVideoData || null);
+
+      // Set thumbnails (for backward compatibility)
+      setNextVideoThumbnail(nextVideoData?.thumbnail || null);
+      setPrevVideoThumbnail(prevVideoData?.thumbnail || null);
+    }
+  }, [currentVideo, currentPlaylistContext, userPlaylists]);
+
+  // Swipe gesture handler
+  const onSwipeGestureEvent = Animated.event(
+    [{ nativeEvent: { translationY: swipeTranslateY } }],
+    { useNativeDriver: true }
+  );
+
+  // 🎬 Get high resolution thumbnail from Vimeo
+  const getHighResolutionThumbnail = (thumbnailUrl: string | undefined): string | undefined => {
+    if (!thumbnailUrl) return undefined;
+    
+    // Vimeo URL format:
+    // API'den: https://i.vimeocdn.com/video/123-hash-d_295x166?&r=pad&region=us
+    // Web'den: https://i.vimeocdn.com/video/123-hash-d?mw=1100&mh=620
+    
+    // Remove size suffix (_295x166) and query params
+    let baseUrl = thumbnailUrl.split('?')[0]; // Remove existing params
+    baseUrl = baseUrl.replace(/_\d+x\d+$/, ''); // Remove _295x166
+    
+    // Add Vimeo's web parameters for high quality
+    const highResUrl = baseUrl + '?mw=1100&mh=620';
+    
+    return highResUrl;
+  };
+
+  // 🎬 Instagram Style: Simple rotation (just change current video)
+  const rotateVideoStack = (direction: 'next' | 'prev') => {
+    if (isRotatingRef.current) {
+      console.log('🎬 ⚠️ Rotation in progress, skipping...');
+      return;
+    }
+    
+    isRotatingRef.current = true;
+
+    try {
+      if (direction === 'next') {
+        console.log('🎬 🔄 Rotating NEXT - Play next video');
+        playNextVideo();
+      } else {
+        console.log('🎬 🔄 Rotating PREV - Play previous video');
+        playPreviousVideo();
+      }
+    } catch (error) {
+      console.log('🎬 ❌ Rotation error:', error);
+    } finally {
+      setTimeout(() => {
+        isRotatingRef.current = false;
+      }, 300); // Allow animation to complete
+    }
+  };
+
+  const onSwipeHandlerStateChange = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationY, velocityY } = event.nativeEvent;
+      const screenHeight = Dimensions.get('screen').height;
+      const SWIPE_THRESHOLD = screenHeight * 0.15; // 15% of screen height
+      const VELOCITY_THRESHOLD = 500;
+
+      console.log('📱 Swipe ended:', { translationY, velocityY, threshold: SWIPE_THRESHOLD });
+
+      // Swipe up (next video)
+      if (translationY < -SWIPE_THRESHOLD || velocityY < -VELOCITY_THRESHOLD) {
+        console.log('⬆️ Swipe UP detected - Next video');
+        console.log('📊 nextVideo state:', nextVideo ? `${nextVideo.title} - thumb: ${nextVideo.thumbnail?.substring(0, 40)}` : 'NULL');
+        
+        // 1. Calculate ACTUAL next video from playlist (don't trust state!)
+        let actualNextVideo = nextVideo;
+        if (currentPlaylistContext && userPlaylists) {
+          const currentPlaylist = userPlaylists.find(p => p.id === currentPlaylistContext.playlistId);
+          if (currentPlaylist?.videos) {
+            const currentIndex = currentPlaylist.videos.findIndex((v: any) => 
+              v.id === currentVideo?.id || v.vimeo_id === currentVideo?.id || v.id === currentVideo?.vimeo_id
+            );
+            if (currentIndex !== -1) {
+              const nextIndex = currentIndex < currentPlaylist.videos.length - 1 ? currentIndex + 1 : 0;
+              actualNextVideo = currentPlaylist.videos[nextIndex];
+            }
+          }
+        }
+        
+        const targetThumbnail = actualNextVideo?.thumbnail;
+        if (targetThumbnail) {
+          transitionThumbnailRef.current = targetThumbnail;
+          setNextVideo(actualNextVideo);
+        }
+        
+        // 2. Pause current video immediately
+        if (mainVideoPlayer) {
+          mainVideoPlayer.pause();
+          console.log('⏸️ Current video paused');
+        }
+        
+        // 3. Animate next thumbnail to CENTER (full screen)
+        Animated.timing(swipeTranslateY, {
+          toValue: -screenHeight,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          // Thumbnail is at center - show loading overlay
+          setIsTransitioning(true);
+          setTransitionDirection('next');
+          
+          // 6. Load new video after short delay
+          setTimeout(() => {
+            rotateVideoStack('next');
+            
+            // 7. Clear after video loads (but keep direction until playing)
+            setTimeout(() => {
+              swipeTranslateY.setValue(0);
+              setIsTransitioning(false);
+              // transitionDirection will be cleared when video starts playing
+            }, 100);
+          }, 400); // Show thumbnail + loading for 400ms
+        });
+      }
+      // Swipe down (previous video)
+      else if (translationY > SWIPE_THRESHOLD || velocityY > VELOCITY_THRESHOLD) {
+        console.log('⬇️ Swipe DOWN detected - Previous video');
+        console.log('📊 prevVideo state:', prevVideo ? `${prevVideo.title} - thumb: ${prevVideo.thumbnail?.substring(0, 40)}` : 'NULL');
+        
+        // 1. CAPTURE prev thumbnail IMMEDIATELY (before any state change)
+        const targetThumbnail = prevVideo?.thumbnail;
+        if (targetThumbnail) {
+          transitionThumbnailRef.current = targetThumbnail;
+        }
+        
+        // 2. Pause current video immediately
+        if (mainVideoPlayer) {
+          mainVideoPlayer.pause();
+          console.log('⏸️ Current video paused');
+        }
+        
+        // 3. Animate prev thumbnail to CENTER (full screen)
+        Animated.timing(swipeTranslateY, {
+          toValue: screenHeight,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => {
+          // Thumbnail is at center - show loading overlay
+          setIsTransitioning(true);
+          setTransitionDirection('prev');
+          
+          // 6. Load new video after short delay
+          setTimeout(() => {
+            rotateVideoStack('prev');
+            
+            // 7. Clear after video loads (but keep direction until playing)
+            setTimeout(() => {
+              swipeTranslateY.setValue(0);
+              setIsTransitioning(false);
+              // transitionDirection will be cleared when video starts playing
+            }, 100);
+          }, 400); // Show thumbnail + loading for 400ms
+        });
+      }
+      // Reset if not enough swipe
+      else {
+        console.log('↩️ Swipe canceled - Reset');
+        Animated.parallel([
+          Animated.spring(swipeTranslateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }),
+          Animated.timing(thumbnailOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    }
   };
 
   // Integration Test Helper Functions
@@ -2146,9 +2600,14 @@ export default function HomeScreen() {
         styles.container, 
         styles.darkContainer, 
         Platform.OS === 'web' ? { justifyContent: 'flex-end', paddingBottom: 34 } : {},
-        { opacity: pageOpacity }
+        { opacity: pageOpacity },
+        isLandscape && styles.landscapeContainer
       ]}>
-        <StatusBar barStyle="light-content" backgroundColor="#000000" />
+        <StatusBar 
+          barStyle="light-content" 
+          backgroundColor="#000000" 
+          hidden={isLandscape && currentVideo} 
+        />
         
         {/* Background Video - Only when no main video */}
         {backgroundVideoPlayer && !currentVideo && (
@@ -2172,21 +2631,56 @@ export default function HomeScreen() {
 
       {/* Main Video - Full Screen - Completely Independent */}
       {currentVideo && Platform.OS !== 'web' && (
-        <View style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'transparent',
-        }}>
-          {/* Unified VideoView - TÜM PLATFORMLAR İÇİN */}
-          {mainVideoPlayer && currentVideo && (
-            <VideoView
-              player={mainVideoPlayer}
-              style={{
+        <PanGestureHandler
+          onGestureEvent={onSwipeGestureEvent}
+          onHandlerStateChange={onSwipeHandlerStateChange}
+          enabled={!isLandscape} // Disable swipe in landscape mode
+        >
+          <Animated.View style={[
+            {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100%',
+              height: '100%',
+              backgroundColor: 'transparent',
+            },
+            isLandscape && (console.log('🔄 Video container landscape styles applied!'), {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100%',
+              height: '100%',
+              zIndex: 10000, // Landscape'de en üstte
+            })
+          ]}>
+            {/* Touch handler for showing overlay */}
+            {!isLandscape && (
+              <Pressable
+                onPress={() => {
+                  console.log('📱 Screen tapped - showing overlay');
+                  showVideoOverlayWithTimer();
+                }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  width: '100%',
+                  height: '100%',
+                  zIndex: 100, // Above everything except overlay itself
+                }}
+              />
+            )}
+
+            {/* 🎬 Instagram Style: Single VideoView + Thumbnail Previews */}
+            {!isLandscape && (
+              <View style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
@@ -2194,79 +2688,485 @@ export default function HomeScreen() {
                 bottom: 0,
                 width: '100%',
                 height: '100%',
-                backgroundColor: 'transparent', // Video background
-                zIndex: -500, // Background'da ama görünür
-              }}
-              allowsFullscreen={false}
-              allowsPictureInPicture={Platform.OS !== 'web'} // Sadece mobile'da PiP
-              allowsExternalPlayback={true}
-              contentFit="cover"
-              nativeControls={false}
-              requiresLinearPlayback={false}
-              showNowPlayingNotification={true} // iOS lock screen için gerekli
-              startPlaybackAutomatically={false}
-              // Tüm UI kontrollerini kapat
-              showsPlaybackControls={false}
-              // VideoView metadata prop - Enhanced for iOS lock screen
-              metadata={currentMetadata ? {
-                ...currentMetadata,
-                // iOS lock screen için ek properties
-                albumTitle: currentMetadata.albumTitle || currentMetadata.album || 'Naber LA Collection',
-                duration: currentMetadata.duration || 180
-              } : {
-                title: currentVideo?.name || currentVideo?.title || 'Naber LA Music',
-                artist: 'Naber LA',
-                albumTitle: 'Naber LA Collection'
-              }}
-            />
-          )}
+              }}>
+                {/* RENDER ORDER: Current first (bottom), then prev/next (top) */}
+                
+                {/* Current Video - Center (main) - ONLY VideoView - RENDER FIRST (stays at bottom) */}
+                {/* Always render but hide during transition and until playing */}
+                {mainVideoPlayer && currentVideo && (
+                  <Animated.View 
+                    key={`current-${currentVideo.id || currentVideo.vimeo_id}`}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      width: '100%',
+                      height: '100%',
+                      backgroundColor: '#000000', // Black background for VideoView
+                      zIndex: (!isVideoPlaying) ? -999 : 1, // Show only when playing (removed isTransitioning check)
+                      opacity: (!isVideoPlaying) ? 0 : 1,
+                      transform: (isTransitioning || !isVideoPlaying) ? [] : [{ translateY: swipeTranslateY }],
+                    }}>
+                    <VideoView
+                      key={`current-video-${currentVideo.id || currentVideo.vimeo_id}`}
+                      player={mainVideoPlayer}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: 'transparent',
+                      }}
+                      contentFit="cover"
+                      fullscreenOptions={{ enterFullscreenButton: false, exitFullscreenButton: false }}
+                      allowsPictureInPicture={true}
+                      nativeControls={false}
+                      showsPlaybackControls={false}
+                    />
+                  </Animated.View>
+                )}
 
-          {/* Video Loading Overlay - Ana video için */}
-          {currentVideo && !isVideoReady && (
-            <View style={{
+                {/* Previous Video Thumbnail - Above current - Show during swipe OR loading */}
+                {prevVideo && prevVideo.thumbnail && (
+                  <>
+                    <Animated.View 
+                      key={`prev-${prevVideo.id || prevVideo.vimeo_id}`}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: Dimensions.get('screen').height,
+                        // Show in front when transitionDirection is 'prev'
+                        zIndex: transitionDirection === 'prev' ? 0 : -2,
+                        // Freeze at center when transitionDirection is 'prev', otherwise follow swipe
+                        transform: transitionDirection === 'prev'
+                          ? [{ translateY: 0 }]
+                          : [{
+                              translateY: Animated.add(
+                                swipeTranslateY,
+                                new Animated.Value(-Dimensions.get('screen').height)
+                              )
+                            }],
+                        // Fade out when video starts playing
+                        opacity: (transitionDirection === 'prev' && isVideoPlaying) ? 0 : 1,
+                      }}>
+                    {/* Crisp Thumbnail - Full Screen */}
+                    <Image
+                      key={transitionDirection === 'prev' && transitionThumbnailRef.current 
+                        ? transitionThumbnailRef.current 
+                        : prevVideo.thumbnail}
+                      source={{ uri: getHighResolutionThumbnail(
+                        transitionDirection === 'prev' && transitionThumbnailRef.current 
+                          ? transitionThumbnailRef.current 
+                          : prevVideo.thumbnail
+                      ) }}
+                      style={{
+                        position: 'absolute',
+                        width: '100%',
+                        height: '100%',
+                      }}
+                      contentFit="cover"
+                      priority="high"
+                      cachePolicy="disk"
+                      transition={0}
+                    />
+                    {/* Loading pulse animation - show when loading AND transition is PREV */}
+                    {transitionDirection === 'prev' && !isVideoPlaying && (
+                      <View style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(0,0,0,0.7)', // Daha karanlık background
+                      }}>
+                        <Animated.View style={{ transform: [{ scale: loadingHeartScale }] }}>
+                          <Image source={loadingHeartImage} style={{ width: 60, height: 60, opacity: 1.0 }} resizeMode="contain" />
+                        </Animated.View>
+                      </View>
+                    )}
+                  </Animated.View>
+                  </>
+                )}
+
+                {/* Next Video Thumbnail - Below current - Show during swipe OR loading */}
+                {nextVideo && nextVideo.thumbnail && (
+                  <>
+                    <Animated.View 
+                      key={`next-${nextVideo.id || nextVideo.vimeo_id}`}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: Dimensions.get('screen').height,
+                        // Show in front when transitionDirection is 'next'
+                        zIndex: transitionDirection === 'next' ? 0 : -3,
+                        // Freeze at center when transitionDirection is 'next', otherwise follow swipe
+                        transform: transitionDirection === 'next' 
+                          ? [{ translateY: 0 }]
+                          : [{
+                              translateY: Animated.add(
+                                swipeTranslateY,
+                                new Animated.Value(Dimensions.get('screen').height)
+                              )
+                            }],
+                        // Fade out when video starts playing
+                        opacity: (transitionDirection === 'next' && isVideoPlaying) ? 0 : 1,
+                      }}>
+                    {/* Crisp Thumbnail - Full Screen */}
+                    <Image
+                      key={transitionDirection === 'next' && transitionThumbnailRef.current 
+                        ? transitionThumbnailRef.current 
+                        : nextVideo.thumbnail}
+                      source={{ uri: getHighResolutionThumbnail(
+                        transitionDirection === 'next' && transitionThumbnailRef.current 
+                          ? transitionThumbnailRef.current 
+                          : nextVideo.thumbnail
+                      ) }}
+                      style={{
+                        position: 'absolute',
+                        width: '100%',
+                        height: '100%',
+                      }}
+                      contentFit="cover"
+                      priority="high"
+                      cachePolicy="disk"
+                      transition={0}
+                    />
+                    {/* Loading pulse animation - show when loading AND transition is NEXT */}
+                    {transitionDirection === 'next' && !isVideoPlaying && (
+                      <View style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(0,0,0,0.7)', // Daha karanlık background
+                      }}>
+                        <Animated.View style={{ transform: [{ scale: loadingHeartScale }] }}>
+                          <Image source={loadingHeartImage} style={{ width: 60, height: 60, opacity: 1.0 }} resizeMode="contain" />
+                        </Animated.View>
+                      </View>
+                    )}
+                  </Animated.View>
+                  </>
+                )}
+              </View>
+            )}
+
+            {/* Landscape Mode - Only current video full screen */}
+            {isLandscape && mainVideoPlayer && currentVideo && (
+              <Animated.View style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                width: '100%',
+                height: '100%',
+                zIndex: 9999,
+              }}>
+                <VideoView
+                  player={mainVideoPlayer}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: '#000000',
+                    ...styles.landscapePlayerArea
+                  }}
+                  fullscreenOptions={{ enterFullscreenButton: false, exitFullscreenButton: false }}
+                  allowsPictureInPicture={true}
+                  allowsExternalPlayback={true}
+                  contentFit="contain"
+                  nativeControls={false}
+                  requiresLinearPlayback={false}
+                  showNowPlayingNotification={true}
+                  startPlaybackAutomatically={false}
+                  showsPlaybackControls={false}
+                  metadata={currentMetadata ? {
+                    ...currentMetadata,
+                    albumTitle: currentMetadata.albumTitle || currentMetadata.album || 'Naber LA Collection',
+                    duration: currentMetadata.duration || 180
+                  } : {
+                    title: currentVideo?.name || currentVideo?.title || 'Naber LA Music',
+                    artist: 'Naber LA',
+                    albumTitle: 'Naber LA Collection'
+                  }}
+                />
+              </Animated.View>
+            )}
+
+          {/* Video Loading Overlay - COMPLETELY DISABLED for clean swipe experience */}
+          {/* Loading overlay removed - thumbnails provide visual feedback during loading */}
+
+          {/* VimeoPlayerNative tamamen devre dışı */}
+          </Animated.View>
+        </PanGestureHandler>
+      )}
+
+      {/* OVERLAYS - OUTSIDE PanGestureHandler for better rendering */}
+      {/* Video Overlay - Song Title */}
+      {currentVideo && !isFullscreen && !isLandscape && (
+        <Animated.View 
+          style={[
+            styles.videoOverlay,
+            { 
+              opacity: overlayOpacity,
+              zIndex: 99999,
+            }
+          ]}
+          pointerEvents="none"
+        >
+          {/* Gradient Background */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.4)', 'transparent']}
+            style={styles.videoOverlayGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
+          
+          {/* Content - Sadece text */}
+          <View style={[
+            styles.videoOverlayContent,
+            { 
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              justifyContent: 'flex-start',
+              alignSelf: 'flex-start',
+              paddingVertical: 10,
+              paddingLeft: Platform.OS === 'web' ? 18 : 20,
+            }
+          ]}>
+            {/* Sanatçı adı */}
+            <Text style={[
+              styles.videoOverlayArtist,
+              { 
+                textAlign: 'left',
+                marginBottom: 2,
+              }
+            ]} numberOfLines={1}>
+              {(() => {
+                const fullTitle = currentVideo.name || currentVideo.title || 'Untitled Video';
+                const parts = fullTitle.split(' - ');
+                return parts.length > 1 ? parts[0] : 'Unknown Artist';
+              })()}
+            </Text>
+            
+            {/* Şarkı adı */}
+            <Text style={[
+              styles.videoOverlaySong,
+              { 
+                textAlign: 'left',
+              }
+            ]} numberOfLines={1}>
+              {(() => {
+                const fullTitle = currentVideo.name || currentVideo.title || 'Untitled Video';
+                const parts = fullTitle.split(' - ');
+                return parts.length > 1 ? parts.slice(1).join(' - ') : fullTitle;
+              })()}
+            </Text>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Share and Heart Icons */}
+      {currentVideo && !isFullscreen && (
+        <Animated.View 
+          style={[
+            {
               position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.9)',
-              justifyContent: 'center',
+              ...(Platform.OS === 'web'
+                ? { top: 25, right: 25 }
+                : { top: 60, right: 25 }
+              ),
+              opacity: overlayOpacity,
+              zIndex: 99999,
+              flexDirection: (Platform.OS === 'web' && width > 768) ? 'row' : 'column',
               alignItems: 'center',
-              zIndex: 9999, // En üstte - video controls'ün üstünde
-              elevation: 999, // Android için
-            }}>
-              <Animated.View
-                style={{
-                  transform: [{ scale: loadingHeartScale }],
-                  justifyContent: 'center',
-                  alignItems: 'center',
+              gap: (Platform.OS === 'web' && width > 768) ? 15 : 10,
+            }
+          ]}
+          pointerEvents="box-none"
+        >
+          {(Platform.OS === 'web' && width > 768) ? (
+            <>
+              {/* Web layout */}
+              <View style={{ position: 'relative' }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log('🔗 SHARE BUTTON PRESSED!');
+                    handleShareVideo();
+                  }}
+                  activeOpacity={0.7}
+                  style={{ padding: 8 }}
+                >
+                  <Image 
+                    source={require('../../assets/images/link2.png')}
+                    style={{ width: 24, height: 24, tintColor: 'white' }}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+                
+                {/* Inline "Link copied" toast - LEFT of share button (web) */}
+                {shareToastVisible && (
+                  <Animated.View
+                    style={{
+                      position: 'absolute',
+                      right: 45, // Icon width 24 + padding 8 + margin 13
+                      top: 8,
+                      width: 92,
+                      height: 22,
+                      opacity: shareToastOpacity,
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)', // Beyaz kutu
+                      borderRadius: 11, // Uzun ince pill shape
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ 
+                      color: '#000000', 
+                      fontSize: 10, 
+                      fontWeight: '400', 
+                      whiteSpace: 'nowrap',
+                      letterSpacing: 0.2,
+                    }}>
+                      Link Copied!
+                    </Text>
+                  </Animated.View>
+                )}
+              </View>
+
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('❤️ HEART BUTTON PRESSED!');
+                  handleHeartPress();
                 }}
+                activeOpacity={0.7}
+                style={{ padding: 8 }}
               >
-                <Image 
-                  source={require('@/assets/images/load.png')} 
-                  style={{ 
-                    width: 60, 
-                    height: 60,
-                    opacity: 1.0,
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  backgroundColor: isHeartFavorited ? '#e0af92' : 'white',
+                  mask: 'url(/hearto.png) no-repeat center',
+                  maskSize: 'contain',
+                  WebkitMask: 'url(/hearto.png) no-repeat center',
+                  WebkitMaskSize: 'contain',
+                }} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              {/* Mobile layout */}
+              <TouchableOpacity
+                onPress={() => {
+                  console.log('❤️ HEART BUTTON PRESSED!');
+                  handleHeartPress();
+                }}
+                activeOpacity={0.7}
+                style={{ padding: 8 }}
+              >
+                <Image
+                  source={heartImage}
+                  style={{
+                    width: 35,
+                    height: 35,
+                    tintColor: isHeartFavorited ? "#e0af92" : "white",
                   }}
                   resizeMode="contain"
                 />
-              </Animated.View>
-            </View>
-          )}
+              </TouchableOpacity>
 
-          {/* VimeoPlayerNative tamamen devre dışı */}
-        </View>
+              <View style={{ position: 'relative' }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log('🔗 SHARE BUTTON PRESSED!');
+                    handleShareVideo();
+                  }}
+                  activeOpacity={0.7}
+                  style={{ padding: 8 }}
+                >
+                  <Image 
+                    source={require('../../assets/images/link2.png')}
+                    style={{ width: 35, height: 35, tintColor: 'white' }}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+                
+                {/* Inline "Link copied" toast - LEFT of share button (mobile) */}
+                {shareToastVisible && (
+                  <Animated.View
+                    style={{
+                      position: 'absolute',
+                      right: 55, // Icon width 35 + padding 8 + margin 12
+                      top: 14,
+                      width: 95,
+                      height: 24,
+                      opacity: shareToastOpacity,
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)', // Beyaz kutu
+                      borderRadius: 12, // Uzun ince pill shape
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ 
+                      color: '#000000', 
+                      fontSize: 11, 
+                      fontWeight: '400',
+                      letterSpacing: 0.2,
+                    }}>
+                      Link Copied!
+                    </Text>
+                  </Animated.View>
+                )}
+              </View>
+            </>
+          )}
+        </Animated.View>
       )}
       
-      {/* Safe Area for Camera Notch */}
-      <ThemedView style={styles.safeAreaTop} />
+      {/* Safe Area for Camera Notch - Hidden in landscape */}
+      {!isLandscape && <ThemedView style={styles.safeAreaTop} />}
       
       {/* Video Player Area with smooth height animation */}
       <Animated.View style={[
         styles.playerArea, 
         isFullscreen && styles.fullscreenPlayer,
-        isLandscape && styles.landscapePlayerArea, // New style for landscape
+        isLandscape && (console.log('🔄 Applying landscape styles with safe area override'), {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: '100%',
+          width: '100%',
+          zIndex: 99999, // Much higher z-index to cover safe areas
+          // Override safe areas completely
+          paddingTop: 0,
+          paddingBottom: 0,
+          paddingLeft: 0,
+          paddingRight: 0,
+          marginTop: 0,
+          marginBottom: 0,
+          marginLeft: 0,
+          marginRight: 0,
+        }), // Inline landscape styles
         Platform.OS === 'web' && {
           height: isLandscape ? '100vh' : videoHeightAnimation.interpolate({
             inputRange: [0.7, 1],
@@ -2299,304 +3199,16 @@ export default function HomeScreen() {
                   zIndex: 100, // Loading overlay'inin altında
                 }}
                 onPress={() => {
-                  // Smooth overlay animation - sadece video hazırken
+                  // Use the centralized overlay function
                   if (currentVideo && isVideoReady) {
-                    console.log('🎬 Video tap - showing overlay');
-                    setShowVideoOverlay(true);
-                    
-                    // Animate in
-                    Animated.timing(overlayOpacity, {
-                      toValue: 1,
-                      duration: 300,
-                      useNativeDriver: true,
-                    }).start();
-                    
-                    // Hide after 4 seconds with animation
-                    setTimeout(() => {
-                      Animated.timing(overlayOpacity, {
-                        toValue: 0,
-                        duration: 300,
-                        useNativeDriver: true,
-                      }).start();
-                    }, 4000);
+                    console.log('📱 Universal tap area pressed - showing overlay');
+                    showVideoOverlayWithTimer();
                   }
                 }}
                 activeOpacity={0.8}
               />
             )}
 
-            {/* Video Overlay - Song Title */}
-            {currentVideo && !isFullscreen && (
-              <Animated.View 
-                style={[
-                  styles.videoOverlay,
-                  { opacity: overlayOpacity }
-                ]}
-                pointerEvents="none"
-              >
-                
-                {/* Gradient Background */}
-                <LinearGradient
-                  colors={['rgba(0,0,0,0.9)', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.4)', 'transparent']}
-                  style={styles.videoOverlayGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 0, y: 1 }}
-                />
-                
-                {/* Content - Sadece text */}
-                <View style={[
-                  styles.videoOverlayContent,
-                  { 
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    justifyContent: 'flex-start',
-                    alignSelf: 'flex-start',
-                    paddingVertical: 10,
-                    paddingLeft: Platform.OS === 'web' ? 18 : 20, // Web'de minimal sol padding
-                  }
-                ]}>
-                  {/* Sanatçı adı */}
-                  <Text style={[
-                    styles.videoOverlayArtist,
-                    { 
-                      textAlign: 'left',
-                      marginBottom: 2,
-                    }
-                  ]} numberOfLines={1}>
-                    {(() => {
-                      const fullTitle = currentVideo.name || currentVideo.title || 'Untitled Video';
-                      const parts = fullTitle.split(' - ');
-                      return parts.length > 1 ? parts[0] : 'Unknown Artist';
-                    })()}
-                  </Text>
-                  
-                  {/* Şarkı adı */}
-                  <Text style={[
-                    styles.videoOverlaySong,
-                    { 
-                      textAlign: 'left',
-                    }
-                  ]} numberOfLines={1}>
-                    {(() => {
-                      const fullTitle = currentVideo.name || currentVideo.title || 'Untitled Video';
-                      const parts = fullTitle.split(' - ');
-                      return parts.length > 1 ? parts.slice(1).join(' - ') : fullTitle;
-                    })()}
-                  </Text>
-                </View>
-              </Animated.View>
-            )}
-
-            {/* Share and Heart Icons - OUTSIDE overlay */}
-            {currentVideo && !isFullscreen && (
-              <Animated.View 
-                style={[
-                  {
-                    position: 'absolute',
-                    ...(Platform.OS === 'web'
-                      ? { top: 25, right: 25 } // Hem desktop hem mobile web'de üstte
-                      : { top: 60, right: 25 } // Native mobile'da da üstte, şarkı hizasında
-                    ),
-                    opacity: overlayOpacity,
-                    zIndex: 10001, // En yüksek z-index
-                    flexDirection: (Platform.OS === 'web' && width > 768) ? 'row' : 'column', // Desktop web'de yan yana, mobil web'de alt alta
-                    alignItems: 'center',
-                    gap: (Platform.OS === 'web' && width > 768) ? 15 : 10, // Desktop web'de 15px, mobil web'de 10px
-                  }
-                ]}
-                pointerEvents="box-none"
-              >
-                {/* Web'de: Share solda, Heart sağda | Mobilde: Heart üstte, Share altta */}
-                {(Platform.OS === 'web' && width > 768) ? (
-                  <>
-                    {/* Share Button with Inline Toast - Web'de solda */}
-                    <View style={{ 
-                      flexDirection: 'row', 
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      {/* Inline Toast - Sol tarafta */}
-                      {shareToastVisible && (
-                        <Animated.View
-                          style={{
-                            marginRight: 8,
-                            backgroundColor: 'white',
-                            borderRadius: 12,
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            shadowColor: '#000',
-                            shadowOffset: {
-                              width: 0,
-                              height: 2,
-                            },
-                            shadowOpacity: 0.25,
-                            shadowRadius: 3.84,
-                            elevation: 5,
-                            opacity: shareToastOpacity,
-                          }}
-                        >
-                          <Text style={{
-                            color: 'black',
-                            fontSize: 12,
-                            fontWeight: '500',
-                          }}>
-                            Link copied!
-                          </Text>
-                        </Animated.View>
-                      )}
-                      
-                      <TouchableOpacity
-                        onPress={() => {
-                          console.log('🔗 SHARE BUTTON PRESSED!');
-                          handleShareVideo();
-                        }}
-                        activeOpacity={0.7}
-                        style={{ 
-                          padding: 8,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: 'transparent',
-                        }}
-                      >
-                        <Image 
-                          source={require('../../assets/images/link2.png')}
-                          style={{ 
-                            width: Platform.OS === 'web' ? 24 : 20, 
-                            height: Platform.OS === 'web' ? 24 : 20, 
-                            tintColor: 'white' 
-                          }}
-                          resizeMode="contain"
-                        />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Heart Button - Web'de sağda */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        console.log('❤️ HEART BUTTON PRESSED!');
-                        handleHeartPress();
-                      }}
-                      activeOpacity={0.7}
-                      style={{ 
-                        padding: 8,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: 'transparent',
-                      }}
-                    >
-                      <div style={{
-                        width: '36px',
-                        height: '36px',
-                        backgroundColor: isHeartFavorited ? '#e0af92' : 'white',
-                        mask: 'url(/hearto.png) no-repeat center',
-                        maskSize: 'contain',
-                        WebkitMask: 'url(/hearto.png) no-repeat center',
-                        WebkitMaskSize: 'contain',
-                      }} />
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <>
-                    {/* Mobilde: Heart üstte, Share altta */}
-                    {/* Heart Button - Mobilde üstte */}
-                    <TouchableOpacity
-                      onPress={() => {
-                        console.log('❤️ HEART BUTTON PRESSED!');
-                        handleHeartPress();
-                      }}
-                      activeOpacity={0.7}
-                      style={{ 
-                        padding: 8,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: 'transparent',
-                      }}
-                    >
-                      <Image
-                        source={heartImage}
-                        style={{
-                          width: 35, // 25 * 1.4 = 35 (daha büyük)
-                          height: 35,
-                          tintColor: isHeartFavorited ? "#e0af92" : "white",
-                        }}
-                        resizeMode="contain"
-                      />
-                    </TouchableOpacity>
-
-                    {/* Share Button with Inline Toast - Mobilde altta */}
-                    <View style={{ 
-                      flexDirection: 'row', 
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative', // Toast için relative positioning
-                    }}>
-                      {/* Inline Toast - Sol tarafta */}
-                      {shareToastVisible && (
-                        <Animated.View
-                          style={{
-                            position: 'absolute',
-                            right: 50, // Share butonunun solunda
-                            backgroundColor: 'white',
-                            borderRadius: 12,
-                            paddingHorizontal: 16, // Daha geniş padding
-                            paddingVertical: 6,
-                            minWidth: 100, // Minimum genişlik
-                            shadowColor: '#000',
-                            shadowOffset: {
-                              width: 0,
-                              height: 2,
-                            },
-                            shadowOpacity: 0.25,
-                            shadowRadius: 3.84,
-                            elevation: 5,
-                            zIndex: 10002, // Toast için yüksek z-index
-                            opacity: shareToastOpacity,
-                          }}
-                        >
-                          <Text 
-                            numberOfLines={1}
-                            style={{
-                              color: 'black',
-                              fontSize: 12,
-                              fontWeight: '500',
-                              textAlign: 'center',
-                              whiteSpace: 'nowrap', // Web için tek satır
-                            }}
-                          >
-                            Link copied!
-                          </Text>
-                        </Animated.View>
-                      )}
-                      
-                      <TouchableOpacity
-                        onPress={() => {
-                          console.log('🔗 SHARE BUTTON PRESSED!');
-                          handleShareVideo();
-                        }}
-                        activeOpacity={0.7}
-                        style={{ 
-                          padding: 8,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: 'transparent',
-                        }}
-                      >
-                        <Image 
-                          source={require('../../assets/images/link2.png')}
-                          style={{ 
-                            width: 35, // Mobile: 25 * 1.4 = 35 (daha büyük)
-                            height: 35, 
-                            tintColor: 'white' 
-                          }}
-                          resizeMode="contain"
-                        />
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                )}
-              </Animated.View>
-            )}
-            
             {/* Top Gradient Overlay - REMOVED */}
           </>
         ) : (
@@ -2891,8 +3503,9 @@ export default function HomeScreen() {
         onHide={() => setToastVisible(false)}
       />
 
+
       {/* Music Player Footer */}
-      {(Platform.OS === 'web' ? !isFullscreen : true) && (
+      {(Platform.OS === 'web' ? !isFullscreen : true) && !isLandscape && (
         <MusicPlayerTabBar
           currentVideo={currentVideo}
           isPaused={isPaused}
@@ -3600,7 +4213,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: Platform.OS === 'web' ? '30%' : 120,
+    height: Platform.OS === 'web' ? '40%' : 180, // Daha uzun gradient (120 -> 180)
     zIndex: 1000, // Çok yüksek z-index
     pointerEvents: 'box-none', // İçerideki elementlerin tıklanabilir olması için
   },
@@ -3641,6 +4254,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)', // Biraz daha soluk
     lineHeight: Platform.OS === 'web' ? 24 : 20, // Line height de büyütüldü
   },
+  // Landscape Container
+  landscapeContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#000000',
+  },
   // Landscape Player Area
   landscapePlayerArea: {
     position: 'absolute',
@@ -3648,8 +4272,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: '100vh',
-    width: '100vw',
+    height: Platform.OS === 'web' ? '100vh' : '100%',
+    width: Platform.OS === 'web' ? '100vw' : '100%',
     zIndex: 1000, // En üstte olsun
   },
   // Gradient Overlays
