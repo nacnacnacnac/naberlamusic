@@ -1232,20 +1232,18 @@ export default function HomeScreen() {
         
         if (naberLAAIPlaylist) {
           setExpandedPlaylists(new Set([naberLAAIPlaylist.id]));
-          console.log('🎵 Auto-expanded only "Naber LA - AI" playlist for better performance');
+          console.log('🎵 Auto-expanded "Naber LA - AI" playlist');
           
-          // ✅ AUTO-LOAD: Fetch videos for auto-expanded playlist
-          if (!naberLAAIPlaylist.videos || naberLAAIPlaylist.videos.length === 0) {
-            console.log('⚡ Auto-loading videos for "Naber LA - AI"...');
-            hybridPlaylistService.loadPlaylistVideos(naberLAAIPlaylist.id)
-              .then(videos => {
-                setUserPlaylists(prev => prev.map(p => 
-                  p.id === naberLAAIPlaylist.id ? { ...p, videos } : p
-                ));
-                console.log(`✅ Auto-loaded ${videos.length} videos for "Naber LA - AI"`);
-              })
-              .catch(err => console.error('Failed to auto-load videos:', err));
-          }
+          // ✅ AUTO-LOAD: ALWAYS fetch videos for auto-expanded playlist (don't trust initial data)
+          console.log('⚡ Auto-loading videos for "Naber LA - AI"... (current videos:', naberLAAIPlaylist.videos?.length || 0, ')');
+          hybridPlaylistService.loadPlaylistVideos(naberLAAIPlaylist.id)
+            .then(videos => {
+              setUserPlaylists(prev => prev.map(p => 
+                p.id === naberLAAIPlaylist.id ? { ...p, videos } : p
+              ));
+              console.log(`✅ Auto-loaded ${videos.length} videos for "Naber LA - AI"`);
+            })
+            .catch(err => console.error('❌ Failed to auto-load videos:', err));
         } else {
           setExpandedPlaylists(new Set());
           console.log('🎵 "Naber LA - AI" playlist not found - all playlists start closed');
@@ -2070,26 +2068,9 @@ export default function HomeScreen() {
     }
     
     if (!currentPlaylist || !currentPlaylist.videos || currentPlaylist.videos.length === 0) {
-      console.log('🎵 No playlist found or playlist empty - using global videos array as fallback');
-      
-      // FALLBACK: Use global videos array
-      if (videos && videos.length > 0) {
-        const nextIndex = (currentVideoIndex + 1) % videos.length;
-        console.log('🎵 Using global videos - Current index:', currentVideoIndex, 'Next index:', nextIndex);
-        const nextGlobalVideo = videos[nextIndex];
-        
-        // Play next video from global array
-        playVideo(
-          nextGlobalVideo, 
-          nextIndex, 
-          currentPlaylistContext?.playlistId || null,
-          currentPlaylistContext?.playlistName || null
-        );
-        return;
-      } else {
-        console.log('❌ No videos available at all!');
-        return;
-      }
+      console.log('🎵 ❌ No playlist found or playlist empty - cannot play next video');
+      console.log('🎵 This should not happen! Playlist videos should be loaded before swipe.');
+      return;
     }
     
     const nextIndex = (currentVideoIndexInPlaylist + 1) % currentPlaylist.videos.length;
@@ -2211,26 +2192,9 @@ export default function HomeScreen() {
     }
     
     if (!currentPlaylist || !currentPlaylist.videos || currentPlaylist.videos.length === 0) {
-      console.log('🎵 No playlist found or playlist empty - using global videos array as fallback');
-      
-      // FALLBACK: Use global videos array
-      if (videos && videos.length > 0) {
-        const prevIndex = currentVideoIndex <= 0 ? videos.length - 1 : currentVideoIndex - 1;
-        console.log('🎵 Using global videos - Current index:', currentVideoIndex, 'Previous index:', prevIndex);
-        const prevGlobalVideo = videos[prevIndex];
-        
-        // Play previous video from global array
-        playVideo(
-          prevGlobalVideo, 
-          prevIndex, 
-          currentPlaylistContext?.playlistId || null,
-          currentPlaylistContext?.playlistName || null
-        );
-        return;
-      } else {
-        console.log('❌ No videos available at all!');
-        return;
-      }
+      console.log('🎵 ❌ No playlist found or playlist empty - cannot play previous video');
+      console.log('🎵 This should not happen! Playlist videos should be loaded before swipe.');
+      return;
     }
     
     const prevIndex = currentVideoIndexInPlaylist <= 0 ? currentPlaylist.videos.length - 1 : currentVideoIndexInPlaylist - 1;
