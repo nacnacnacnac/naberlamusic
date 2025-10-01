@@ -3098,7 +3098,7 @@ export default function HomeScreen() {
             top: '50%',
             left: '50%',
             transform: [
-              { translateX: -85 }, // Center the container (170px wide)
+              { translateX: -100 }, // Center the container (wider for text)
               { translateY: -50 },
               { scale: doubleTapToastOpacity.interpolate({
                 inputRange: [0, 1],
@@ -3108,12 +3108,13 @@ export default function HomeScreen() {
             opacity: doubleTapToastOpacity,
             zIndex: 999999,
             backgroundColor: 'rgba(0, 0, 0, 0.75)', // Semi-transparent black
-            paddingHorizontal: 20,
-            paddingVertical: 15,
+            paddingHorizontal: 24,
+            paddingVertical: 16,
             borderRadius: 20,
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 10,
+            gap: 8,
+            minWidth: 200, // Ensure enough space for text
           }}
           pointerEvents="none"
         >
@@ -3131,9 +3132,10 @@ export default function HomeScreen() {
           />
           <Text style={{
             color: '#FFFFFF',
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: '500',
             textAlign: 'center',
+            maxWidth: 180,
           }}>
             {doubleTapToastMessage}
           </Text>
