@@ -3096,7 +3096,7 @@ export default function HomeScreen() {
           style={{
             position: 'absolute',
             top: screenHeight / 2 - 60, // Center vertically (approximate height: 120px)
-            left: width / 2 - 100, // Center horizontally (approximate width: 200px)
+            left: width / 2 - 110, // Center horizontally (container is ~220px wide)
             transform: [
               { scale: doubleTapToastOpacity.interpolate({
                 inputRange: [0, 1],
@@ -3112,7 +3112,7 @@ export default function HomeScreen() {
             flexDirection: 'column',
             alignItems: 'center',
             gap: 8,
-            minWidth: 200, // Ensure enough space for text
+            minWidth: 220, // Wider for "Removed from Liked Songs"
           }}
           pointerEvents="none"
         >
