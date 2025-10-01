@@ -108,6 +108,11 @@ class HybridPlaylistService {
         
         let cachedResult = [...prefixedUserPlaylists, ...filteredCachedPlaylists, ...webOnlyPlaylists];
         
+        // ✅ Remove duplicates from cache
+        cachedResult = cachedResult.filter((playlist, index, self) => 
+          index === self.findIndex(p => p.id === playlist.id)
+        );
+        
         // Fix duplicate Liked Songs playlists
         const likedSongsPlaylists = cachedResult.filter(p => p.isLikedSongs || p.name === 'Liked Songs');
         if (likedSongsPlaylists.length > 1) {
@@ -180,10 +185,17 @@ class HybridPlaylistService {
       
       const finalPlaylists = [...prefixedUserPlaylists, ...finalAdminPlaylists, ...webOnlyPlaylists];
       
+      // ✅ Remove duplicates by ID (do it once in service, not every time in UI)
+      const uniquePlaylists = finalPlaylists.filter((playlist, index, self) => 
+        index === self.findIndex(p => p.id === playlist.id)
+      );
+      
+      console.log(`📊 Deduplicated: ${finalPlaylists.length} → ${uniquePlaylists.length} playlists`);
+      
       // Save refresh timestamp
       await AsyncStorage.setItem('playlists_last_refresh', Date.now().toString());
       
-      return finalPlaylists;
+      return uniquePlaylists;
       
     } catch (error) {
       console.warn('⚠️ Admin API failed, showing only user playlists:', error);

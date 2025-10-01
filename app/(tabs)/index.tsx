@@ -1179,16 +1179,14 @@ export default function HomeScreen() {
         // ✅ REMOVED: Unnecessary 1-second delay - playlists load instantly now!
         // await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Remove duplicates by ID
-        const uniquePlaylists = playlists.filter((playlist, index, self) => 
-          index === self.findIndex(p => p.id === playlist.id)
-        );
+        // ✅ REMOVED: Duplicate check - service already handles this
+        // Service deduplicates at 2 points: cache return and fresh API return
         
         // Filter playlists based on user type
-        let filteredPlaylists = uniquePlaylists;
+        let filteredPlaylists = playlists;
         if (!isGoogleUser) {
           // Non-Google users: only show admin playlists
-          filteredPlaylists = uniquePlaylists.filter(playlist => playlist.isAdminPlaylist);
+          filteredPlaylists = playlists.filter(playlist => playlist.isAdminPlaylist);
           logger.system('🔒 Non-Google user: filtered to', filteredPlaylists.length, 'admin playlists');
         }
         
