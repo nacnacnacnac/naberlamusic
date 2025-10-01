@@ -1005,6 +1005,31 @@ export default function HomeScreen() {
   // Double tap detection
   const lastTapRef = useRef<number>(0);
   const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [doubleTapToastVisible, setDoubleTapToastVisible] = useState(false);
+  const [doubleTapToastMessage, setDoubleTapToastMessage] = useState('');
+  const doubleTapToastOpacity = useRef(new Animated.Value(0)).current;
+  
+  // Show double tap toast message
+  const showDoubleTapToast = (message: string) => {
+    setDoubleTapToastMessage(message);
+    setDoubleTapToastVisible(true);
+    
+    Animated.sequence([
+      Animated.timing(doubleTapToastOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.delay(1500),
+      Animated.timing(doubleTapToastOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setDoubleTapToastVisible(false);
+    });
+  };
 
   // Integration Testing State
   const [testState, setTestState] = useState<IntegrationTestState>({
@@ -1651,6 +1676,9 @@ export default function HomeScreen() {
         }
         
         console.log(`${newLikedState ? '❤️ Added to' : '💔 Removed from'} Liked Songs:`, currentVideo.name);
+        
+        // Show toast message
+        showDoubleTapToast(newLikedState ? 'Added to Liked Songs' : 'Removed from Liked Songs');
       } catch (error) {
         console.error('Error toggling liked song on iOS:', error);
       }
@@ -3060,6 +3088,35 @@ export default function HomeScreen() {
               })()}
             </Text>
           </View>
+        </Animated.View>
+      )}
+
+      {/* Double Tap Toast - Center of screen */}
+      {doubleTapToastVisible && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: [{ translateX: -100 }, { translateY: -20 }],
+            opacity: doubleTapToastOpacity,
+            zIndex: 100000,
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 25,
+            minWidth: 200,
+          }}
+          pointerEvents="none"
+        >
+          <Text style={{
+            color: '#FFFFFF',
+            fontSize: 15,
+            fontWeight: '500',
+            textAlign: 'center',
+          }}>
+            {doubleTapToastMessage}
+          </Text>
         </Animated.View>
       )}
 
