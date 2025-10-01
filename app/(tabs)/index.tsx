@@ -1176,8 +1176,8 @@ export default function HomeScreen() {
         
         const playlists = await hybridPlaylistService.getPlaylists();
         
-        // Add a delay to ensure loading state is visible (even with cache)
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // ✅ REMOVED: Unnecessary 1-second delay - playlists load instantly now!
+        // await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Remove duplicates by ID
         const uniquePlaylists = playlists.filter((playlist, index, self) => 
