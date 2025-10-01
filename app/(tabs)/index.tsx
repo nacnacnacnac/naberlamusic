@@ -2691,7 +2691,7 @@ export default function HomeScreen() {
         <PanGestureHandler
           onGestureEvent={onSwipeGestureEvent}
           onHandlerStateChange={onSwipeHandlerStateChange}
-          enabled={!isLandscape} // Disable swipe in landscape mode
+          enabled={!isLandscape && !transitionDirection} // Disable swipe in landscape mode AND during loading
         >
           <Animated.View style={[
             {
