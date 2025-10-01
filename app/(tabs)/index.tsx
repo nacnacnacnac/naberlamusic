@@ -577,9 +577,9 @@ export default function HomeScreen() {
     }
   }, [mainVideoPlayer?.playing, transitionDirection]);
 
-  // Optimized video end detection - Adaptive timer
+  // ✅ BATTERY OPTIMIZED: Video end detection - Only when PLAYING
   useEffect(() => {
-    if (Platform.OS !== 'web' && currentVideo && mainVideoPlayer) {
+    if (Platform.OS !== 'web' && currentVideo && mainVideoPlayer && !isPaused) {
       let interval: NodeJS.Timeout;
       let hasReachedNearEnd = false;
       
@@ -619,7 +619,8 @@ export default function HomeScreen() {
       
       return () => clearInterval(interval);
     }
-  }, [currentVideo, mainVideoPlayer]);
+    // ✅ Video pause olunca interval temizlenir (battery save!)
+  }, [currentVideo, mainVideoPlayer, isPaused]);
 
   // Event-based detection (backup) - Silent mode
   useEvent(mainVideoPlayer, 'playbackStatusUpdate', (status) => {
@@ -1068,13 +1069,12 @@ export default function HomeScreen() {
     // Dimensions listener
     const dimensionsSubscription = Dimensions.addEventListener('change', checkOrientation);
     
-    // Backup polling (her 2 saniye)
-    const interval = setInterval(checkOrientation, 2000);
+    // ✅ BATTERY FIX: Removed 2-second polling - events are enough!
+    // Event listeners (orientationSubscription + dimensionsSubscription) catch all orientation changes
     
     return () => {
       ScreenOrientation.removeOrientationChangeListener(orientationSubscription);
       dimensionsSubscription?.remove();
-      clearInterval(interval);
     };
   }, []);
 
