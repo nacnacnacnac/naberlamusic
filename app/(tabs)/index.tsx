@@ -1243,16 +1243,22 @@ export default function HomeScreen() {
           setExpandedPlaylists(new Set([naberLAAIPlaylist.id]));
           console.log('🎵 Auto-expanded "Naber LA - AI" playlist');
           
-          // ✅ AUTO-LOAD: ALWAYS fetch videos for auto-expanded playlist (don't trust initial data)
+          // ✅ AUTO-LOAD: AWAIT videos before continuing (critical for swipe to work)
           console.log('⚡ Auto-loading videos for "Naber LA - AI"... (current videos:', naberLAAIPlaylist.videos?.length || 0, ')');
-          hybridPlaylistService.loadPlaylistVideos(naberLAAIPlaylist.id)
-            .then(videos => {
-              setUserPlaylists(prev => prev.map(p => 
-                p.id === naberLAAIPlaylist.id ? { ...p, videos } : p
-              ));
-              console.log(`✅ Auto-loaded ${videos.length} videos for "Naber LA - AI"`);
-            })
-            .catch(err => console.error('❌ Failed to auto-load videos:', err));
+          try {
+            const videos = await hybridPlaylistService.loadPlaylistVideos(naberLAAIPlaylist.id);
+            setUserPlaylists(prev => prev.map(p => 
+              p.id === naberLAAIPlaylist.id ? { ...p, videos } : p
+            ));
+            console.log(`✅ Auto-loaded ${videos.length} videos for "Naber LA - AI"`);
+            
+            // Update filteredPlaylists too (for immediate use in playVideo)
+            filteredPlaylists = filteredPlaylists.map(p => 
+              p.id === naberLAAIPlaylist.id ? { ...p, videos } : p
+            );
+          } catch (err) {
+            console.error('❌ Failed to auto-load videos:', err);
+          }
         } else {
           setExpandedPlaylists(new Set());
           console.log('🎵 "Naber LA - AI" playlist not found - all playlists start closed');
