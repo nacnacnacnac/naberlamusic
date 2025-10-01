@@ -543,6 +543,20 @@ export default function HomeScreen() {
     }
   });
 
+  // ✅ PiP mode event listener - Keep playing when PiP stops
+  useEventListener(mainVideoPlayer, 'pictureInPictureStop', () => {
+    if (Platform.OS !== 'web') {
+      console.log('📱 PiP stopped - ensuring video continues playing');
+      // PiP kapandığında video pause olabilir, tekrar play et
+      if (mainVideoPlayer && !isPaused) {
+        setTimeout(() => {
+          mainVideoPlayer.play();
+          console.log('📱 ✅ Video resumed after PiP stop');
+        }, 100); // Short delay to ensure state is stable
+      }
+    }
+  });
+
   // ✅ FALLBACK: Clear loading if video is playing (in case playingChange event is missed)
   useEffect(() => {
     if (mainVideoPlayer && mainVideoPlayer.playing && transitionDirection) {
@@ -2705,9 +2719,9 @@ export default function HomeScreen() {
                       width: '100%',
                       height: '100%',
                       backgroundColor: '#000000', // Black background for VideoView
-                      zIndex: (!isVideoPlaying) ? -999 : 1, // Show only when playing (removed isTransitioning check)
-                      opacity: (!isVideoPlaying) ? 0 : 1,
-                      transform: (isTransitioning || !isVideoPlaying) ? [] : [{ translateY: swipeTranslateY }],
+                      zIndex: (transitionDirection && !isVideoPlaying) ? -999 : 1, // Hide ONLY during loading (not pause!)
+                      opacity: (transitionDirection && !isVideoPlaying) ? 0 : 1, // Hide ONLY during loading (not pause!)
+                      transform: (isTransitioning || (transitionDirection && !isVideoPlaying)) ? [] : [{ translateY: swipeTranslateY }],
                     }}>
                     <VideoView
                       key={`current-video-${currentVideo.id || currentVideo.vimeo_id}`}
