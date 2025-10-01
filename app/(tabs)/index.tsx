@@ -3117,8 +3117,8 @@ export default function HomeScreen() {
         >
           <Image 
             source={doubleTapIsAdded 
-              ? require('@/assets/images/heart.png')  // Filled heart for added
-              : require('@/assets/images/hearto.png') // Outline heart for removed
+              ? require('@/assets/images/animation/heart.png')  // Filled heart for added
+              : require('@/assets/hearto.png') // Outline heart for removed
             }
             style={{ 
               width: 60, 
