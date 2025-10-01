@@ -1204,6 +1204,11 @@ const MainPlaylistModal = forwardRef<any, MainPlaylistModalProps>(({
                     {/* Spacer for last playlist */}
                     {isLastPlaylist && <View style={styles.lastPlaylistSpacer} />}
                   </>
+                ) : loadingPlaylistVideos.has(playlist.id) ? (
+                  <View style={styles.emptyPlaylistContainer}>
+                    <ActivityIndicator size="small" color="#e0af92" />
+                    <ThemedText style={[styles.emptyPlaylistText, { marginTop: 8, fontSize: 12 }]}>Loading videos...</ThemedText>
+                  </View>
                 ) : (
                   <View style={styles.emptyPlaylistContainer}>
                     <ThemedText style={styles.emptyPlaylistText}>No videos in this playlist</ThemedText>
