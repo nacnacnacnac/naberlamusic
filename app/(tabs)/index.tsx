@@ -3090,7 +3090,7 @@ export default function HomeScreen() {
         </Animated.View>
       )}
 
-      {/* Double Tap Heart Icon - Center of screen */}
+      {/* Double Tap Heart Icon + Text - Center of screen */}
       {doubleTapToastVisible && (
         <Animated.View
           style={{
@@ -3098,15 +3098,22 @@ export default function HomeScreen() {
             top: '50%',
             left: '50%',
             transform: [
-              { translateX: -30 }, // Center the 60x60 icon
-              { translateY: -30 },
+              { translateX: -85 }, // Center the container (170px wide)
+              { translateY: -50 },
               { scale: doubleTapToastOpacity.interpolate({
                 inputRange: [0, 1],
-                outputRange: [0.5, 1.2], // Start small, grow larger
+                outputRange: [0.8, 1], // Subtle scale
               })},
             ],
             opacity: doubleTapToastOpacity,
             zIndex: 999999,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)', // Semi-transparent black
+            paddingHorizontal: 20,
+            paddingVertical: 15,
+            borderRadius: 20,
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 10,
           }}
           pointerEvents="none"
         >
@@ -3116,12 +3123,20 @@ export default function HomeScreen() {
               : require('@/assets/hearto.png') // Outline heart for removed
             }
             style={{ 
-              width: 60, 
-              height: 60,
-              tintColor: doubleTapIsAdded ? '#e0af92' : '#888888', // Brand color for added, gray for removed
+              width: 50, 
+              height: 50,
+              tintColor: doubleTapIsAdded ? '#e0af92' : '#FFFFFF', // Brand color for added, white for removed
             }}
             resizeMode="contain"
           />
+          <Text style={{
+            color: '#FFFFFF',
+            fontSize: 14,
+            fontWeight: '500',
+            textAlign: 'center',
+          }}>
+            {doubleTapToastMessage}
+          </Text>
         </Animated.View>
       )}
 
