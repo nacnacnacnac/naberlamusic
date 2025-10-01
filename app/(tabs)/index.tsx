@@ -1001,6 +1001,10 @@ export default function HomeScreen() {
   const overlayTimeout = useRef<NodeJS.Timeout | null>(null);
   const [isHeartFavorited, setIsHeartFavorited] = useState(false);
   const heartScale = useRef(new Animated.Value(1)).current;
+  
+  // Double tap detection
+  const lastTapRef = useRef<number>(0);
+  const doubleTapTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Integration Testing State
   const [testState, setTestState] = useState<IntegrationTestState>({
@@ -2695,12 +2699,48 @@ export default function HomeScreen() {
               zIndex: 10000, // Landscape'de en üstte
             })
           ]}>
-            {/* Touch handler for showing overlay */}
+            {/* Touch handler for showing overlay (single tap) and like (double tap) */}
             {!isLandscape && (
               <Pressable
                 onPress={() => {
-                  console.log('📱 Screen tapped - showing overlay');
-                  showVideoOverlayWithTimer();
+                  const now = Date.now();
+                  const DOUBLE_TAP_DELAY = 300; // 300ms için double tap
+                  
+                  if (lastTapRef.current && (now - lastTapRef.current) < DOUBLE_TAP_DELAY) {
+                    // Double tap detected - Like video
+                    console.log('❤️ Double tap detected - liking video');
+                    if (doubleTapTimeoutRef.current) {
+                      clearTimeout(doubleTapTimeoutRef.current);
+                      doubleTapTimeoutRef.current = null;
+                    }
+                    
+                    // Trigger like action
+                    if (currentVideo) {
+                      console.log('❤️ DOUBLE TAP - HEART PRESSED!');
+                      if (isAuthenticated) {
+                        // Authenticated user - toggle like
+                        handleHeartPress();
+                      } else {
+                        // Not authenticated - open sign in modal
+                        console.log('❌ Not authenticated - opening sign in modal');
+                        setIsFromLikeButton(true);
+                        setMainPlaylistInitialView('profile');
+                        setShowMainPlaylistModal(true);
+                      }
+                    }
+                    
+                    lastTapRef.current = 0; // Reset
+                  } else {
+                    // Single tap - wait to see if double tap comes
+                    lastTapRef.current = now;
+                    
+                    doubleTapTimeoutRef.current = setTimeout(() => {
+                      // No double tap - show overlay
+                      console.log('📱 Single tap - showing overlay');
+                      showVideoOverlayWithTimer();
+                      lastTapRef.current = 0;
+                    }, DOUBLE_TAP_DELAY);
+                  }
                 }}
                 style={{
                   position: 'absolute',
