@@ -79,8 +79,8 @@ class HybridPlaylistService {
       const cachedAdminPlaylists = await this.getCachedAdminPlaylists();
       const userPlaylists = await this.getUserPlaylists();
       
-      // If we have cached data, return it immediately
-      if (cachedAdminPlaylists.length > 0) {
+      // If we have cached data, return it immediately (UNLESS forceRefresh)
+      if (!forceRefresh && cachedAdminPlaylists.length > 0) {
         console.log('📦 Using cached admin playlists:', cachedAdminPlaylists.length);
         
         // Return cached data immediately
