@@ -2070,8 +2070,26 @@ export default function HomeScreen() {
     }
     
     if (!currentPlaylist || !currentPlaylist.videos || currentPlaylist.videos.length === 0) {
-      console.log('🎵 No playlist found or playlist empty');
-      return;
+      console.log('🎵 No playlist found or playlist empty - using global videos array as fallback');
+      
+      // FALLBACK: Use global videos array
+      if (videos && videos.length > 0) {
+        const nextIndex = (currentVideoIndex + 1) % videos.length;
+        console.log('🎵 Using global videos - Current index:', currentVideoIndex, 'Next index:', nextIndex);
+        const nextGlobalVideo = videos[nextIndex];
+        
+        // Play next video from global array
+        playVideo(
+          nextGlobalVideo, 
+          nextIndex, 
+          currentPlaylistContext?.playlistId || null,
+          currentPlaylistContext?.playlistName || null
+        );
+        return;
+      } else {
+        console.log('❌ No videos available at all!');
+        return;
+      }
     }
     
     const nextIndex = (currentVideoIndexInPlaylist + 1) % currentPlaylist.videos.length;
@@ -2193,8 +2211,26 @@ export default function HomeScreen() {
     }
     
     if (!currentPlaylist || !currentPlaylist.videos || currentPlaylist.videos.length === 0) {
-      console.log('🎵 No playlist found or playlist empty');
-      return;
+      console.log('🎵 No playlist found or playlist empty - using global videos array as fallback');
+      
+      // FALLBACK: Use global videos array
+      if (videos && videos.length > 0) {
+        const prevIndex = currentVideoIndex <= 0 ? videos.length - 1 : currentVideoIndex - 1;
+        console.log('🎵 Using global videos - Current index:', currentVideoIndex, 'Previous index:', prevIndex);
+        const prevGlobalVideo = videos[prevIndex];
+        
+        // Play previous video from global array
+        playVideo(
+          prevGlobalVideo, 
+          prevIndex, 
+          currentPlaylistContext?.playlistId || null,
+          currentPlaylistContext?.playlistName || null
+        );
+        return;
+      } else {
+        console.log('❌ No videos available at all!');
+        return;
+      }
     }
     
     const prevIndex = currentVideoIndexInPlaylist <= 0 ? currentPlaylist.videos.length - 1 : currentVideoIndexInPlaylist - 1;
