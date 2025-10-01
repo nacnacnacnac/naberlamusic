@@ -1211,6 +1211,10 @@ export default function HomeScreen() {
       try {
         setPlaylistsLoading(true);
         
+        // ✅ CLEAR OLD CACHE: Remove cached playlists with videos (from before lazy loading)
+        await hybridPlaylistService.clearPlaylistCache();
+        console.log('🗑️ Cleared playlist cache on app start');
+        
         // ✅ ALWAYS fetch fresh data on app start (bypass 5-minute cache)
         const playlists = await hybridPlaylistService.getPlaylists(true);
         
