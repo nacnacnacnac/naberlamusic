@@ -2748,12 +2748,23 @@ export default function HomeScreen() {
                       doubleTapTimeoutRef.current = null;
                     }
                     
-                    // Trigger like action
+                    // Trigger like action WITHOUT pausing video
                     if (currentVideo) {
                       console.log('❤️ DOUBLE TAP - HEART PRESSED!');
                       if (isAuthenticated) {
-                        // Authenticated user - toggle like
+                        // Authenticated user - toggle like (keep video playing!)
+                        const wasPlaying = !isPaused;
                         handleHeartPress();
+                        
+                        // Resume playback if video was playing
+                        if (wasPlaying && mainVideoPlayer) {
+                          setTimeout(() => {
+                            if (mainVideoPlayer.paused) {
+                              mainVideoPlayer.play();
+                              console.log('▶️ Resumed playback after double tap like');
+                            }
+                          }, 100);
+                        }
                       } else {
                         // Not authenticated - open sign in modal
                         console.log('❌ Not authenticated - opening sign in modal');
